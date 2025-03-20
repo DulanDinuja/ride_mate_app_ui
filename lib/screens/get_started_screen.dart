@@ -13,39 +13,44 @@ class GetStartedScreen extends StatelessWidget {
       body: Column(
         children: [
           // ── Top: full background image ──────────────────────────────
-          Stack(
-            children: [
-              Image.asset(
-                'assets/images/getstart_background.png',
-                width: double.infinity,
-                fit: BoxFit.fitWidth,
-              ),
-              // Bottom fade into dark section
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: screenHeight * 0.15,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Color(0xFF020808)],
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  'assets/images/getstart_background.png',
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
+                ),
+                // Bottom fade into dark section
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: screenHeight * 0.15,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Color(0xFF020808)],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
 
           // ── Bottom: logo + button + login ──────────────────────────
-          Expanded(
+          SafeArea(
+            top: false,
             child: Container(
               color: const Color(0xFF020808),
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   // Full logo with name
                   SizedBox(
