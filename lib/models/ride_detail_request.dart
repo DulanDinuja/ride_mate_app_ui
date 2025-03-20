@@ -35,8 +35,6 @@ class RideDetailRequest {
     this.vehicleId,
   });
 
-
-
   Map<String, dynamic> toJson() {
     return {
       'driverProfileId': driverProfileId,
