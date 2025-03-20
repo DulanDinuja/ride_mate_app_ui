@@ -8,6 +8,7 @@ import '../core/routes/app_routes.dart';
 import '../models/driver_registration_data.dart';
 import '../services/driver_service.dart';
 import '../services/file_service.dart';
+import '../services/vehicle_service.dart';
 import '../widgets/custom_back_button.dart';
 import 'selfie_camera_screen.dart';
 
@@ -132,15 +133,7 @@ class _RevenueLicenseUploadScreenState extends State<RevenueLicenseUploadScreen>
     setState(() => _isSubmitting = true);
 
     try {
-      // Upload all documents
-      final driverLicenseFrontId = await FileService.uploadFile(
-        bytes: data.driverLicenseFrontBytes!,
-        fileName: 'driver_license_front.jpg',
-      );
-      final driverLicenseBackId = await FileService.uploadFile(
-        bytes: data.driverLicenseBackBytes!,
-        fileName: 'driver_license_back.jpg',
-      );
+      // Upload vehicle images (always required)
       final vehicleImageId1 = await FileService.uploadFile(
         bytes: data.vehicleImageBytes1!,
         fileName: 'vehicle_image_front.jpg',
@@ -178,26 +171,50 @@ class _RevenueLicenseUploadScreenState extends State<RevenueLicenseUploadScreen>
         fileName: 'revenue_license_back.jpg',
       );
 
-      // Build the request body
-      final body = data.toSaveBody(
-        driverLicenseFrontDocumentId: driverLicenseFrontId,
-        driverLicenseBackDocumentId: driverLicenseBackId,
-        vehicleImageDocumentId1: vehicleImageId1,
-        vehicleImageDocumentId2: vehicleImageId2,
-        vehicleImageDocumentId3: vehicleImageId3,
-        vehicleImageDocumentId4: vehicleImageId4,
-        registrationCertificateDocumentId: registrationCertId,
-        insuranceDocumentId1: insuranceDocId1,
-        insuranceDocumentId2: insuranceDocId2,
-        revenueLicenseDocumentId1: revenueLicenseId1,
-        revenueLicenseDocumentId2: revenueLicenseId2,
-      );
-
-      // Save the driver profile
-      await DriverService.saveDriverProfile(body: body);
+      if (data.skipLicenseUpload) {
+        // Adding a 2nd+ vehicle — call add-vehicle endpoint
+        final body = data.toAddVehicleBody(
+          vehicleImageDocumentId1: vehicleImageId1,
+          vehicleImageDocumentId2: vehicleImageId2,
+          vehicleImageDocumentId3: vehicleImageId3,
+          vehicleImageDocumentId4: vehicleImageId4,
+          registrationCertificateDocumentId: registrationCertId,
+          insuranceDocumentId1: insuranceDocId1,
+          insuranceDocumentId2: insuranceDocId2,
+          revenueLicenseDocumentId1: revenueLicenseId1,
+          revenueLicenseDocumentId2: revenueLicenseId2,
+        );
+        await VehicleService.addVehicle(
+          driverProfileId: data.existingDriverProfileId!,
+          body: body,
+        );
+      } else {
+        // First vehicle — upload license and call save-driver-profile endpoint
+        final driverLicenseFrontId = await FileService.uploadFile(
+          bytes: data.driverLicenseFrontBytes!,
+          fileName: 'driver_license_front.jpg',
+        );
+        final driverLicenseBackId = await FileService.uploadFile(
+          bytes: data.driverLicenseBackBytes!,
+          fileName: 'driver_license_back.jpg',
+        );
+        final body = data.toSaveBody(
+          driverLicenseFrontDocumentId: driverLicenseFrontId,
+          driverLicenseBackDocumentId: driverLicenseBackId,
+          vehicleImageDocumentId1: vehicleImageId1,
+          vehicleImageDocumentId2: vehicleImageId2,
+          vehicleImageDocumentId3: vehicleImageId3,
+          vehicleImageDocumentId4: vehicleImageId4,
+          registrationCertificateDocumentId: registrationCertId,
+          insuranceDocumentId1: insuranceDocId1,
+          insuranceDocumentId2: insuranceDocId2,
+          revenueLicenseDocumentId1: revenueLicenseId1,
+          revenueLicenseDocumentId2: revenueLicenseId2,
+        );
+        await DriverService.saveDriverProfile(body: body);
+      }
 
       if (!mounted) return;
-      // Pop all the registration screens back to the home map
       Navigator.of(context).pushNamedAndRemoveUntil(
         AppRoutes.userHomeMap,
         (route) => false,

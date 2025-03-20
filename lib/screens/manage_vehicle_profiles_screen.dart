@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/routes/app_routes.dart';
 import '../widgets/custom_back_button.dart';
+import '../models/driver_registration_data.dart';
 import '../services/vehicle_service.dart';
 import '../services/driver_service.dart';
 import '../services/token_service.dart';
@@ -22,6 +23,7 @@ class _ManageVehicleProfilesScreenState extends State<ManageVehicleProfilesScree
   String? _errorMessage;
   Map<String, dynamic>? _vehicleData;
   List<Map<String, dynamic>> _vehicles = [];
+  int? _driverProfileId;
 
   @override
   void initState() {
@@ -47,6 +49,7 @@ class _ManageVehicleProfilesScreenState extends State<ManageVehicleProfilesScree
       if (!mounted) return;
 
       setState(() {
+        _driverProfileId = driverProfile.id;
         _vehicleData = vehicleData;
         _vehicles = (vehicleData['vehicles'] as List<dynamic>)
             .map((v) => v as Map<String, dynamic>)
@@ -445,6 +448,13 @@ class _ManageVehicleProfilesScreenState extends State<ManageVehicleProfilesScree
   }
 
   void _onAddVehicle() {
-    Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
+    final data = DriverRegistrationData()
+      ..skipLicenseUpload = _vehicles.isNotEmpty
+      ..existingDriverProfileId = _vehicles.isNotEmpty ? _driverProfileId : null;
+    Navigator.pushNamed(
+      context,
+      AppRoutes.vehicleRegistration,
+      arguments: data,
+    );
   }
 }

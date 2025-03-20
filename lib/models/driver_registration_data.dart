@@ -36,7 +36,45 @@ class DriverRegistrationData {
   Uint8List? revenueLicenseFrontBytes;
   Uint8List? revenueLicenseBackBytes;
 
+  bool skipLicenseUpload = false;
+  int? existingDriverProfileId; // set when adding a 2nd+ vehicle
+
   DriverRegistrationData();
+
+  /// Builds the JSON body for POST /driver-profile/{driverProfileId}/add-vehicle
+  Map<String, dynamic> toAddVehicleBody({
+    required int vehicleImageDocumentId1,
+    required int vehicleImageDocumentId2,
+    required int vehicleImageDocumentId3,
+    required int vehicleImageDocumentId4,
+    required int registrationCertificateDocumentId,
+    required int insuranceDocumentId1,
+    required int insuranceDocumentId2,
+    required int revenueLicenseDocumentId1,
+    required int revenueLicenseDocumentId2,
+  }) {
+    return {
+      'vehicleTypeId': vehicleTypeId ?? 0,
+      'vehicleMakeId': vehicleMakeId ?? 0,
+      'vehicleModelId': vehicleModelId ?? 0,
+      'registrationNumber': registrationNumber ?? '',
+      'model': model ?? '',
+      'year': year ?? 0,
+      'color': color ?? '',
+      'vehicleImageDocumentId1': vehicleImageDocumentId1,
+      'vehicleImageDocumentId2': vehicleImageDocumentId2,
+      'vehicleImageDocumentId3': vehicleImageDocumentId3,
+      'vehicleImageDocumentId4': vehicleImageDocumentId4,
+      'registrationCertificateDocumentId': registrationCertificateDocumentId,
+      'insuranceDocumentId1': insuranceDocumentId1,
+      'insuranceDocumentId2': insuranceDocumentId2,
+      'insuranceNumber': insuranceNumber ?? '',
+      'insuranceProvider': insuranceProvider ?? '',
+      'insuranceExpiry': insuranceExpiry ?? '',
+      'revenueLicenseDocumentId1': revenueLicenseDocumentId1,
+      'revenueLicenseDocumentId2': revenueLicenseDocumentId2,
+    };
+  }
 
   /// Builds the JSON body for POST /driver-profile/save/{userId}
   Map<String, dynamic> toSaveBody({

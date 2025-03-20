@@ -108,6 +108,33 @@ class VehicleService {
     }
   }
 
+  /// POST /driver-profile/{driverProfileId}/vehicle
+  /// Adds a new vehicle to an existing driver profile
+  static Future<void> addVehicle({
+    required int driverProfileId,
+    required Map<String, dynamic> body,
+  }) async {
+    try {
+      final response = await ApiClient.post(
+        '/driver-profile/$driverProfileId/vehicle',
+        body: body,
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return;
+      }
+
+      final error = jsonDecode(response.body);
+      if (error.containsKey('errorMessage') && error['errorMessage'] != null) {
+        throw ApiException(error['errorMessage']);
+      }
+      throw Exception(error['message'] ?? 'Failed to add vehicle');
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Network error: $e');
+    }
+  }
+
   /// PUT /driver-profile/vehicles/{vehicleId}
   /// Updates a specific vehicle
   static Future<void> updateVehicle({

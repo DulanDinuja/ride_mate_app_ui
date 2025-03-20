@@ -216,7 +216,8 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
       return;
     }
 
-    final data = DriverRegistrationData()
+    final existing = ModalRoute.of(context)?.settings.arguments;
+    final data = (existing is DriverRegistrationData ? existing : DriverRegistrationData())
       ..vehicleTypeId = _selectedVehicleType!.id
       ..vehicleMakeId = _selectedMake!.id
       ..vehicleModelId = _selectedModel!.id

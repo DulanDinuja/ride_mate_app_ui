@@ -122,9 +122,12 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
       return;
     }
 
+    final data = _getRegistrationData();
     Navigator.of(context).pushNamed(
-      AppRoutes.drivingLicenseUpload,
-      arguments: _getRegistrationData(),
+      data.skipLicenseUpload
+          ? AppRoutes.vehicleInsuranceUpload
+          : AppRoutes.drivingLicenseUpload,
+      arguments: data,
     );
   }
 

@@ -134,7 +134,10 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const IdentificationSuccessScreen());
 
       case vehicleRegistration:
-        return MaterialPageRoute(builder: (_) => const VehicleRegistrationScreen());
+        return MaterialPageRoute(
+          builder: (_) => const VehicleRegistrationScreen(),
+          settings: settings,
+        );
 
       case vehiclePhotosUpload:
         final data = settings.arguments;
