@@ -28,7 +28,7 @@ class AppConfig {
 
   static const String _baseUrl = String.fromEnvironment(
     'BASE_URL',
-    defaultValue: 'http://187.124.98.120:8080/ride-mate',
+    defaultValue: 'http://localhost:8080/ride-mate',
   );
 
   // ─── PayHere Configuration ───────────────────────────────────────
@@ -70,6 +70,25 @@ class AppConfig {
   /// * **local** → `http://localhost:8080/ride-mate`  (default)
   /// * **prod**  → whatever is passed via `--dart-define=BASE_URL=…`
   static String get baseUrl => _baseUrl;
+
+  /// WebSocket URL for STOMP over SockJS.
+  ///
+  /// Derived from [baseUrl] by replacing `http(s)` with `ws(s)` and appending `/ws`.
+  /// Override with `--dart-define=WS_URL=wss://...` for production if needed.
+  static const String _wsUrl = String.fromEnvironment('WS_URL', defaultValue: '');
+
+  static String get wsUrl {
+    if (_wsUrl.isNotEmpty) return _wsUrl;
+    // Derive from baseUrl: http → ws, https → wss
+    final base = _baseUrl
+        .replaceFirst(RegExp(r'^https://'), 'wss://')
+        .replaceFirst(RegExp(r'^http://'), 'ws://');
+    return '$base/ws';
+  }
+
+  /// SockJS HTTP URL for STOMP (used by stomp_dart_client with useSockJS).
+  /// SockJS needs the http(s) scheme, not ws(s).
+  static String get sockJsUrl => '$_baseUrl/ws';
 
   // ─── PayHere Public API ──────────────────────────────────────────
 

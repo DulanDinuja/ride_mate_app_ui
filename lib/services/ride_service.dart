@@ -329,6 +329,36 @@ class RideService {
     }
   }
 
+  /// PUT /ride-details/{rideDetailId}/location — update driver live location.
+  static Future<void> updateDriverLocation({
+    required int rideDetailId,
+    required double latitude,
+    required double longitude,
+  }) async {
+    try {
+      final response = await ApiClient.put(
+        '/ride-details/$rideDetailId/location',
+        body: {
+          'latitude': latitude,
+          'longitude': longitude,
+        },
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) return;
+
+      // Best-effort — don't throw for location updates
+      dev.log(
+        '[RideService] updateDriverLocation failed: ${response.statusCode}',
+        name: 'RideService',
+      );
+    } catch (e) {
+      dev.log(
+        '[RideService] updateDriverLocation error: $e',
+        name: 'RideService',
+      );
+    }
+  }
+
   /// PUT /ride-details/{rideDetailId}/cancel — cancel an active ride.
   static Future<void> cancelRide(int rideDetailId) async {
     try {

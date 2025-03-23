@@ -20,6 +20,7 @@ import '../../screens/revenue_license_upload_screen.dart';
 import '../../screens/ride_start_screen.dart';
 import '../../screens/ride_requests_screen.dart';
 import '../../screens/navigation_screen.dart';
+import '../../screens/passenger_tracking_screen.dart';
 import '../../screens/cost_split_screen.dart';
 import '../../screens/active_ride_screen.dart';
 import '../../screens/manage_vehicle_profiles_screen.dart';
@@ -60,6 +61,7 @@ class AppRoutes {
   static const String activeRide = '/active-ride';
   static const String rideRequests = '/ride-requests';
   static const String manageVehicleProfiles = '/manage-vehicle-profiles';
+  static const String passengerTracking = '/passenger-tracking';
 
   // ─── Payment routes ──────────────────────────────────────────────
   static const String paymentMethods = '/payment-methods';
@@ -230,6 +232,15 @@ class AppRoutes {
 
       case manageVehicleProfiles:
         return MaterialPageRoute(builder: (_) => const ManageVehicleProfilesScreen());
+
+      case passengerTracking:
+        final args = settings.arguments;
+        if (args is! PassengerTrackingArgs) {
+          return _errorRoute('Passenger tracking data is missing');
+        }
+        return MaterialPageRoute(
+          builder: (_) => PassengerTrackingScreen(args: args),
+        );
 
       // ─── Payment Routes ──────────────────────────────────────────
       case paymentMethods:

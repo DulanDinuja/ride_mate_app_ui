@@ -25,6 +25,7 @@ import '../widgets/custom_back_button.dart';
 import 'available_rides_screen.dart';
 import 'driver_home_mixin.dart';
 import 'help_support_screen.dart';
+import 'passenger_tracking_screen.dart';
 import 'privacy_terms_screen.dart';
 import 'ride_preferences_screen.dart';
 import 'ride_requests_screen.dart';
@@ -2503,18 +2504,23 @@ Future<void> _onChangeProfilePhoto() async {
                         onPressed: () {
                           Navigator.pushNamed(
                             context,
-                            AppRoutes.costSplit,
-                            arguments: {
-                              'rideDetailId': rideDetailId,
-                              'isDriver': false,
-                            },
+                            AppRoutes.passengerTracking,
+                            arguments: PassengerTrackingArgs(
+                              rideDetailId: rideDetailId,
+                              pickupAddress: startCity,
+                              dropAddress: endCity,
+                              pickupLat: (req['passengerStartLat'] as num?)?.toDouble(),
+                              pickupLng: (req['passengerStartLng'] as num?)?.toDouble(),
+                              dropLat: (req['passengerEndLat'] as num?)?.toDouble(),
+                              dropLng: (req['passengerEndLng'] as num?)?.toDouble(),
+                            ),
                           );
                         },
-                        icon: const Icon(Icons.pie_chart_outline, size: 16),
-                        label: const Text('Cost Breakdown',
+                        icon: const Icon(Icons.location_on, size: 16),
+                        label: const Text('Track Driver',
                             style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: navy,
+                          backgroundColor: const Color(0xFF03AF74),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                         ),
@@ -2522,8 +2528,38 @@ Future<void> _onChangeProfilePhoto() async {
                     ),
                   ),
                 ],
+                // Cost breakdown row (separate line for accepted rides)
+                if (isAccepted) ...[
+                  const SizedBox(height: 10),
+                ],
               ],
             ),
+            if (isAccepted)
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.costSplit,
+                      arguments: {
+                        'rideDetailId': rideDetailId,
+                        'isDriver': false,
+                      },
+                    );
+                  },
+                  icon: const Icon(Icons.pie_chart_outline, size: 16),
+                  label: const Text('Cost Breakdown',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: navy,
+                    side: BorderSide(color: navy),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

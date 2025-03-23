@@ -10,6 +10,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 
 import '../services/api_client.dart';
+import '../services/location_tracking_service.dart';
+import '../services/ride_service.dart';
 import '../widgets/custom_back_button.dart';
 import 'help_support_screen.dart';
 
@@ -87,6 +89,9 @@ class _NavigationScreenState extends State<NavigationScreen>
   // ── driver marker icon ──────────────────────────────────────────
   BitmapDescriptor? _driverIcon;
 
+  // ── live location backend sync (WebSocket) ──────────────────────
+  bool _wsInitialized = false;
+
 
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -103,11 +108,13 @@ class _NavigationScreenState extends State<NavigationScreen>
     _createDriverIcon();
     _fetchSteps();
     _startLocationStream();
+    _initWebSocket();
   }
 
   @override
   void dispose() {
     _locationSubscription?.cancel();
+    LocationTrackingService.stopPublishing();
     _mapController?.dispose();
     super.dispose();
   }
@@ -123,7 +130,36 @@ class _NavigationScreenState extends State<NavigationScreen>
         distanceFilter: 5,
       ),
     ).listen(_onLocationUpdate);
+  }
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 1b. LIVE LOCATION SYNC VIA WEBSOCKET
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /// Initialise the WebSocket connection for publishing driver location.
+  Future<void> _initWebSocket() async {
+    try {
+      await LocationTrackingService.startPublishing(
+        rideId: widget.args.rideId,
+      );
+      _wsInitialized = true;
+      // Send initial location immediately
+      _publishLocationViaWs();
+    } catch (e) {
+      // Fallback: location still updates locally even if WS fails
+      debugPrint('[NavigationScreen] WebSocket init failed: $e');
+    }
+  }
+
+  /// Publish current driver location through the WebSocket.
+  void _publishLocationViaWs() {
+    if (!_wsInitialized || _hasArrived || _driverLatLng == null) return;
+    LocationTrackingService.publishLocation(
+      rideId: widget.args.rideId,
+      latitude: _driverLatLng!.latitude,
+      longitude: _driverLatLng!.longitude,
+      bearing: _bearing,
+    );
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -180,7 +216,10 @@ class _NavigationScreenState extends State<NavigationScreen>
     // g) Update navigation step
     _updateCurrentStep(latLng);
 
-    // h) Check arrival
+    // h) Publish location to passengers via WebSocket
+    _publishLocationViaWs();
+
+    // i) Check arrival
     _checkArrival(latLng);
   }
 
