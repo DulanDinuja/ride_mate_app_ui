@@ -15,7 +15,7 @@ class ApiService {
   static Future<ApiResponse> registerUser(UserRegistrationRequest request) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/user-registration'),
+        Uri.parse('$baseUrl/auth/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(request.toJson()),
       );
@@ -34,7 +34,7 @@ class ApiService {
   static Future<LoginResponse> loginUser(LoginRequest request) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/login/with-email-and-password'),
+        Uri.parse('$baseUrl/auth/with-email-and-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(request.toJson()),
       );
@@ -53,7 +53,7 @@ class ApiService {
   static Future<ApiResponse> sendVerificationCode(SendVerificationCodeRequest request) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/login/send-verification-code'),
+        Uri.parse('$baseUrl/auth/send-verification-code'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(request.toJson()),
       );
@@ -72,7 +72,7 @@ class ApiService {
   static Future<ApiResponse> verifyCode(VerifyCodeRequest request) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/login/verify-code'),
+        Uri.parse('$baseUrl/auth/verify-code'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(request.toJson()),
       );
