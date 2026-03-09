@@ -22,13 +22,15 @@ class CustomTextField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5), // Light gray background
+        color: const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(16),
       ),
       child: TextField(
         controller: controller,
         obscureText: obscureText,
         keyboardType: keyboardType,
+        autocorrect: false,
+        enableSuggestions: false,
         style: const TextStyle(
           color: Color(0xFF1E2939),
           fontSize: 16,
@@ -60,4 +62,3 @@ class CustomTextField extends StatelessWidget {
     );
   }
 }
-

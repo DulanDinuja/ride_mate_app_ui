@@ -192,7 +192,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       controller: _emailController,
                       hintText: 'your.email@example.com',
                       icon: Icons.email_outlined,
-                      keyboardType: TextInputType.emailAddress,
+                      keyboardType: TextInputType.text,
                     ),
 
                     const SizedBox(height: 16),
