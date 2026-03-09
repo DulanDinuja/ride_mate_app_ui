@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
+import '../services/api_service.dart';
+import '../models/login_request.dart';
 import 'signup_screen.dart';
+import 'login_success_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,12 +17,43 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _handleLogin() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final request = LoginRequest(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+
+      final response = await ApiService.loginUser(request);
+      
+      if (mounted && response.success) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const LoginSuccessScreen(),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -164,10 +198,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     // Login Button
                     CustomButton(
-                      text: 'Login',
-                      onPressed: () {
-                        // TODO: Implement login logic
-                      },
+                      text: _isLoading ? 'Logging in...' : 'Login',
+                      onPressed: _isLoading ? () {} : _handleLogin,
                       backgroundColor: const Color(0xFF040F1B),
                     ),
 

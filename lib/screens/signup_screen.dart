@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
+import '../services/api_service.dart';
+import '../models/user_registration_request.dart';
+import '../models/user_role.dart';
+import 'email_verification_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -18,6 +22,8 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _agreedToTerms = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  String? _selectedRole;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -29,16 +35,65 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
+  void _handleSignup() async {
+    if (!_agreedToTerms) return;
+
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match')),
+      );
+      return;
+    }
+
+    if (_selectedRole == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a role')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final request = UserRegistrationRequest(
+        email: _emailController.text.trim(),
+        phoneNumber: _phoneController.text.trim(),
+        password: _passwordController.text,
+        userRole: _selectedRole == 'Driver' ? UserRole.DRIVER : UserRole.PASSENGER,
+      );
+
+      await ApiService.registerUser(request);
+      
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EmailVerificationScreen(
+              email: _emailController.text.trim(),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFFF0), // Cream/Ivory background
+      backgroundColor: const Color(0xFFFFFFF0),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Gradient Top Section
             Container(
               height: screenHeight * 0.25,
               decoration: const BoxDecoration(
@@ -70,11 +125,10 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
             ),
 
-            // Content Container
             Container(
               transform: Matrix4.translationValues(0, -40, 0),
               decoration: const BoxDecoration(
-                color: Color(0xFFFFFFF0), // Cream/Ivory background
+                color: Color(0xFFFFFFF0),
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(40),
                   topRight: Radius.circular(40),
@@ -87,7 +141,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   children: [
                     const SizedBox(height: 8),
 
-                    // Create Account Title
                     const Text(
                       'Create Account',
                       style: TextStyle(
@@ -99,7 +152,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
                     const SizedBox(height: 8),
 
-                    // Subtitle
                     const Text(
                       'Join us for seamless ride sharing',
                       style: TextStyle(
@@ -110,7 +162,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
                     const SizedBox(height: 32),
 
-                    // Full Name Field
                     const Text(
                       'Full Name',
                       style: TextStyle(
@@ -128,7 +179,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Email Field
                     const Text(
                       'Email',
                       style: TextStyle(
@@ -147,7 +197,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Phone Number Field
                     const Text(
                       'Phone Number',
                       style: TextStyle(
@@ -159,14 +208,13 @@ class _SignupScreenState extends State<SignupScreen> {
                     const SizedBox(height: 8),
                     CustomTextField(
                       controller: _phoneController,
-                      hintText: '+94 (123) 456-789',
+                      hintText: '0712345678',
                       icon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
                     ),
 
                     const SizedBox(height: 16),
 
-                    // Password Field
                     const Text(
                       'Password',
                       style: TextStyle(
@@ -196,7 +244,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Confirm Password Field
                     const Text(
                       'Confirm Password',
                       style: TextStyle(
@@ -224,9 +271,42 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
 
+                    const SizedBox(height: 16),
+
+                    const Text(
+                      'I am a',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF4A5565),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: RadioListTile<String>(
+                            title: const Text('Passenger'),
+                            value: 'Passenger',
+                            groupValue: _selectedRole,
+                            onChanged: (value) => setState(() => _selectedRole = value),
+                            activeColor: const Color(0xFF169F7E),
+                          ),
+                        ),
+                        Expanded(
+                          child: RadioListTile<String>(
+                            title: const Text('Driver'),
+                            value: 'Driver',
+                            groupValue: _selectedRole,
+                            onChanged: (value) => setState(() => _selectedRole = value),
+                            activeColor: const Color(0xFF169F7E),
+                          ),
+                        ),
+                      ],
+                    ),
+
                     const SizedBox(height: 24),
 
-                    // Terms & Conditions Checkbox
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -276,23 +356,16 @@ class _SignupScreenState extends State<SignupScreen> {
 
                     const SizedBox(height: 24),
 
-                    // Create Account Button
                     CustomButton(
-                      text: 'Create Account',
-                      onPressed: _agreedToTerms
-                          ? () {
-                              // TODO: Implement signup logic
-                              print('Create account pressed');
-                            }
-                          : () {},
-                      backgroundColor: _agreedToTerms
+                      text: _isLoading ? 'Creating Account...' : 'Create Account',
+                      onPressed: _agreedToTerms && !_isLoading ? _handleSignup : () {},
+                      backgroundColor: _agreedToTerms && !_isLoading
                           ? const Color(0xFF040F1B)
                           : Colors.grey,
                     ),
 
                     const SizedBox(height: 24),
 
-                    // Login Text
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -336,4 +409,3 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 }
-
