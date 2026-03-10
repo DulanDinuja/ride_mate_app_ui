@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'screens/get_started_screen.dart';
+import 'core/routes/app_routes.dart';
+import 'core/theme/app_theme.dart';
 
 void main() {
   runApp(const RideMateApp());
@@ -13,11 +14,9 @@ class RideMateApp extends StatelessWidget {
     return MaterialApp(
       title: 'Ride Mate',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-      ),
-      home: const GetStartedScreen(),
+      theme: AppTheme.lightTheme,
+      initialRoute: AppRoutes.getStarted,
+      onGenerateRoute: AppRoutes.generateRoute,
     );
   }
 }
