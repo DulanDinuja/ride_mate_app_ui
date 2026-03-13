@@ -112,152 +112,168 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFFF0),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Container(
-              height: screenHeight * 0.15,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0xFF4B6164), Color(0xFF1A2A33), Color(0xFF020D19)],
-                  stops: [0.0, 0.5, 1.0],
-                ),
-              ),
-              child: SafeArea(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 20.0),
-                    child: Container(
-                      width: 155,
-                      height: 15,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDFE2EB),
-                        borderRadius: BorderRadius.circular(26),
-                      ),
-                    ),
-                  ),
-                ),
+      body: Stack(
+        children: [
+          // Gradient Background
+          Container(
+            height: screenHeight,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFF4B6164), Color(0xFF1A2A33), Color(0xFF020D19)],
+                stops: [0.0, 0.5, 1.0],
               ),
             ),
+          ),
 
-            Container(
-              transform: Matrix4.translationValues(0, -40, 0),
-              decoration: const BoxDecoration(
-                color: Color(0xFFFFFFF0),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(40),
-                  topRight: Radius.circular(40),
+          // Bottom Sheet Content
+          DraggableScrollableSheet(
+            initialChildSize: 0.80,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            snap: true,
+            snapSizes: const [0.5, 0.80, 0.95],
+            builder: (context, scrollController) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFFF0),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(25),
+                    topRight: Radius.circular(25),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      spreadRadius: 5,
+                    ),
+                  ],
                 ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Text(
-                      'Verify Your Email',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF040F1B),
+                    // iOS-style grabber
+                    Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 8),
+                      width: 40,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2.5),
                       ),
-                      textAlign: TextAlign.center,
                     ),
 
-                    const SizedBox(height: 16),
-
-                    RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Color(0xFF5A6B7C),
-                          height: 1.5,
-                        ),
+                    // Scrollable content
+                    Expanded(
+                      child: ListView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 20.0),
                         children: [
-                          const TextSpan(text: "We've sent a 6-digit code to your email\n"),
-                          TextSpan(
-                            text: widget.email,
-                            style: const TextStyle(
+                          const Text(
+                            'Verify Your Email',
+                            style: TextStyle(
+                              fontSize: 32,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF040F1B),
                             ),
+                            textAlign: TextAlign.center,
                           ),
+
+                          const SizedBox(height: 16),
+
+                          RichText(
+                            textAlign: TextAlign.center,
+                            text: TextSpan(
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Color(0xFF5A6B7C),
+                                height: 1.5,
+                              ),
+                              children: [
+                                const TextSpan(text: "We've sent a 6-digit code to your email\n"),
+                                TextSpan(
+                                  text: widget.email,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF040F1B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 40),
+
+                          Container(
+                            height: 250,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F5E9),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.mark_email_read_outlined,
+                                size: 120,
+                                color: Color(0xFF4CAF50),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 50),
+
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(
+                              6,
+                              (index) => Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                child: _buildCodeBox(index),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 32),
+
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                "Didn't receive the code?  ",
+                                style: TextStyle(fontSize: 15, color: Color(0xFF5A6B7C)),
+                              ),
+                              GestureDetector(
+                                onTap: _isResending ? null : _sendVerificationCode,
+                                child: Text(
+                                  _isResending ? 'Sending...' : 'Resend Code',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: _isResending ? Colors.grey : const Color(0xFF00BFA5),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 40),
+
+                          CustomButton(
+                            text: _isLoading ? 'Verifying...' : 'Verify Email',
+                            onPressed: _isLoading ? () {} : _verifyEmail,
+                            backgroundColor: const Color(0xFF040F1B),
+                            textColor: Colors.white,
+                          ),
+
+                          const SizedBox(height: 20),
                         ],
                       ),
                     ),
-
-                    const SizedBox(height: 40),
-
-                    Container(
-                      height: 250,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5E9),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.mark_email_read_outlined,
-                          size: 120,
-                          color: Color(0xFF4CAF50),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 50),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        6,
-                        (index) => Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                          child: _buildCodeBox(index),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          "Didn't receive the code?  ",
-                          style: TextStyle(fontSize: 15, color: Color(0xFF5A6B7C)),
-                        ),
-                        GestureDetector(
-                          onTap: _isResending ? null : _sendVerificationCode,
-                          child: Text(
-                            _isResending ? 'Sending...' : 'Resend Code',
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: _isResending ? Colors.grey : const Color(0xFF00BFA5),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 40),
-
-                    CustomButton(
-                      text: _isLoading ? 'Verifying...' : 'Verify Email',
-                      onPressed: _isLoading ? () {} : _verifyEmail,
-                      backgroundColor: const Color(0xFF040F1B),
-                      textColor: Colors.white,
-                    ),
-
-                    const SizedBox(height: 20),
                   ],
                 ),
-              ),
-            ),
-          ],
-        ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

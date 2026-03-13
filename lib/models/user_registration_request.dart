@@ -5,12 +5,16 @@ class UserRegistrationRequest {
   final String phoneNumber;
   final String password;
   final UserRole userRole;
+  final String firstName;
+  final String lastName;
 
   UserRegistrationRequest({
     required this.email,
     required this.phoneNumber,
     required this.password,
     required this.userRole,
+    required this.firstName,
+    required this.lastName,
   });
 
   Map<String, dynamic> toJson() {
@@ -19,6 +23,8 @@ class UserRegistrationRequest {
       'phoneNumber': phoneNumber,
       'password': password,
       'userRole': userRole.name,
+      'firstName': firstName,
+      'lastName': lastName,
     };
   }
 }
