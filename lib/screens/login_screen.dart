@@ -3,8 +3,10 @@ import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
 import '../services/api_service.dart';
 import '../models/login_request.dart';
+import '../models/send_verification_code_request.dart';
 import 'signup_screen.dart';
 import 'login_success_screen.dart';
+import 'email_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -27,9 +29,25 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleLogin() async {
+    // Validate fields
+    if (_emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email')),
+      );
+      return;
+    }
+
+    if (_passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your password')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
+      // Step 1: Attempt login
       final request = LoginRequest(
         email: _emailController.text.trim(),
         password: _passwordController.text,
@@ -38,6 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final response = await ApiService.loginUser(request);
       
       if (mounted && response.success) {
+        // Login successful - proceed to success screen
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -47,12 +66,98 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
-        );
+        String errorMessage = e.toString()
+            .replaceAll('Exception: ', '')
+            .replaceAll('Network error: Exception: ', '');
+        
+        // Check if error is about email not verified
+        if (errorMessage.toLowerCase().contains('email not verified') || 
+            errorMessage.toLowerCase().contains('verify your email')) {
+          
+          // Step 2: Email not verified - send verification code automatically
+          setState(() => _isLoading = true); // Keep loading state
+          await _sendVerificationCodeAndRedirect();
+          
+        } else {
+          // Show other errors (wrong password, user not found, etc.)
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red[700],
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // Send verification code and redirect to verification screen
+  Future<void> _sendVerificationCodeAndRedirect() async {
+    try {
+      print('Sending verification code to: ${_emailController.text.trim()}');
+      
+      // Send verification code
+      final sendRequest = SendVerificationCodeRequest(email: _emailController.text.trim());
+      await ApiService.sendVerificationCode(sendRequest);
+      
+      print('Verification code sent successfully');
+      
+      if (mounted) {
+        setState(() => _isLoading = false);
+        
+        // Redirect to email verification screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EmailVerificationScreen(
+              email: _emailController.text.trim(),
+            ),
+          ),
+        );
+        
+        // Show success message
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Verification code sent! Please check your email.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+        });
+      }
+    } catch (e) {
+      print('Error sending verification code: $e');
+      
+      if (mounted) {
+        setState(() => _isLoading = false);
+        
+        // If sending fails, still redirect but show error
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EmailVerificationScreen(
+              email: _emailController.text.trim(),
+            ),
+          ),
+        );
+        
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Please verify your email. You can resend the code from the verification screen.'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        });
+      }
     }
   }
 

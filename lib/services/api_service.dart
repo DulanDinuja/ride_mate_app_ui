@@ -40,19 +40,30 @@ class ApiService {
 
   static Future<LoginResponse> loginUser(LoginRequest request) async {
     try {
+      print('Sending login request: ${jsonEncode(request.toJson())}');
+      
       final response = await http.post(
-        Uri.parse('$baseUrl/auth/with-email-and-password'),
+        Uri.parse('$baseUrl/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(request.toJson()),
       );
 
+      print('Login response status: ${response.statusCode}');
+      print('Login response body: ${response.body}');
+
       if (response.statusCode == 200) {
         return LoginResponse.fromJson(jsonDecode(response.body));
       } else {
+        // Handle error responses (422, 400, 401, etc.)
         final error = jsonDecode(response.body);
-        throw Exception(error['messages'] ?? 'Login failed');
+        final errorMessage = error['message'] ?? error['messages'] ?? 'Login failed';
+        throw Exception(errorMessage);
       }
     } catch (e) {
+      print('Login error: $e');
+      if (e is Exception) {
+        rethrow; // Re-throw our custom exceptions
+      }
       throw Exception('Network error: $e');
     }
   }

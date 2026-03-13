@@ -27,16 +27,25 @@ class ApiResponse {
 class LoginResponse {
   final String message;
   final bool success;
+  final bool? emailVerified;
+  final String? email;
+  final String? token;
 
   LoginResponse({
     required this.message,
     required this.success,
+    this.emailVerified,
+    this.email,
+    this.token,
   });
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
     return LoginResponse(
-      message: json['message'] as String,
-      success: json['success'] as bool,
+      message: json['message'] as String? ?? json['messages'] as String? ?? 'Login response',
+      success: json['success'] as bool? ?? false,
+      emailVerified: json['emailVerified'] as bool?,
+      email: json['email'] as String?,
+      token: json['token'] as String?,
     );
   }
 }

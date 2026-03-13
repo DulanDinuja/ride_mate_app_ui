@@ -48,13 +48,25 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       await ApiService.sendVerificationCode(request);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Verification code sent!')),
+          const SnackBar(
+            content: Text('Verification code sent to your email!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = e.toString()
+            .replaceAll('Exception: ', '')
+            .replaceAll('Network error: Exception: ', '');
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red[700],
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     } finally {
@@ -66,7 +78,10 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     String code = _codeControllers.map((controller) => controller.text).join();
     if (code.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter the complete 6-digit code')),
+        const SnackBar(
+          content: Text('Please enter the complete 6-digit code'),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
@@ -77,16 +92,46 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       final request = VerifyCodeRequest(email: widget.email, code: code);
       final response = await ApiService.verifyCode(request);
       
-      if (mounted && response.isValid == true) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginSuccessScreen()),
-        );
+      if (mounted) {
+        if (response.isValid == true) {
+          // Verification successful
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Email verified successfully!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+          
+          // Navigate to login success screen
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginSuccessScreen()),
+          );
+        } else {
+          // Verification failed - show backend message
+          String errorMessage = response.messages ?? 'Verification failed. Please try again.';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red[700],
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = e.toString()
+            .replaceAll('Exception: ', '')
+            .replaceAll('Network error: Exception: ', '');
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red[700],
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     } finally {
