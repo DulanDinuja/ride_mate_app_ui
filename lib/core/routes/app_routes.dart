@@ -5,6 +5,7 @@ import '../../screens/signup_screen.dart';
 import '../../screens/email_verification_screen.dart';
 import '../../screens/login_success_screen.dart';
 import '../../screens/home_map_screen.dart';
+import '../../screens/forgot_password_screen.dart';
 
 class AppRoutes {
   // Route names
@@ -14,6 +15,7 @@ class AppRoutes {
   static const String emailVerification = '/email-verification';
   static const String loginSuccess = '/login-success';
   static const String homeMap = '/home-map';
+  static const String forgotPassword = '/forgot-password';
 
   // Generate routes
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -41,7 +43,10 @@ class AppRoutes {
       
       case homeMap:
         return MaterialPageRoute(builder: (_) => const HomeMapScreen());
-      
+
+      case forgotPassword:
+        return MaterialPageRoute(builder: (_) => const ForgotPasswordScreen());
+
       default:
         return _errorRoute('Route not found: ${settings.name}');
     }
