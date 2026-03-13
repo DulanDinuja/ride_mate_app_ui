@@ -38,7 +38,12 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   void _handleSignup() async {
-    if (!_agreedToTerms) return;
+    if (!_agreedToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please agree to the Terms & Conditions')),
+      );
+      return;
+    }
 
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -50,6 +55,42 @@ class _SignupScreenState extends State<SignupScreen> {
     if (_selectedRole == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a role')),
+      );
+      return;
+    }
+
+    // Validate all fields are filled
+    if (_nameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your first name')),
+      );
+      return;
+    }
+
+    if (_lastNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your last name')),
+      );
+      return;
+    }
+
+    if (_emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email')),
+      );
+      return;
+    }
+
+    if (_phoneController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your phone number')),
+      );
+      return;
+    }
+
+    if (_passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a password')),
       );
       return;
     }
@@ -80,8 +121,17 @@ class _SignupScreenState extends State<SignupScreen> {
       }
     } catch (e) {
       if (mounted) {
+        // Clean up the error message
+        String errorMessage = e.toString()
+            .replaceAll('Exception: ', '')
+            .replaceAll('Network error: Exception: ', '');
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red[700],
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     } finally {
