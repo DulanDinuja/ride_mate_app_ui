@@ -14,19 +14,26 @@ class ApiService {
 
   static Future<ApiResponse> registerUser(UserRegistrationRequest request) async {
     try {
+      print('Sending registration request: ${jsonEncode(request.toJson())}');
+      
       final response = await http.post(
         Uri.parse('$baseUrl/user-registration'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(request.toJson()),
       );
 
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
       if (response.statusCode == 201) {
         return ApiResponse.fromJson(jsonDecode(response.body));
       } else {
         final error = jsonDecode(response.body);
-        throw Exception(error['messages'] ?? 'Registration failed');
+        final errorMessage = error['messages'] ?? error['message'] ?? 'Registration failed';
+        throw Exception(errorMessage);
       }
     } catch (e) {
+      print('Registration error: $e');
       throw Exception('Network error: $e');
     }
   }
