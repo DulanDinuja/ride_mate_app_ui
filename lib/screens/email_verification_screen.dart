@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/custom_button.dart';
-import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../models/send_verification_code_request.dart';
 import '../models/verify_code_request.dart';
 import 'login_success_screen.dart';
@@ -45,7 +45,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     setState(() => _isResending = true);
     try {
       final request = SendVerificationCodeRequest(email: widget.email);
-      await ApiService.sendVerificationCode(request);
+      await AuthService.sendVerificationCode(request);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -90,7 +90,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
     try {
       final request = VerifyCodeRequest(email: widget.email, code: code);
-      final response = await ApiService.verifyCode(request);
+      final response = await AuthService.verifyCode(request);
       
       if (mounted) {
         if (response.isValid == true) {

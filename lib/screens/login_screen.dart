@@ -3,6 +3,7 @@ import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
 import '../services/api_service.dart';
 import '../models/api_response.dart';
+import '../services/auth_service.dart';
 import '../models/login_request.dart';
 import '../models/send_verification_code_request.dart';
 import 'signup_screen.dart';
@@ -115,6 +116,8 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
+      final response = await AuthService.loginUser(request);
+
       if (mounted && response.success) {
         // Login successful - proceed to success screen
         Navigator.pushReplacement(
@@ -152,7 +155,7 @@ class _LoginScreenState extends State<LoginScreen> {
           // Step 2: Email not verified - send verification code automatically
           setState(() => _isLoading = true); // Keep loading state
           await _sendVerificationCodeAndRedirect();
-
+          
         } else {
           // Show other errors (wrong password, user not found, etc.)
           setState(() => _isLoading = false);
@@ -175,7 +178,7 @@ class _LoginScreenState extends State<LoginScreen> {
       
       // Send verification code
       final sendRequest = SendVerificationCodeRequest(email: _emailController.text.trim());
-      await ApiService.sendVerificationCode(sendRequest);
+      await AuthService.sendVerificationCode(sendRequest);
       
       print('Verification code sent successfully');
       

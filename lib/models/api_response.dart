@@ -27,7 +27,12 @@ class ApiResponse {
 class LoginResponse {
   final String message;
   final bool success;
-  final bool? emailVerified;
+  final String? accessToken;
+  final String? refreshToken;
+  final String? tokenType;
+  final int? expiresIn;
+  final int? userId;
+  final String? userName;
   final String? email;
   final String? token;
   final String? details;
@@ -35,11 +40,18 @@ class LoginResponse {
   final String? userRole;
   final bool? profileCompleted;
   final bool? registrationCompleted;
+  final String? role;
+  final String? emailVerified;
 
   LoginResponse({
     required this.message,
     required this.success,
-    this.emailVerified,
+    this.accessToken,
+    this.refreshToken,
+    this.tokenType,
+    this.expiresIn,
+    this.userId,
+    this.userName,
     this.email,
     this.token,
     this.details,
@@ -47,6 +59,8 @@ class LoginResponse {
     this.userRole,
     this.profileCompleted,
     this.registrationCompleted,
+    this.role,
+    this.emailVerified,
   });
 
   static bool? _readBool(dynamic value) {
@@ -64,6 +78,12 @@ class LoginResponse {
       message: json['message'] as String? ?? json['messages'] as String? ?? 'Login response',
       success: json['success'] as bool? ?? false,
       emailVerified: _readBool(json['emailVerified']),
+      accessToken: json['accessToken'] as String?,
+      refreshToken: json['refreshToken'] as String?,
+      tokenType: json['tokenType'] as String?,
+      expiresIn: json['expiresIn'] as int?,
+      userId: json['userId'] as int?,
+      userName: json['userName'] as String?,
       email: json['email'] as String?,
       token: json['token'] as String?,
       details: json['details'] as String?,
@@ -73,6 +93,10 @@ class LoginResponse {
       registrationCompleted: _readBool(
         json['registrationCompleted'] ?? json['isRegistrationCompleted'],
       ),
+      role: json['role'] as String?,
+      emailVerified: json['emailVerified'] as String?,
     );
   }
+
+  bool get isEmailVerified => emailVerified?.toUpperCase() == 'YES';
 }
