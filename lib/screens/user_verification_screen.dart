@@ -123,8 +123,8 @@ class UserVerificationScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  Row(
-                    children: const [
+                  const Row(
+                    children: [
                       Expanded(
                         child: _GuidelineImageItem(
                           imagePath: 'assets/images/correct_selfie.png',
