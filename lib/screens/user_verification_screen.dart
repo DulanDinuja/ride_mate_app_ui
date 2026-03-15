@@ -212,11 +212,17 @@ class _GuidelineImageItem extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.asset(
-              imagePath,
+            child: Container(
               width: double.infinity,
-              height: 78,
-              fit: BoxFit.cover,
+              height: 90,
+              color: const Color(0xFFF4F4EA),
+              alignment: Alignment.center,
+              child: Image.asset(
+                imagePath,
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
           const SizedBox(height: 6),
