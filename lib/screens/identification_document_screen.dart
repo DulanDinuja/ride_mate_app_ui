@@ -20,6 +20,7 @@ class IdentificationDocumentScreen extends StatefulWidget {
 
 class _IdentificationDocumentScreenState extends State<IdentificationDocumentScreen> {
   Uint8List? _capturedDocument;
+  Uint8List? _capturedRearDocument;
   bool _isOpeningCamera = false;
 
   static const Color _screenBackground = Colors.black;
@@ -64,6 +65,41 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
     }
   }
 
+  Future<void> _openRearDocumentCamera() async {
+    if (_isOpeningCamera) return;
+
+    setState(() => _isOpeningCamera = true);
+    try {
+      final rearBytes = await Navigator.of(context).push<Uint8List>(
+        MaterialPageRoute(
+          builder: (_) => const SelfieCameraScreen(
+            title: 'Capture Rear View',
+            preferredLensDirection: CameraLensDirection.back,
+            overlayShape: BoxShape.rectangle,
+          ),
+        ),
+      );
+
+      if (!mounted || rearBytes == null) {
+        return;
+      }
+
+      setState(() => _capturedRearDocument = rearBytes);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to open camera: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isOpeningCamera = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -80,7 +116,9 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
             ),
             child: _capturedDocument == null
                 ? _buildInstructionView(context)
-                : _buildPreviewView(context),
+                : _capturedRearDocument == null
+                    ? _buildPreviewView(context)
+                    : _buildFinalCapturePreviewView(context),
           ),
         ),
       ),
@@ -343,14 +381,7 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
             width: double.infinity,
             height: 58,
             child: ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Identification document uploaded successfully.'),
-                    backgroundColor: _accent,
-                  ),
-                );
-              },
+              onPressed: _isOpeningCamera ? null : _openRearDocumentCamera,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.black,
                 foregroundColor: Colors.white,
@@ -358,8 +389,128 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
                   borderRadius: BorderRadius.circular(20),
                 ),
               ),
+              child: _isOpeningCamera
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text(
+                      'Capture Rear View',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFinalCapturePreviewView(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 24, 22, 28),
+      child: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      onPressed: () => setState(() => _capturedRearDocument = null),
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                      color: _textPrimary,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Capture Preview',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: _textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Review both front and rear photos before continuing.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      height: 1.45,
+                      color: _textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: _cardBackground,
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    child: Column(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(22),
+                          child: AspectRatio(
+                            aspectRatio: 1.55,
+                            child: Image.memory(
+                              _capturedDocument!,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(22),
+                          child: AspectRatio(
+                            aspectRatio: 1.55,
+                            child: Image.memory(
+                              _capturedRearDocument!,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 58,
+            child: ElevatedButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Continue To Next Step'),
+                    backgroundColor: _accent,
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _accent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
               child: const Text(
-                'Capture Rear View',
+                'Continue To Next Step',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
