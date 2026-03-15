@@ -237,10 +237,10 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
             ),
             const Expanded(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10),
+                padding: EdgeInsets.symmetric(horizontal: 6),
                 child: Divider(
                   color: Color(0xFFD8DACF),
-                  thickness: 6,
+                  thickness: 3,
                 ),
               ),
             ),
@@ -250,15 +250,15 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 8),
         const Row(
           children: [
             Expanded(
               child: Text(
                 'Personal\nDetails',
                 style: TextStyle(
-                  height: 1.35,
-                  fontSize: 19,
+                  height: 1.25,
+                  fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: Color(0xFF111A2B),
                 ),
@@ -269,8 +269,8 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                 'Vehical\nDetails',
                 textAlign: TextAlign.right,
                 style: TextStyle(
-                  height: 1.35,
-                  fontSize: 19,
+                  height: 1.25,
+                  fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: Color(0xFFA7A9AF),
                 ),
@@ -284,8 +284,8 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
 
   Widget _buildStepCircle({required String label, required bool isActive}) {
     return Container(
-      width: 126,
-      height: 126,
+      width: 68,
+      height: 68,
       decoration: BoxDecoration(
         color: isActive ? const Color(0xFF10B47A) : const Color(0xFFDEDFD5),
         shape: BoxShape.circle,
@@ -294,7 +294,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 52,
+            fontSize: 24,
             fontWeight: FontWeight.w600,
             color: isActive ? Colors.white : const Color(0xFFF5F5F0),
           ),
