@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
-import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../models/user_registration_request.dart';
 import '../models/user_role.dart';
 import 'email_verification_screen.dart';
@@ -107,7 +107,7 @@ class _SignupScreenState extends State<SignupScreen> {
         lastName: _lastNameController.text.trim(),
       );
 
-      await ApiService.registerUser(request);
+      await AuthService.registerUser(request);
       
       if (mounted) {
         Navigator.pushReplacement(
