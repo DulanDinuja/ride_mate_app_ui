@@ -84,6 +84,21 @@ class TokenService {
     return token != null;
   }
 
+  /// Save only token fields (used by the automatic token-refresh flow)
+  static Future<void> saveTokens({
+    required String accessToken,
+    String? refreshToken,
+    String? tokenType,
+  }) async {
+    await _storage.write(key: _accessTokenKey, value: accessToken);
+    if (refreshToken != null) {
+      await _storage.write(key: _refreshTokenKey, value: refreshToken);
+    }
+    if (tokenType != null) {
+      await _storage.write(key: _tokenTypeKey, value: tokenType);
+    }
+  }
+
   /// Clear all stored tokens and user info (logout)
   static Future<void> clearAll() async {
     await _storage.deleteAll();
