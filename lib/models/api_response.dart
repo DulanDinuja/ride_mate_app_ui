@@ -30,6 +30,11 @@ class LoginResponse {
   final bool? emailVerified;
   final String? email;
   final String? token;
+  final String? details;
+  final String? code;
+  final String? userRole;
+  final bool? profileCompleted;
+  final bool? registrationCompleted;
 
   LoginResponse({
     required this.message,
@@ -37,15 +42,37 @@ class LoginResponse {
     this.emailVerified,
     this.email,
     this.token,
+    this.details,
+    this.code,
+    this.userRole,
+    this.profileCompleted,
+    this.registrationCompleted,
   });
+
+  static bool? _readBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is String) {
+      final normalized = value.toLowerCase().trim();
+      if (normalized == 'true') return true;
+      if (normalized == 'false') return false;
+    }
+    return null;
+  }
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
     return LoginResponse(
       message: json['message'] as String? ?? json['messages'] as String? ?? 'Login response',
       success: json['success'] as bool? ?? false,
-      emailVerified: json['emailVerified'] as bool?,
+      emailVerified: _readBool(json['emailVerified']),
       email: json['email'] as String?,
       token: json['token'] as String?,
+      details: json['details'] as String?,
+      code: json['code'] as String?,
+      userRole: json['userRole']?.toString(),
+      profileCompleted: _readBool(json['profileCompleted'] ?? json['isProfileCompleted']),
+      registrationCompleted: _readBool(
+        json['registrationCompleted'] ?? json['isRegistrationCompleted'],
+      ),
     );
   }
 }

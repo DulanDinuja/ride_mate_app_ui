@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
 import '../services/api_service.dart';
+import '../models/api_response.dart';
 import '../models/login_request.dart';
 import '../models/send_verification_code_request.dart';
 import 'signup_screen.dart';
@@ -27,6 +28,57 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  bool _requiresProfileCompletion(String? message) {
+    if (message == null) return false;
+    final normalized = message.toLowerCase();
+    return normalized.contains('complete your profile') ||
+        normalized.contains('complete profile') ||
+        normalized.contains('complete your registration') ||
+        normalized.contains('complete registration') ||
+        normalized.contains('profile incomplete') ||
+        normalized.contains('registration incomplete') ||
+        normalized.contains('finish registration') ||
+        normalized.contains('finish profile');
+  }
+
+  bool _requiresProfileCompletionFromResponse(LoginResponse response) {
+    final completionFlagIndicatesIncomplete =
+        response.profileCompleted == false || response.registrationCompleted == false;
+
+    return completionFlagIndicatesIncomplete ||
+        _requiresProfileCompletion(response.message) ||
+        _requiresProfileCompletion(response.details) ||
+        _requiresProfileCompletion(response.code);
+  }
+
+  String _profileCompletionMessage(LoginResponse response) {
+    if (response.message.trim().isNotEmpty) return response.message;
+    if ((response.details ?? '').trim().isNotEmpty) return response.details!;
+    return 'Please complete your profile to continue.';
+  }
+
+  void _redirectToRegistrationScreen(String message) {
+    if (!mounted) return;
+
+    setState(() => _isLoading = false);
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const SignupScreen()),
+    );
+
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    });
   }
 
   void _handleLogin() async {
@@ -55,7 +107,14 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       final response = await ApiService.loginUser(request);
-      
+      final responseMessage = _profileCompletionMessage(response);
+      final requiresProfileCompletion = _requiresProfileCompletionFromResponse(response);
+
+      if (mounted && requiresProfileCompletion) {
+        _redirectToRegistrationScreen(responseMessage);
+        return;
+      }
+
       if (mounted && response.success) {
         // Login successful - proceed to success screen
         Navigator.pushReplacement(
@@ -64,21 +123,36 @@ class _LoginScreenState extends State<LoginScreen> {
             builder: (context) => const LoginSuccessScreen(),
           ),
         );
+      } else if (mounted) {
+        setState(() => _isLoading = false);
+        final failureMessage = response.message.trim().isEmpty
+            ? 'Login failed. Please try again.'
+            : response.message;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(failureMessage),
+            backgroundColor: Colors.red[700],
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         String errorMessage = e.toString()
             .replaceAll('Exception: ', '')
             .replaceAll('Network error: Exception: ', '');
-        
+
+        if (_requiresProfileCompletion(errorMessage)) {
+          _redirectToRegistrationScreen(errorMessage);
+
         // Check if error is about email not verified
-        if (errorMessage.toLowerCase().contains('email not verified') || 
+        } else if (errorMessage.toLowerCase().contains('email not verified') ||
             errorMessage.toLowerCase().contains('verify your email')) {
-          
+
           // Step 2: Email not verified - send verification code automatically
           setState(() => _isLoading = true); // Keep loading state
           await _sendVerificationCodeAndRedirect();
-          
+
         } else {
           // Show other errors (wrong password, user not found, etc.)
           setState(() => _isLoading = false);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
 class HomeMapScreen extends StatefulWidget {
   const HomeMapScreen({super.key});
@@ -8,7 +9,6 @@ class HomeMapScreen extends StatefulWidget {
 }
 
 class _HomeMapScreenState extends State<HomeMapScreen> {
-  bool _isOfferRide = true;
   bool _showRideCost = true;
 
   String _pickupAddress = '158/23, Danny Hettiarachchi Mawatha';
@@ -63,88 +63,14 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
     );
   }
 
-  /// Top section: Offer Ride / Request Ride toggle + menu button
+  /// Top section: menu button only
   Widget _buildTopControls() {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            // Offer Ride / Request Ride Toggle
-            Expanded(
-              child: Container(
-                height: 52,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF040F1B),
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Row(
-                  children: [
-                    // Offer Ride
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _isOfferRide = true),
-                        child: Container(
-                          height: 42,
-                          margin: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: _isOfferRide
-                                ? const Color(0xFF03AF74)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(26),
-                          ),
-                          child: Center(
-                            child: Text(
-                              'Offer Ride',
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: _isOfferRide
-                                    ? const Color(0xFFFFFFF0)
-                                    : const Color(0xFFFFFFF0).withOpacity(0.7),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Request Ride
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _isOfferRide = false),
-                        child: Container(
-                          height: 42,
-                          margin: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: !_isOfferRide
-                                ? const Color(0xFF03AF74)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(26),
-                          ),
-                          child: Center(
-                            child: Text(
-                              'Request Ride',
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: !_isOfferRide
-                                    ? const Color(0xFFFFFFF0)
-                                    : const Color(0xFFFFFFF0).withOpacity(0.7),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(width: 14),
-
             // Menu Button
             GestureDetector(
               onTap: _onMenuPressed,
@@ -492,528 +418,389 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
   }
 }
 
-/// Custom painter to simulate a detailed dark-themed map pattern
+/// Custom painter for a dark city-style map background.
 class _MapPatternPainter extends CustomPainter {
+  static const Color _landBase = Color(0xFF2A2C34);
+  static const Color _landBand = Color(0xFF30333C);
+  static const Color _minorRoad = Color(0xFF5A5E67);
+  static const Color _collectorRoad = Color(0xFF6F747D);
+  static const Color _arterialRoad = Color(0xFF8C9098);
+  static const Color _waterFill = Color(0xFF0E3F4A);
+  static const Color _waterEdge = Color(0xFF165A69);
+  static const Color _parkFill = Color(0xFF1A3A16);
+  static const Color _parkEdge = Color(0xFF2E5A2A);
+
   @override
   void paint(Canvas canvas, Size size) {
+    final area = Offset.zero & size;
+    canvas.drawRect(area, Paint()..color = _landBase);
+
+    _drawLandBands(canvas, size);
+    _drawWater(canvas, size);
+    _drawParks(canvas, size);
+    _drawRoadHierarchy(canvas, size);
+    _drawNeighborhoodStreets(canvas, size);
+    _drawDetailAccents(canvas, size);
+  }
+
+  void _drawLandBands(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final bandPaint = Paint()..color = _landBand.withOpacity(0.28);
+
+    final bands = [
+      Rect.fromLTWH(0, h * 0.08, w, h * 0.07),
+      Rect.fromLTWH(0, h * 0.31, w, h * 0.06),
+      Rect.fromLTWH(0, h * 0.55, w, h * 0.08),
+      Rect.fromLTWH(0, h * 0.79, w, h * 0.06),
+    ];
+
+    for (final band in bands) {
+      canvas.drawRect(band, bandPaint);
+    }
+  }
+
+  void _drawWater(Canvas canvas, Size size) {
+    final fill = Paint()..color = _waterFill.withOpacity(0.72);
+    final edge = Paint()
+      ..color = _waterEdge.withOpacity(0.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8;
+
+    final mainRiver = _ribbonPath(
+      size,
+      const [
+        Offset(-0.08, 0.12),
+        Offset(0.14, 0.24),
+        Offset(0.30, 0.32),
+        Offset(0.54, 0.40),
+        Offset(0.76, 0.53),
+        Offset(1.05, 0.66),
+      ],
+      widthFactor: 0.032,
+    );
+
+    final southRiver = _ribbonPath(
+      size,
+      const [
+        Offset(-0.10, 0.90),
+        Offset(0.18, 0.84),
+        Offset(0.38, 0.80),
+        Offset(0.60, 0.87),
+        Offset(0.86, 0.91),
+        Offset(1.08, 0.95),
+      ],
+      widthFactor: 0.028,
+    );
+
+    final branch = _ribbonPath(
+      size,
+      const [
+        Offset(0.74, -0.06),
+        Offset(0.70, 0.16),
+        Offset(0.76, 0.34),
+        Offset(0.70, 0.48),
+        Offset(0.76, 0.70),
+        Offset(0.72, 1.05),
+      ],
+      widthFactor: 0.018,
+    );
+
+    final canal = _ribbonPath(
+      size,
+      const [
+        Offset(0.08, 0.44),
+        Offset(0.24, 0.47),
+        Offset(0.42, 0.49),
+        Offset(0.64, 0.46),
+        Offset(0.82, 0.44),
+      ],
+      widthFactor: 0.011,
+    );
+
+    for (final water in [mainRiver, southRiver, branch, canal]) {
+      canvas.drawPath(water, fill);
+      canvas.drawPath(water, edge);
+    }
+  }
+
+  void _drawParks(Canvas canvas, Size size) {
+    final fill = Paint()..color = _parkFill.withOpacity(0.82);
+    final edge = Paint()
+      ..color = _parkEdge.withOpacity(0.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1;
+
+    final parkShapes = [
+      _blobPath(size, const [
+        Offset(0.08, 0.18),
+        Offset(0.13, 0.17),
+        Offset(0.16, 0.20),
+        Offset(0.14, 0.24),
+        Offset(0.09, 0.23),
+      ]),
+      _blobPath(size, const [
+        Offset(0.56, 0.34),
+        Offset(0.63, 0.33),
+        Offset(0.66, 0.38),
+        Offset(0.61, 0.41),
+        Offset(0.55, 0.39),
+      ]),
+      _blobPath(size, const [
+        Offset(0.34, 0.58),
+        Offset(0.42, 0.56),
+        Offset(0.46, 0.61),
+        Offset(0.41, 0.66),
+        Offset(0.33, 0.64),
+      ]),
+      _blobPath(size, const [
+        Offset(0.74, 0.72),
+        Offset(0.83, 0.69),
+        Offset(0.86, 0.75),
+        Offset(0.81, 0.79),
+        Offset(0.73, 0.78),
+      ]),
+      _blobPath(size, const [
+        Offset(0.22, 0.86),
+        Offset(0.30, 0.84),
+        Offset(0.34, 0.89),
+        Offset(0.29, 0.92),
+        Offset(0.21, 0.91),
+      ]),
+    ];
+
+    for (final park in parkShapes) {
+      canvas.drawPath(park, fill);
+      canvas.drawPath(park, edge);
+    }
+  }
+
+  void _drawRoadHierarchy(Canvas canvas, Size size) {
+    final minor = Paint()
+      ..color = _minorRoad.withOpacity(0.75)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1
+      ..strokeCap = StrokeCap.round;
+
+    final collector = Paint()
+      ..color = _collectorRoad.withOpacity(0.85)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.round;
+
+    final arterial = Paint()
+      ..color = _arterialRoad
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.1
+      ..strokeCap = StrokeCap.round;
+
+    final arterials = [
+      _polyPath(size, const [Offset(-0.05, 0.20), Offset(1.06, 0.19)]),
+      _polyPath(size, const [Offset(-0.04, 0.42), Offset(1.04, 0.42)]),
+      _polyPath(size, const [Offset(-0.06, 0.63), Offset(1.02, 0.61)]),
+      _polyPath(size, const [Offset(-0.05, 0.79), Offset(1.04, 0.83)]),
+      _polyPath(size, const [Offset(0.19, -0.04), Offset(0.18, 1.06)]),
+      _polyPath(size, const [Offset(0.52, -0.06), Offset(0.50, 1.04)]),
+      _polyPath(size, const [Offset(0.82, -0.04), Offset(0.85, 1.06)]),
+      _polyPath(size, const [
+        Offset(-0.08, 0.30),
+        Offset(0.18, 0.36),
+        Offset(0.40, 0.41),
+        Offset(0.62, 0.47),
+        Offset(1.04, 0.52),
+      ]),
+      _polyPath(size, const [
+        Offset(-0.07, 0.74),
+        Offset(0.20, 0.69),
+        Offset(0.44, 0.73),
+        Offset(0.69, 0.78),
+        Offset(1.04, 0.76),
+      ]),
+    ];
+
+    final collectors = [
+      for (final y in [0.10, 0.15, 0.27, 0.35, 0.50, 0.56, 0.70, 0.88])
+        _polyPath(size, [Offset(-0.02, y), Offset(1.02, y)]),
+      for (final x in [0.08, 0.28, 0.36, 0.62, 0.71, 0.92])
+        _polyPath(size, [Offset(x, -0.02), Offset(x, 1.02)]),
+      _polyPath(size, const [
+        Offset(0.04, 0.05),
+        Offset(0.22, 0.14),
+        Offset(0.40, 0.22),
+      ]),
+      _polyPath(size, const [
+        Offset(0.64, 0.28),
+        Offset(0.78, 0.38),
+        Offset(0.96, 0.47),
+      ]),
+      _polyPath(size, const [
+        Offset(0.14, 0.88),
+        Offset(0.36, 0.84),
+        Offset(0.57, 0.85),
+      ]),
+    ];
+
+    final minorDiagonals = [
+      _polyPath(size, const [Offset(0.04, 0.58), Offset(0.26, 0.52)]),
+      _polyPath(size, const [Offset(0.28, 0.48), Offset(0.56, 0.59)]),
+      _polyPath(size, const [Offset(0.54, 0.67), Offset(0.90, 0.58)]),
+      _polyPath(size, const [Offset(0.66, 0.88), Offset(0.95, 0.98)]),
+    ];
+
+    for (final path in minorDiagonals) {
+      canvas.drawPath(path, minor);
+    }
+    for (final path in collectors) {
+      canvas.drawPath(path, collector);
+    }
+    for (final path in arterials) {
+      canvas.drawPath(path, arterial);
+    }
+
+    final ringPaint = Paint()
+      ..color = _collectorRoad.withOpacity(0.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    for (final node in [
+      Offset(size.width * 0.26, size.height * 0.42),
+      Offset(size.width * 0.52, size.height * 0.61),
+      Offset(size.width * 0.82, size.height * 0.80),
+    ]) {
+      canvas.drawCircle(node, 7.5, ringPaint);
+    }
+  }
+
+  void _drawNeighborhoodStreets(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = _minorRoad.withOpacity(0.60)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+
     final w = size.width;
     final h = size.height;
 
-    // Background
-    final bgPaint = Paint()..color = const Color(0xFF1E2A36);
-    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), bgPaint);
+    final horizontalSpacings = [20.0, 26.0, 18.0, 24.0, 22.0, 19.0];
+    final verticalSpacings = [17.0, 23.0, 28.0, 21.0, 19.0, 25.0];
 
-    // Building block fill (slightly lighter than bg)
-    final blockPaint = Paint()
-      ..color = const Color(0xFF232F3C)
-      ..style = PaintingStyle.fill;
-
-    // Draw city blocks (irregular rectangles)
-    _drawCityBlocks(canvas, w, h, blockPaint);
-
-    // Water bodies (rivers, canals)
-    _drawWaterBodies(canvas, w, h);
-
-    // Park / green areas
-    _drawParks(canvas, w, h);
-
-    // Minor roads (thin, subtle)
-    final minorRoadPaint = Paint()
-      ..color = const Color(0xFF2E3D4D)
-      ..strokeWidth = 0.8
-      ..style = PaintingStyle.stroke;
-
-    // Medium roads
-    final medRoadPaint = Paint()
-      ..color = const Color(0xFF374A5C)
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-
-    // Major roads (wider, brighter)
-    final majorRoadPaint = Paint()
-      ..color = const Color(0xFF435A6E)
-      ..strokeWidth = 3.0
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    // Highway roads
-    final highwayPaint = Paint()
-      ..color = const Color(0xFF4D6578)
-      ..strokeWidth = 4.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    // Draw minor grid (dense street network)
-    _drawMinorStreets(canvas, w, h, minorRoadPaint);
-
-    // Draw medium streets
-    _drawMediumStreets(canvas, w, h, medRoadPaint);
-
-    // Draw major roads
-    _drawMajorRoads(canvas, w, h, majorRoadPaint);
-
-    // Draw highways / arterials
-    _drawHighways(canvas, w, h, highwayPaint);
-
-    // Draw diagonal & curved roads
-    _drawDiagonalRoads(canvas, w, h, medRoadPaint, majorRoadPaint);
-
-    // Draw roundabouts
-    _drawRoundabouts(canvas, w, h);
-
-    // Draw small building details
-    _drawBuildingDetails(canvas, w, h);
-  }
-
-  void _drawCityBlocks(Canvas canvas, double w, double h, Paint paint) {
-    // Irregular blocks throughout the map
-    final blocks = [
-      Rect.fromLTWH(w * 0.02, h * 0.02, w * 0.12, h * 0.04),
-      Rect.fromLTWH(w * 0.16, h * 0.01, w * 0.10, h * 0.05),
-      Rect.fromLTWH(w * 0.30, h * 0.02, w * 0.15, h * 0.03),
-      Rect.fromLTWH(w * 0.50, h * 0.01, w * 0.08, h * 0.04),
-      Rect.fromLTWH(w * 0.70, h * 0.02, w * 0.12, h * 0.05),
-      Rect.fromLTWH(w * 0.85, h * 0.01, w * 0.13, h * 0.04),
-      // Row 2
-      Rect.fromLTWH(w * 0.03, h * 0.08, w * 0.18, h * 0.06),
-      Rect.fromLTWH(w * 0.24, h * 0.07, w * 0.12, h * 0.05),
-      Rect.fromLTWH(w * 0.40, h * 0.08, w * 0.14, h * 0.04),
-      Rect.fromLTWH(w * 0.58, h * 0.07, w * 0.10, h * 0.06),
-      Rect.fromLTWH(w * 0.72, h * 0.09, w * 0.11, h * 0.04),
-      Rect.fromLTWH(w * 0.86, h * 0.07, w * 0.12, h * 0.05),
-      // Row 3
-      Rect.fromLTWH(w * 0.01, h * 0.16, w * 0.14, h * 0.05),
-      Rect.fromLTWH(w * 0.18, h * 0.15, w * 0.16, h * 0.06),
-      Rect.fromLTWH(w * 0.38, h * 0.14, w * 0.10, h * 0.05),
-      Rect.fromLTWH(w * 0.52, h * 0.16, w * 0.13, h * 0.04),
-      Rect.fromLTWH(w * 0.68, h * 0.15, w * 0.15, h * 0.06),
-      Rect.fromLTWH(w * 0.86, h * 0.14, w * 0.12, h * 0.05),
-      // Row 4
-      Rect.fromLTWH(w * 0.02, h * 0.24, w * 0.11, h * 0.05),
-      Rect.fromLTWH(w * 0.16, h * 0.23, w * 0.18, h * 0.06),
-      Rect.fromLTWH(w * 0.37, h * 0.22, w * 0.12, h * 0.05),
-      Rect.fromLTWH(w * 0.53, h * 0.24, w * 0.14, h * 0.04),
-      Rect.fromLTWH(w * 0.70, h * 0.23, w * 0.10, h * 0.06),
-      Rect.fromLTWH(w * 0.83, h * 0.22, w * 0.15, h * 0.05),
-      // Row 5
-      Rect.fromLTWH(w * 0.04, h * 0.32, w * 0.13, h * 0.04),
-      Rect.fromLTWH(w * 0.20, h * 0.31, w * 0.15, h * 0.06),
-      Rect.fromLTWH(w * 0.38, h * 0.30, w * 0.11, h * 0.05),
-      Rect.fromLTWH(w * 0.52, h * 0.32, w * 0.16, h * 0.04),
-      Rect.fromLTWH(w * 0.72, h * 0.31, w * 0.12, h * 0.05),
-      Rect.fromLTWH(w * 0.87, h * 0.30, w * 0.11, h * 0.06),
-      // Row 6-10 (continue pattern down the screen)
-      Rect.fromLTWH(w * 0.01, h * 0.40, w * 0.16, h * 0.05),
-      Rect.fromLTWH(w * 0.20, h * 0.39, w * 0.12, h * 0.06),
-      Rect.fromLTWH(w * 0.35, h * 0.40, w * 0.14, h * 0.04),
-      Rect.fromLTWH(w * 0.53, h * 0.39, w * 0.11, h * 0.06),
-      Rect.fromLTWH(w * 0.68, h * 0.41, w * 0.13, h * 0.04),
-      Rect.fromLTWH(w * 0.84, h * 0.39, w * 0.14, h * 0.05),
-      // Row 7
-      Rect.fromLTWH(w * 0.03, h * 0.48, w * 0.14, h * 0.05),
-      Rect.fromLTWH(w * 0.20, h * 0.47, w * 0.10, h * 0.04),
-      Rect.fromLTWH(w * 0.34, h * 0.48, w * 0.16, h * 0.05),
-      Rect.fromLTWH(w * 0.54, h * 0.47, w * 0.12, h * 0.06),
-      Rect.fromLTWH(w * 0.70, h * 0.48, w * 0.14, h * 0.04),
-      Rect.fromLTWH(w * 0.87, h * 0.47, w * 0.11, h * 0.06),
-      // Row 8
-      Rect.fromLTWH(w * 0.02, h * 0.56, w * 0.12, h * 0.05),
-      Rect.fromLTWH(w * 0.17, h * 0.55, w * 0.15, h * 0.06),
-      Rect.fromLTWH(w * 0.36, h * 0.56, w * 0.10, h * 0.04),
-      Rect.fromLTWH(w * 0.50, h * 0.55, w * 0.14, h * 0.06),
-      Rect.fromLTWH(w * 0.68, h * 0.57, w * 0.11, h * 0.04),
-      Rect.fromLTWH(w * 0.82, h * 0.55, w * 0.16, h * 0.05),
-      // Row 9
-      Rect.fromLTWH(w * 0.04, h * 0.64, w * 0.15, h * 0.04),
-      Rect.fromLTWH(w * 0.22, h * 0.63, w * 0.12, h * 0.06),
-      Rect.fromLTWH(w * 0.38, h * 0.64, w * 0.14, h * 0.05),
-      Rect.fromLTWH(w * 0.55, h * 0.63, w * 0.10, h * 0.06),
-      Rect.fromLTWH(w * 0.69, h * 0.65, w * 0.13, h * 0.04),
-      Rect.fromLTWH(w * 0.85, h * 0.63, w * 0.13, h * 0.06),
-      // Row 10
-      Rect.fromLTWH(w * 0.01, h * 0.72, w * 0.13, h * 0.05),
-      Rect.fromLTWH(w * 0.17, h * 0.71, w * 0.16, h * 0.04),
-      Rect.fromLTWH(w * 0.37, h * 0.72, w * 0.11, h * 0.06),
-      Rect.fromLTWH(w * 0.52, h * 0.71, w * 0.14, h * 0.05),
-      Rect.fromLTWH(w * 0.70, h * 0.73, w * 0.12, h * 0.04),
-      Rect.fromLTWH(w * 0.85, h * 0.71, w * 0.13, h * 0.06),
-      // Row 11
-      Rect.fromLTWH(w * 0.03, h * 0.80, w * 0.14, h * 0.04),
-      Rect.fromLTWH(w * 0.20, h * 0.79, w * 0.12, h * 0.06),
-      Rect.fromLTWH(w * 0.35, h * 0.80, w * 0.15, h * 0.05),
-      Rect.fromLTWH(w * 0.54, h * 0.79, w * 0.11, h * 0.06),
-      Rect.fromLTWH(w * 0.69, h * 0.81, w * 0.14, h * 0.04),
-      Rect.fromLTWH(w * 0.86, h * 0.79, w * 0.12, h * 0.05),
-      // Row 12
-      Rect.fromLTWH(w * 0.02, h * 0.88, w * 0.16, h * 0.05),
-      Rect.fromLTWH(w * 0.21, h * 0.87, w * 0.13, h * 0.06),
-      Rect.fromLTWH(w * 0.38, h * 0.88, w * 0.10, h * 0.04),
-      Rect.fromLTWH(w * 0.52, h * 0.87, w * 0.15, h * 0.06),
-      Rect.fromLTWH(w * 0.71, h * 0.89, w * 0.11, h * 0.04),
-      Rect.fromLTWH(w * 0.85, h * 0.87, w * 0.13, h * 0.06),
-      // Row 13
-      Rect.fromLTWH(w * 0.01, h * 0.95, w * 0.14, h * 0.04),
-      Rect.fromLTWH(w * 0.18, h * 0.94, w * 0.15, h * 0.05),
-      Rect.fromLTWH(w * 0.36, h * 0.95, w * 0.12, h * 0.04),
-      Rect.fromLTWH(w * 0.52, h * 0.94, w * 0.14, h * 0.05),
-      Rect.fromLTWH(w * 0.70, h * 0.95, w * 0.13, h * 0.04),
-      Rect.fromLTWH(w * 0.86, h * 0.94, w * 0.12, h * 0.05),
-    ];
-
-    for (final rect in blocks) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(2)),
-        paint,
-      );
-    }
-  }
-
-  void _drawWaterBodies(Canvas canvas, double w, double h) {
-    final waterPaint = Paint()
-      ..color = const Color(0xFF1A3545)
-      ..style = PaintingStyle.fill;
-
-    final waterEdgePaint = Paint()
-      ..color = const Color(0xFF1E4055)
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-
-    // Main river (winding through left-center)
-    final river1 = Path();
-    river1.moveTo(w * 0.22, 0);
-    river1.cubicTo(w * 0.20, h * 0.05, w * 0.15, h * 0.08, w * 0.12, h * 0.12);
-    river1.cubicTo(w * 0.08, h * 0.18, w * 0.10, h * 0.22, w * 0.14, h * 0.28);
-    river1.cubicTo(w * 0.18, h * 0.33, w * 0.12, h * 0.38, w * 0.08, h * 0.42);
-    river1.cubicTo(w * 0.04, h * 0.46, w * 0.06, h * 0.52, w * 0.10, h * 0.56);
-    river1.cubicTo(w * 0.14, h * 0.60, w * 0.10, h * 0.65, w * 0.06, h * 0.70);
-    river1.cubicTo(w * 0.02, h * 0.75, w * 0.05, h * 0.80, w * 0.10, h * 0.85);
-    river1.cubicTo(w * 0.15, h * 0.90, w * 0.12, h * 0.95, w * 0.14, h);
-    // Return path (river width)
-    river1.lineTo(w * 0.18, h);
-    river1.cubicTo(w * 0.16, h * 0.95, w * 0.19, h * 0.90, w * 0.14, h * 0.85);
-    river1.cubicTo(w * 0.09, h * 0.80, w * 0.06, h * 0.75, w * 0.10, h * 0.70);
-    river1.cubicTo(w * 0.14, h * 0.65, w * 0.18, h * 0.60, w * 0.14, h * 0.56);
-    river1.cubicTo(w * 0.10, h * 0.52, w * 0.08, h * 0.46, w * 0.12, h * 0.42);
-    river1.cubicTo(w * 0.16, h * 0.38, w * 0.22, h * 0.33, w * 0.18, h * 0.28);
-    river1.cubicTo(w * 0.14, h * 0.22, w * 0.12, h * 0.18, w * 0.16, h * 0.12);
-    river1.cubicTo(w * 0.19, h * 0.08, w * 0.24, h * 0.05, w * 0.26, 0);
-    river1.close();
-    canvas.drawPath(river1, waterPaint);
-    canvas.drawPath(river1, waterEdgePaint);
-
-    // Secondary river / canal (right side)
-    final river2 = Path();
-    river2.moveTo(w * 0.75, 0);
-    river2.cubicTo(w * 0.72, h * 0.06, w * 0.78, h * 0.12, w * 0.74, h * 0.18);
-    river2.cubicTo(w * 0.70, h * 0.24, w * 0.76, h * 0.30, w * 0.72, h * 0.36);
-    river2.cubicTo(w * 0.68, h * 0.42, w * 0.74, h * 0.48, w * 0.70, h * 0.54);
-    river2.cubicTo(w * 0.66, h * 0.60, w * 0.72, h * 0.66, w * 0.68, h * 0.72);
-    river2.cubicTo(w * 0.64, h * 0.78, w * 0.70, h * 0.84, w * 0.66, h * 0.90);
-    river2.cubicTo(w * 0.62, h * 0.95, w * 0.65, h * 0.98, w * 0.63, h);
-    river2.lineTo(w * 0.67, h);
-    river2.cubicTo(w * 0.69, h * 0.98, w * 0.66, h * 0.95, w * 0.70, h * 0.90);
-    river2.cubicTo(w * 0.74, h * 0.84, w * 0.68, h * 0.78, w * 0.72, h * 0.72);
-    river2.cubicTo(w * 0.76, h * 0.66, w * 0.70, h * 0.60, w * 0.74, h * 0.54);
-    river2.cubicTo(w * 0.78, h * 0.48, w * 0.72, h * 0.42, w * 0.76, h * 0.36);
-    river2.cubicTo(w * 0.80, h * 0.30, w * 0.74, h * 0.24, w * 0.78, h * 0.18);
-    river2.cubicTo(w * 0.82, h * 0.12, w * 0.76, h * 0.06, w * 0.79, 0);
-    river2.close();
-    canvas.drawPath(river2, waterPaint);
-    canvas.drawPath(river2, waterEdgePaint);
-
-    // Small canal connecting rivers
-    final canal = Path();
-    canal.moveTo(w * 0.18, h * 0.28);
-    canal.cubicTo(w * 0.30, h * 0.26, w * 0.50, h * 0.30, w * 0.72, h * 0.36);
-    canal.lineTo(w * 0.72, h * 0.38);
-    canal.cubicTo(w * 0.50, h * 0.32, w * 0.30, h * 0.28, w * 0.18, h * 0.30);
-    canal.close();
-    canvas.drawPath(canal, waterPaint);
-
-    // Another canal lower
-    final canal2 = Path();
-    canal2.moveTo(w * 0.14, h * 0.56);
-    canal2.cubicTo(w * 0.25, h * 0.58, w * 0.45, h * 0.55, w * 0.70, h * 0.54);
-    canal2.lineTo(w * 0.70, h * 0.56);
-    canal2.cubicTo(w * 0.45, h * 0.57, w * 0.25, h * 0.60, w * 0.14, h * 0.58);
-    canal2.close();
-    canvas.drawPath(canal2, waterPaint);
-  }
-
-  void _drawParks(Canvas canvas, double w, double h) {
-    final parkPaint = Paint()
-      ..color = const Color(0xFF1E3528)
-      ..style = PaintingStyle.fill;
-
-    final parkOutline = Paint()
-      ..color = const Color(0xFF244030)
-      ..strokeWidth = 0.8
-      ..style = PaintingStyle.stroke;
-
-    final parks = [
-      // Various parks scattered around
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.30, h * 0.05, w * 0.06, h * 0.025),
-          const Radius.circular(3)),
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.55, h * 0.10, w * 0.04, h * 0.02),
-          const Radius.circular(3)),
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.42, h * 0.18, w * 0.08, h * 0.03),
-          const Radius.circular(4)),
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.85, h * 0.22, w * 0.05, h * 0.025),
-          const Radius.circular(3)),
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.05, h * 0.35, w * 0.06, h * 0.03),
-          const Radius.circular(4)),
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.48, h * 0.42, w * 0.07, h * 0.025),
-          const Radius.circular(3)),
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.30, h * 0.50, w * 0.05, h * 0.02),
-          const Radius.circular(3)),
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.82, h * 0.48, w * 0.06, h * 0.03),
-          const Radius.circular(4)),
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.20, h * 0.62, w * 0.04, h * 0.025),
-          const Radius.circular(3)),
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.60, h * 0.68, w * 0.07, h * 0.02),
-          const Radius.circular(3)),
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.40, h * 0.76, w * 0.06, h * 0.03),
-          const Radius.circular(4)),
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.15, h * 0.85, w * 0.05, h * 0.02),
-          const Radius.circular(3)),
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.78, h * 0.82, w * 0.08, h * 0.025),
-          const Radius.circular(4)),
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.55, h * 0.92, w * 0.05, h * 0.02),
-          const Radius.circular(3)),
-      // Larger park
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(w * 0.35, h * 0.35, w * 0.10, h * 0.04),
-          const Radius.circular(6)),
-    ];
-
-    for (final rrect in parks) {
-      canvas.drawRRect(rrect, parkPaint);
-      canvas.drawRRect(rrect, parkOutline);
-    }
-  }
-
-  void _drawMinorStreets(
-      Canvas canvas, double w, double h, Paint paint) {
-    // Dense horizontal minor streets
-    final hSpacings = [18.0, 22.0, 28.0, 15.0, 25.0, 20.0, 30.0, 17.0, 24.0];
-    double y = 0;
-    int idx = 0;
+    double y = 6;
+    int yi = 0;
     while (y < h) {
       canvas.drawLine(Offset(0, y), Offset(w, y), paint);
-      y += hSpacings[idx % hSpacings.length];
-      idx++;
+      y += horizontalSpacings[yi % horizontalSpacings.length];
+      yi++;
     }
 
-    // Dense vertical minor streets
-    final vSpacings = [20.0, 25.0, 18.0, 30.0, 22.0, 16.0, 28.0, 24.0];
-    double x = 0;
-    idx = 0;
+    double x = 4;
+    int xi = 0;
     while (x < w) {
       canvas.drawLine(Offset(x, 0), Offset(x, h), paint);
-      x += vSpacings[idx % vSpacings.length];
-      idx++;
+      x += verticalSpacings[xi % verticalSpacings.length];
+      xi++;
     }
   }
 
-  void _drawMediumStreets(
-      Canvas canvas, double w, double h, Paint paint) {
-    // Horizontal medium roads (irregular spacing)
-    final hPositions = [
-      h * 0.06, h * 0.13, h * 0.21, h * 0.30, h * 0.38,
-      h * 0.46, h * 0.53, h * 0.62, h * 0.70, h * 0.78,
-      h * 0.86, h * 0.93,
-    ];
-    for (final py in hPositions) {
-      canvas.drawLine(Offset(0, py), Offset(w, py), paint);
-    }
+  void _drawDetailAccents(Canvas canvas, Size size) {
+    final buildingFill = Paint()..color = const Color(0xFF353844).withOpacity(0.75);
+    final buildingStroke = Paint()
+      ..color = const Color(0xFF444956).withOpacity(0.8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.5;
 
-    // Vertical medium roads
-    final vPositions = [
-      w * 0.08, w * 0.17, w * 0.28, w * 0.38, w * 0.48,
-      w * 0.58, w * 0.68, w * 0.80, w * 0.90,
-    ];
-    for (final px in vPositions) {
-      canvas.drawLine(Offset(px, 0), Offset(px, h), paint);
-    }
-  }
-
-  void _drawMajorRoads(
-      Canvas canvas, double w, double h, Paint paint) {
-    // Major horizontal arterials
-    canvas.drawLine(Offset(0, h * 0.10), Offset(w, h * 0.10), paint);
-    canvas.drawLine(Offset(0, h * 0.25), Offset(w, h * 0.25), paint);
-    canvas.drawLine(Offset(0, h * 0.42), Offset(w, h * 0.42), paint);
-    canvas.drawLine(Offset(0, h * 0.58), Offset(w, h * 0.58), paint);
-    canvas.drawLine(Offset(0, h * 0.75), Offset(w, h * 0.75), paint);
-    canvas.drawLine(Offset(0, h * 0.90), Offset(w, h * 0.90), paint);
-
-    // Major vertical arterials
-    canvas.drawLine(Offset(w * 0.15, 0), Offset(w * 0.15, h), paint);
-    canvas.drawLine(Offset(w * 0.35, 0), Offset(w * 0.35, h), paint);
-    canvas.drawLine(Offset(w * 0.55, 0), Offset(w * 0.55, h), paint);
-    canvas.drawLine(Offset(w * 0.85, 0), Offset(w * 0.85, h), paint);
-  }
-
-  void _drawHighways(Canvas canvas, double w, double h, Paint paint) {
-    // Curved highway 1 (top-left to bottom-right)
-    final hw1 = Path();
-    hw1.moveTo(0, h * 0.15);
-    hw1.cubicTo(w * 0.15, h * 0.18, w * 0.30, h * 0.22, w * 0.45, h * 0.20);
-    hw1.cubicTo(w * 0.60, h * 0.18, w * 0.75, h * 0.15, w, h * 0.12);
-    canvas.drawPath(hw1, paint);
-
-    // Curved highway 2 (across middle)
-    final hw2 = Path();
-    hw2.moveTo(0, h * 0.50);
-    hw2.cubicTo(w * 0.20, h * 0.48, w * 0.40, h * 0.52, w * 0.60, h * 0.50);
-    hw2.cubicTo(w * 0.80, h * 0.48, w * 0.90, h * 0.46, w, h * 0.48);
-    canvas.drawPath(hw2, paint);
-
-    // Curved highway 3 (lower)
-    final hw3 = Path();
-    hw3.moveTo(0, h * 0.82);
-    hw3.cubicTo(w * 0.25, h * 0.80, w * 0.50, h * 0.85, w * 0.75, h * 0.83);
-    hw3.cubicTo(w * 0.90, h * 0.82, w * 0.95, h * 0.80, w, h * 0.78);
-    canvas.drawPath(hw3, paint);
-
-    // Vertical highway
-    final hw4 = Path();
-    hw4.moveTo(w * 0.45, 0);
-    hw4.cubicTo(w * 0.43, h * 0.20, w * 0.47, h * 0.40, w * 0.44, h * 0.60);
-    hw4.cubicTo(w * 0.41, h * 0.80, w * 0.46, h * 0.90, w * 0.43, h);
-    canvas.drawPath(hw4, paint);
-  }
-
-  void _drawDiagonalRoads(Canvas canvas, double w, double h,
-      Paint medPaint, Paint majorPaint) {
-    // Diagonal roads for realism
-    final diag1 = Path();
-    diag1.moveTo(0, h * 0.05);
-    diag1.lineTo(w * 0.35, h * 0.25);
-    canvas.drawPath(diag1, medPaint);
-
-    final diag2 = Path();
-    diag2.moveTo(w * 0.60, 0);
-    diag2.cubicTo(w * 0.55, h * 0.10, w * 0.50, h * 0.15, w * 0.40, h * 0.30);
-    canvas.drawPath(diag2, medPaint);
-
-    final diag3 = Path();
-    diag3.moveTo(w, h * 0.30);
-    diag3.cubicTo(w * 0.85, h * 0.35, w * 0.75, h * 0.40, w * 0.60, h * 0.50);
-    canvas.drawPath(diag3, majorPaint);
-
-    final diag4 = Path();
-    diag4.moveTo(0, h * 0.65);
-    diag4.cubicTo(w * 0.15, h * 0.68, w * 0.30, h * 0.72, w * 0.50, h * 0.80);
-    canvas.drawPath(diag4, medPaint);
-
-    final diag5 = Path();
-    diag5.moveTo(w * 0.80, h * 0.60);
-    diag5.cubicTo(w * 0.85, h * 0.70, w * 0.90, h * 0.80, w, h * 0.95);
-    canvas.drawPath(diag5, medPaint);
-
-    // More curved connectors
-    final diag6 = Path();
-    diag6.moveTo(w * 0.25, h * 0.40);
-    diag6.cubicTo(w * 0.30, h * 0.45, w * 0.40, h * 0.48, w * 0.55, h * 0.50);
-    canvas.drawPath(diag6, medPaint);
-
-    final diag7 = Path();
-    diag7.moveTo(w * 0.10, h * 0.70);
-    diag7.lineTo(w * 0.45, h * 0.60);
-    canvas.drawPath(diag7, majorPaint);
-
-    final diag8 = Path();
-    diag8.moveTo(w * 0.50, h * 0.70);
-    diag8.cubicTo(w * 0.60, h * 0.75, w * 0.75, h * 0.78, w * 0.90, h * 0.72);
-    canvas.drawPath(diag8, medPaint);
-  }
-
-  void _drawRoundabouts(Canvas canvas, double w, double h) {
-    final roundaboutPaint = Paint()
-      ..color = const Color(0xFF3A4F62)
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke;
-
-    final centerPaint = Paint()
-      ..color = const Color(0xFF1E3228)
-      ..style = PaintingStyle.fill;
-
-    final positions = [
-      Offset(w * 0.35, h * 0.10),
-      Offset(w * 0.55, h * 0.25),
-      Offset(w * 0.15, h * 0.42),
-      Offset(w * 0.85, h * 0.58),
-      Offset(w * 0.45, h * 0.75),
-      Offset(w * 0.25, h * 0.90),
+    final details = [
+      const Offset(0.12, 0.14),
+      const Offset(0.18, 0.29),
+      const Offset(0.42, 0.26),
+      const Offset(0.58, 0.47),
+      const Offset(0.77, 0.36),
+      const Offset(0.14, 0.67),
+      const Offset(0.36, 0.73),
+      const Offset(0.63, 0.74),
+      const Offset(0.84, 0.90),
     ];
 
-    for (final pos in positions) {
-      canvas.drawCircle(pos, 8, roundaboutPaint);
-      canvas.drawCircle(pos, 3, centerPaint);
+    for (final p in details) {
+      final rect = Rect.fromLTWH(
+        p.dx * size.width,
+        p.dy * size.height,
+        10,
+        7,
+      );
+      canvas.drawRect(rect, buildingFill);
+      canvas.drawRect(rect, buildingStroke);
     }
   }
 
-  void _drawBuildingDetails(Canvas canvas, double w, double h) {
-    final bldgPaint = Paint()
-      ..color = const Color(0xFF262F3A)
-      ..style = PaintingStyle.fill;
+  Path _polyPath(Size size, List<Offset> normalizedPoints) {
+    final path = Path();
+    if (normalizedPoints.isEmpty) return path;
 
-    final bldgOutline = Paint()
-      ..color = const Color(0xFF2A3848)
-      ..strokeWidth = 0.5
-      ..style = PaintingStyle.stroke;
+    final first = normalizedPoints.first;
+    path.moveTo(first.dx * size.width, first.dy * size.height);
+    for (var i = 1; i < normalizedPoints.length; i++) {
+      final point = normalizedPoints[i];
+      path.lineTo(point.dx * size.width, point.dy * size.height);
+    }
+    return path;
+  }
 
-    // Scatter tiny rectangles to represent buildings
-    final rng = [
-      Rect.fromLTWH(w * 0.04, h * 0.03, 6, 5),
-      Rect.fromLTWH(w * 0.06, h * 0.03, 4, 6),
-      Rect.fromLTWH(w * 0.32, h * 0.06, 5, 4),
-      Rect.fromLTWH(w * 0.34, h * 0.06, 3, 5),
-      Rect.fromLTWH(w * 0.56, h * 0.11, 6, 5),
-      Rect.fromLTWH(w * 0.59, h * 0.11, 4, 4),
-      Rect.fromLTWH(w * 0.87, h * 0.23, 5, 6),
-      Rect.fromLTWH(w * 0.90, h * 0.23, 4, 4),
-      Rect.fromLTWH(w * 0.44, h * 0.19, 5, 5),
-      Rect.fromLTWH(w * 0.47, h * 0.19, 3, 6),
-      Rect.fromLTWH(w * 0.07, h * 0.36, 6, 4),
-      Rect.fromLTWH(w * 0.10, h * 0.36, 4, 5),
-      Rect.fromLTWH(w * 0.50, h * 0.43, 5, 5),
-      Rect.fromLTWH(w * 0.53, h * 0.43, 3, 4),
-      Rect.fromLTWH(w * 0.84, h * 0.49, 6, 5),
-      Rect.fromLTWH(w * 0.87, h * 0.49, 4, 6),
-      Rect.fromLTWH(w * 0.22, h * 0.63, 5, 4),
-      Rect.fromLTWH(w * 0.25, h * 0.63, 3, 5),
-      Rect.fromLTWH(w * 0.62, h * 0.69, 6, 5),
-      Rect.fromLTWH(w * 0.65, h * 0.69, 4, 4),
-      Rect.fromLTWH(w * 0.42, h * 0.77, 5, 6),
-      Rect.fromLTWH(w * 0.45, h * 0.77, 3, 4),
-      Rect.fromLTWH(w * 0.17, h * 0.86, 6, 5),
-      Rect.fromLTWH(w * 0.20, h * 0.86, 4, 6),
-      Rect.fromLTWH(w * 0.80, h * 0.83, 5, 4),
-      Rect.fromLTWH(w * 0.83, h * 0.83, 3, 5),
-      Rect.fromLTWH(w * 0.57, h * 0.93, 6, 5),
-      Rect.fromLTWH(w * 0.60, h * 0.93, 4, 4),
+  Path _blobPath(Size size, List<Offset> normalizedPoints) {
+    final path = Path();
+    if (normalizedPoints.length < 3) return path;
+
+    final scaled = [
+      for (final point in normalizedPoints)
+        Offset(point.dx * size.width, point.dy * size.height),
     ];
 
-    for (final rect in rng) {
-      canvas.drawRect(rect, bldgPaint);
-      canvas.drawRect(rect, bldgOutline);
+    path.moveTo(scaled.first.dx, scaled.first.dy);
+    for (var i = 0; i < scaled.length; i++) {
+      final current = scaled[i];
+      final next = scaled[(i + 1) % scaled.length];
+      final mid = Offset((current.dx + next.dx) / 2, (current.dy + next.dy) / 2);
+      path.quadraticBezierTo(current.dx, current.dy, mid.dx, mid.dy);
     }
+    path.close();
+    return path;
+  }
+
+  Path _ribbonPath(
+    Size size,
+    List<Offset> centerLine, {
+    required double widthFactor,
+  }) {
+    final width = size.width * widthFactor;
+    final points = [
+      for (final point in centerLine)
+        Offset(point.dx * size.width, point.dy * size.height),
+    ];
+
+    final left = <Offset>[];
+    final right = <Offset>[];
+    for (var i = 0; i < points.length; i++) {
+      final prev = points[i == 0 ? i : i - 1];
+      final next = points[i == points.length - 1 ? i : i + 1];
+      final dx = next.dx - prev.dx;
+      final dy = next.dy - prev.dy;
+      final len = math.sqrt(dx * dx + dy * dy);
+      final nx = len == 0 ? 0.0 : -dy / len;
+      final ny = len == 0 ? 0.0 : dx / len;
+      left.add(Offset(points[i].dx + nx * width, points[i].dy + ny * width));
+      right.add(Offset(points[i].dx - nx * width, points[i].dy - ny * width));
+    }
+
+    final path = Path()..moveTo(left.first.dx, left.first.dy);
+    for (var i = 1; i < left.length; i++) {
+      final a = left[i - 1];
+      final b = left[i];
+      path.quadraticBezierTo(a.dx, a.dy, (a.dx + b.dx) / 2, (a.dy + b.dy) / 2);
+    }
+    for (var i = right.length - 1; i >= 1; i--) {
+      final a = right[i];
+      final b = right[i - 1];
+      path.quadraticBezierTo(a.dx, a.dy, (a.dx + b.dx) / 2, (a.dy + b.dy) / 2);
+    }
+    path.close();
+    return path;
   }
 
   @override
