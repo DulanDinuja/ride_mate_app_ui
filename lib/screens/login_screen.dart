@@ -8,6 +8,8 @@ import 'signup_screen.dart';
 import 'login_success_screen.dart';
 import 'email_verification_screen.dart';
 import 'forgot_password_screen.dart';
+import '../models/api_exception.dart';
+import '../utils/snackbar_helper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -65,6 +67,11 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        SnackBarHelper.showError(context, e.message);
+      }
     } catch (e) {
       if (mounted) {
         String errorMessage = e.toString()
@@ -82,13 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
         } else {
           // Show other errors (wrong password, user not found, etc.)
           setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(errorMessage),
-              backgroundColor: Colors.red[700],
-              duration: const Duration(seconds: 4),
-            ),
-          );
+          SnackBarHelper.showError(context, errorMessage);
         }
       }
     }
@@ -121,13 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Show success message
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Verification code sent! Please check your email.'),
-                backgroundColor: Colors.orange,
-                duration: Duration(seconds: 4),
-              ),
-            );
+            SnackBarHelper.showWarning(context, 'Verification code sent! Please check your email.');
           }
         });
       }
@@ -149,13 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
         
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Please verify your email. You can resend the code from the verification screen.'),
-                backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 4),
-              ),
-            );
+            SnackBarHelper.showWarning(context, 'Please verify your email. You can resend the code from the verification screen.');
           }
         });
       }
