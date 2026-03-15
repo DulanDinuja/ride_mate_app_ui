@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
-import '../services/api_service.dart';
 import '../models/api_response.dart';
 import '../services/auth_service.dart';
 import '../models/login_request.dart';
@@ -101,13 +100,13 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Step 1: Attempt login
+      // Attempt login
       final request = LoginRequest(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
-      final response = await ApiService.loginUser(request);
+      final response = await AuthService.loginUser(request);
       final responseMessage = _profileCompletionMessage(response);
       final requiresProfileCompletion = _requiresProfileCompletionFromResponse(response);
 
@@ -116,7 +115,6 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      final response = await AuthService.loginUser(request);
 
       if (mounted && response.success) {
         // Login successful - proceed to success screen

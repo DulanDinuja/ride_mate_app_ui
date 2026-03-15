@@ -41,7 +41,7 @@ class LoginResponse {
   final bool? profileCompleted;
   final bool? registrationCompleted;
   final String? role;
-  final String? emailVerified;
+  final bool? emailVerified;
 
   LoginResponse({
     required this.message,
@@ -94,9 +94,8 @@ class LoginResponse {
         json['registrationCompleted'] ?? json['isRegistrationCompleted'],
       ),
       role: json['role'] as String?,
-      emailVerified: json['emailVerified'] as String?,
     );
   }
 
-  bool get isEmailVerified => emailVerified?.toUpperCase() == 'YES';
+  bool get isEmailVerified => emailVerified == true;
 }
