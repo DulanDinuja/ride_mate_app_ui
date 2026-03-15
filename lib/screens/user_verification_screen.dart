@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
 
 import '../models/user_verification_args.dart';
+import 'selfie_camera_screen.dart';
 
-class UserVerificationScreen extends StatelessWidget {
+class UserVerificationScreen extends StatefulWidget {
   const UserVerificationScreen({
     super.key,
     required this.args,
@@ -10,12 +12,51 @@ class UserVerificationScreen extends StatelessWidget {
 
   final UserVerificationArgs args;
 
+  @override
+  State<UserVerificationScreen> createState() => _UserVerificationScreenState();
+}
+
+class _UserVerificationScreenState extends State<UserVerificationScreen> {
+  Uint8List? _capturedSelfie;
+  bool _isOpeningCamera = false;
+
   static const Color _screenBackground = Colors.black;
   static const Color _panelBackground = Color(0xFFFFFFF0);
   static const Color _textPrimary = Color(0xFF111A2B);
   static const Color _textSecondary = Color(0xFF5A6475);
   static const Color _cardBackground = Color(0xFFECEBDD);
   static const Color _accent = Color(0xFF10B47A);
+
+  Future<void> _openSelfieCamera() async {
+    if (_isOpeningCamera) return;
+
+    setState(() => _isOpeningCamera = true);
+    try {
+      final Uint8List? selfieBytes = await Navigator.of(context).push<Uint8List>(
+        MaterialPageRoute(
+          builder: (_) => const SelfieCameraScreen(),
+        ),
+      );
+
+      if (!mounted || selfieBytes == null) {
+        return;
+      }
+
+      setState(() => _capturedSelfie = selfieBytes);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to open camera: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isOpeningCamera = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +111,7 @@ class UserVerificationScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${args.documentType} • ${args.gender}',
+                    '${widget.args.documentType} • ${widget.args.gender}',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -91,9 +132,22 @@ class UserVerificationScreen extends StatelessWidget {
                           aspectRatio: 1,
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(26),
-                            child: Image.asset(
-                              'assets/images/selfie.png',
-                              fit: BoxFit.cover,
+                            child: Container(
+                              color: const Color(0xFFF4F4EA),
+                              alignment: Alignment.center,
+                              child: _capturedSelfie == null
+                                  ? Image.asset(
+                                      'assets/images/selfie.png',
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      fit: BoxFit.contain,
+                                    )
+                                  : Image.memory(
+                                      _capturedSelfie!,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      fit: BoxFit.contain,
+                                    ),
                             ),
                           ),
                         ),
@@ -155,13 +209,7 @@ class UserVerificationScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 58,
                     child: ElevatedButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Selfie capture flow can be added next.'),
-                          ),
-                        );
-                      },
+                      onPressed: _isOpeningCamera ? null : _openSelfieCamera,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _accent,
                         foregroundColor: Colors.white,
@@ -169,13 +217,22 @@ class UserVerificationScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                       ),
-                      child: const Text(
-                        'Continue',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      child: _isOpeningCamera
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text(
+                              'Continue',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -239,6 +296,4 @@ class _GuidelineImageItem extends StatelessWidget {
     );
   }
 }
-
-
 
