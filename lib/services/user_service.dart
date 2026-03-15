@@ -1,5 +1,6 @@
 import 'dart:convert';
 import '../models/api_response.dart';
+import '../models/api_exception.dart';
 import 'api_client.dart';
 
 /// Handles all user-related API calls (authenticated — token auto-attached).
@@ -12,6 +13,9 @@ class UserService {
         return jsonDecode(response.body) as Map<String, dynamic>;
       } else {
         final error = jsonDecode(response.body);
+        if (error.containsKey('errorMessage') && error['errorMessage'] != null) {
+          throw ApiException(error['errorMessage']);
+        }
         throw Exception(error['message'] ?? 'Failed to fetch profile');
       }
     } catch (e) {
@@ -28,6 +32,9 @@ class UserService {
         return ApiResponse.fromJson(jsonDecode(response.body));
       } else {
         final error = jsonDecode(response.body);
+        if (error.containsKey('errorMessage') && error['errorMessage'] != null) {
+          throw ApiException(error['errorMessage']);
+        }
         throw Exception(error['message'] ?? 'Failed to update profile');
       }
     } catch (e) {

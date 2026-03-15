@@ -5,6 +5,8 @@ import '../services/auth_service.dart';
 import '../models/send_verification_code_request.dart';
 import '../models/verify_code_request.dart';
 import 'login_success_screen.dart';
+import '../models/api_exception.dart';
+import '../utils/snackbar_helper.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   final String email;
@@ -47,13 +49,11 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       final request = SendVerificationCodeRequest(email: widget.email);
       await AuthService.sendVerificationCode(request);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verification code sent to your email!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
+        SnackBarHelper.showSuccess(context, 'Verification code sent to your email!');
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, e.message);
       }
     } catch (e) {
       if (mounted) {
@@ -61,13 +61,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
             .replaceAll('Exception: ', '')
             .replaceAll('Network error: Exception: ', '');
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red[700],
-            duration: const Duration(seconds: 4),
-          ),
-        );
+        SnackBarHelper.showError(context, errorMessage);
       }
     } finally {
       if (mounted) setState(() => _isResending = false);
@@ -77,12 +71,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   void _verifyEmail() async {
     String code = _codeControllers.map((controller) => controller.text).join();
     if (code.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter the complete 6-digit code'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      SnackBarHelper.showWarning(context, 'Please enter the complete 6-digit code');
       return;
     }
 
@@ -95,13 +84,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       if (mounted) {
         if (response.isValid == true) {
           // Verification successful
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Email verified successfully!'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
+          SnackBarHelper.showSuccess(context, 'Email verified successfully!');
           
           // Navigate to login success screen
           Navigator.pushReplacement(
@@ -111,14 +94,12 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         } else {
           // Verification failed - show backend message
           String errorMessage = response.messages ?? 'Verification failed. Please try again.';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(errorMessage),
-              backgroundColor: Colors.red[700],
-              duration: const Duration(seconds: 4),
-            ),
-          );
+          SnackBarHelper.showError(context, errorMessage);
         }
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, e.message);
       }
     } catch (e) {
       if (mounted) {
@@ -126,13 +107,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
             .replaceAll('Exception: ', '')
             .replaceAll('Network error: Exception: ', '');
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red[700],
-            duration: const Duration(seconds: 4),
-          ),
-        );
+        SnackBarHelper.showError(context, errorMessage);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

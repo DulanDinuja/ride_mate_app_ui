@@ -5,7 +5,8 @@ import '../services/auth_service.dart';
 import '../models/user_registration_request.dart';
 import '../models/user_role.dart';
 import 'email_verification_screen.dart';
-
+import '../models/api_exception.dart';
+import '../utils/snackbar_helper.dart';
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
@@ -119,6 +120,11 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
         );
       }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        SnackBarHelper.showError(context, e.message);
+      }
     } catch (e) {
       if (mounted) {
         // Clean up the error message
@@ -126,13 +132,7 @@ class _SignupScreenState extends State<SignupScreen> {
             .replaceAll('Exception: ', '')
             .replaceAll('Network error: Exception: ', '');
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red[700],
-            duration: const Duration(seconds: 4),
-          ),
-        );
+        SnackBarHelper.showError(context, errorMessage);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
