@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/routes/app_routes.dart';
+
 class IdentificationSuccessScreen extends StatelessWidget {
   const IdentificationSuccessScreen({super.key});
 
@@ -10,6 +12,8 @@ class IdentificationSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
     return Scaffold(
       backgroundColor: _screenBackground,
       body: SafeArea(
@@ -20,35 +24,73 @@ class IdentificationSuccessScreen extends StatelessWidget {
             height: double.infinity,
             decoration: BoxDecoration(
               color: _panelBackground,
-              borderRadius: BorderRadius.circular(56),
+              borderRadius: BorderRadius.circular(48),
             ),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 40, 24, 28),
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Image.asset(
-                    'assets/images/success.png',
-                    fit: BoxFit.contain,
+                  // ── Image fills upper portion ──────────────────────────
+                  Expanded(
+                    child: Center(
+                      child: Image.asset(
+                        'assets/images/success.png',
+                        width: size.width * 0.80,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 24),
+
+                  // ── Title ─────────────────────────────────────────────
                   const Text(
-                    'Verification Successful',
+                    'Successful!',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 30,
+                      fontWeight: FontWeight.w800,
                       color: _textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 16),
+
+                  // ── Subtitle ──────────────────────────────────────────
                   const Text(
-                    'Your identification documents have been uploaded successfully.',
+                    'You have successfully completed\nthe user verification.\n'
+                    'Your account will be approved\nafter a review process',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
-                      height: 1.45,
+                      height: 1.6,
                       color: _textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+
+                  // ── Continue button ───────────────────────────────────
+                  SizedBox(
+                    width: double.infinity,
+                    height: 58,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          AppRoutes.homeMap,
+                          (route) => false,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _textPrimary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      child: const Text(
+                        'Continue',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -60,4 +102,3 @@ class IdentificationSuccessScreen extends StatelessWidget {
     );
   }
 }
-
