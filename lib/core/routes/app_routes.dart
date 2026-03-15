@@ -10,6 +10,7 @@ import '../../screens/profile_completion_screen.dart';
 import '../../screens/user_verification_screen.dart';
 import '../../screens/identification_document_screen.dart';
 import '../../screens/identification_success_screen.dart';
+import '../../screens/vehicle_registration_screen.dart';
 import '../../models/user_verification_args.dart';
 
 class AppRoutes {
@@ -25,6 +26,7 @@ class AppRoutes {
   static const String userVerification = '/user-verification';
   static const String identificationDocument = '/identification-document';
   static const String identificationSuccess = '/identification-success';
+  static const String vehicleRegistration = '/vehicle-registration';
 
   // Generate routes
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -79,6 +81,9 @@ class AppRoutes {
 
       case identificationSuccess:
         return MaterialPageRoute(builder: (_) => const IdentificationSuccessScreen());
+
+      case vehicleRegistration:
+        return MaterialPageRoute(builder: (_) => const VehicleRegistrationScreen());
 
       default:
         return _errorRoute('Route not found: ${settings.name}');

@@ -18,6 +18,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   bool _willingToDrive = true;
   String _selectedDocumentType = 'NIC';
   String? _selectedGender;
+  DateTime? _selectedDateOfBirth;
 
   @override
   void dispose() {
@@ -150,6 +151,52 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                               color: Color(0xFF10B47A),
                               width: 1.5,
                             ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 26),
+                      const Text(
+                        'Date of Birth',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF44526A),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      InkWell(
+                        onTap: _pickDateOfBirth,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 22,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE3E3D8),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                _selectedDateOfBirth == null
+                                    ? 'Select Date of Birth'
+                                    : _formatDate(_selectedDateOfBirth!),
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  color: _selectedDateOfBirth == null
+                                      ? const Color(0xFF9AA0AA)
+                                      : const Color(0xFF172235),
+                                ),
+                              ),
+                              const Icon(
+                                Icons.calendar_month,
+                                color: Color(0xFFA8AAB0),
+                                size: 28,
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -346,11 +393,40 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     );
   }
 
+  Future<void> _pickDateOfBirth() async {
+    final now = DateTime.now();
+    final initialDate = _selectedDateOfBirth ?? DateTime(now.year - 18, now.month, now.day);
+
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate.isAfter(now) ? now : initialDate,
+      firstDate: DateTime(1900),
+      lastDate: now,
+    );
+
+    if (pickedDate != null) {
+      setState(() => _selectedDateOfBirth = pickedDate);
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$day/$month/${date.year}';
+  }
+
   void _onNextPressed() {
     final idNumber = _idNumberController.text.trim();
     if (idNumber.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter your NIC or passport number')),
+      );
+      return;
+    }
+
+    if (_selectedDateOfBirth == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select your date of birth')),
       );
       return;
     }
