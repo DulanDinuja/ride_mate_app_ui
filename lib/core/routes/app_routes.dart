@@ -8,6 +8,7 @@ import '../../screens/home_map_screen.dart';
 import '../../screens/forgot_password_screen.dart';
 import '../../screens/profile_completion_screen.dart';
 import '../../screens/user_verification_screen.dart';
+import '../../screens/identification_document_screen.dart';
 import '../../models/user_verification_args.dart';
 
 class AppRoutes {
@@ -21,6 +22,7 @@ class AppRoutes {
   static const String forgotPassword = '/forgot-password';
   static const String profileCompletion = '/profile-completion';
   static const String userVerification = '/user-verification';
+  static const String identificationDocument = '/identification-document';
 
   // Generate routes
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -62,6 +64,15 @@ class AppRoutes {
         }
         return MaterialPageRoute(
           builder: (_) => UserVerificationScreen(args: args),
+        );
+
+      case identificationDocument:
+        final args = settings.arguments;
+        if (args is! UserVerificationArgs) {
+          return _errorRoute('Identification document details are missing');
+        }
+        return MaterialPageRoute(
+          builder: (_) => IdentificationDocumentScreen(args: args),
         );
 
       default:

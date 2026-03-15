@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 
+import '../core/routes/app_routes.dart';
 import '../models/user_verification_args.dart';
 import 'selfie_camera_screen.dart';
 
@@ -324,11 +325,11 @@ class _UserVerificationScreenState extends State<UserVerificationScreen> {
               borderRadius: BorderRadius.circular(30),
               border: Border.all(color: _accent.withOpacity(0.4), width: 1.2),
             ),
-            child: Row(
+            child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.check_circle_rounded, color: _accent, size: 18),
-                const SizedBox(width: 6),
+                SizedBox(width: 6),
                 Text(
                   'Selfie Captured',
                   style: TextStyle(
@@ -372,12 +373,9 @@ class _UserVerificationScreenState extends State<UserVerificationScreen> {
             height: 58,
             child: ElevatedButton(
               onPressed: () {
-                // TODO: Submit verification with _capturedSelfie
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Verification submitted!'),
-                    backgroundColor: Color(0xFF10B47A),
-                  ),
+                Navigator.of(context).pushNamed(
+                  AppRoutes.identificationDocument,
+                  arguments: widget.args,
                 );
               },
               style: ElevatedButton.styleFrom(

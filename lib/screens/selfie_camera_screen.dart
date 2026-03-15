@@ -4,7 +4,16 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
 class SelfieCameraScreen extends StatefulWidget {
-  const SelfieCameraScreen({super.key});
+  const SelfieCameraScreen({
+    super.key,
+    this.title = 'Take Selfie',
+    this.preferredLensDirection = CameraLensDirection.front,
+    this.overlayShape = BoxShape.circle,
+  });
+
+  final String title;
+  final CameraLensDirection preferredLensDirection;
+  final BoxShape overlayShape;
 
   @override
   State<SelfieCameraScreen> createState() => _SelfieCameraScreenState();
@@ -35,7 +44,7 @@ class _SelfieCameraScreenState extends State<SelfieCameraScreen> {
 
       CameraDescription selectedCamera = cameras.first;
       for (final camera in cameras) {
-        if (camera.lensDirection == CameraLensDirection.front) {
+        if (camera.lensDirection == widget.preferredLensDirection) {
           selectedCamera = camera;
           break;
         }
@@ -60,7 +69,7 @@ class _SelfieCameraScreenState extends State<SelfieCameraScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Unable to start camera. Check browser camera permission.';
+        _error = 'Unable to start camera. Check camera permission and try again.';
         _isInitializing = false;
       });
     }
@@ -101,7 +110,7 @@ class _SelfieCameraScreenState extends State<SelfieCameraScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: const Text('Take Selfie'),
+        title: Text(widget.title),
       ),
       body: _buildBody(),
     );
@@ -149,6 +158,24 @@ class _SelfieCameraScreenState extends State<SelfieCameraScreen> {
         Positioned.fill(
           child: CameraPreview(controller),
         ),
+        IgnorePointer(
+          child: Center(
+            child: Container(
+              width: widget.overlayShape == BoxShape.circle ? 260 : 300,
+              height: widget.overlayShape == BoxShape.circle ? 260 : 210,
+              decoration: ShapeDecoration(
+                shape: widget.overlayShape == BoxShape.circle
+                    ? const CircleBorder(
+                        side: BorderSide(color: Colors.white, width: 3),
+                      )
+                    : RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        side: const BorderSide(color: Colors.white, width: 3),
+                      ),
+              ),
+            ),
+          ),
+        ),
         Align(
           alignment: Alignment.bottomCenter,
           child: Padding(
@@ -177,4 +204,3 @@ class _SelfieCameraScreenState extends State<SelfieCameraScreen> {
     );
   }
 }
-
