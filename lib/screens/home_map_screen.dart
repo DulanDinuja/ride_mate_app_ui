@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'dart:math' as math;
 
 class HomeMapScreen extends StatefulWidget {
@@ -9,6 +10,8 @@ class HomeMapScreen extends StatefulWidget {
 }
 
 class _HomeMapScreenState extends State<HomeMapScreen> {
+  bool _showProfileCard = true;
+
   void _onMenuPressed() {
     // TODO: Open drawer/menu
   }
@@ -23,6 +26,9 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
 
           // Top Controls
           _buildTopControls(),
+
+          // Complete Profile Card
+          if (_showProfileCard) _buildCompleteProfileCard(),
         ],
       ),
     );
@@ -74,6 +80,135 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompleteProfileCard() {
+    return Center(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(40),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.8,
+            padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
+            decoration: BoxDecoration(
+              color: const Color(0xFF040F1B).withOpacity(0.7),
+              borderRadius: BorderRadius.circular(40),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.08),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Close button
+                Align(
+                  alignment: Alignment.topRight,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _showProfileCard = false),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white70,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Title
+                const Text(
+                  'Complete Your Profile',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Subtitle
+                const Text(
+                  "You're Almost Done! Complete Your Profile To Unlock All Features.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 14,
+                    color: Colors.white70,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Progress bar + percentage
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: 0.75,
+                          minHeight: 10,
+                          backgroundColor: Colors.grey.shade800,
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFF03AF74),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      '75%',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+
+                // Complete Now button
+                SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.8 * 0.6,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // TODO: Navigate to Profile Completion Screen
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF03AF74),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Complete Now',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
