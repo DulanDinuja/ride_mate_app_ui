@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
+import '../core/routes/app_routes.dart';
 import '../models/user_verification_args.dart';
 import 'selfie_camera_screen.dart';
 
@@ -495,12 +496,7 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
             height: 58,
             child: ElevatedButton(
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Continue To Next Step'),
-                    backgroundColor: _accent,
-                  ),
-                );
+                Navigator.of(context).pushNamed(AppRoutes.identificationSuccess);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: _accent,
