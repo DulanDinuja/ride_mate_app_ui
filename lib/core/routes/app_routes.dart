@@ -6,6 +6,9 @@ import '../../screens/email_verification_screen.dart';
 import '../../screens/login_success_screen.dart';
 import '../../screens/home_map_screen.dart';
 import '../../screens/forgot_password_screen.dart';
+import '../../screens/profile_completion_screen.dart';
+import '../../screens/user_verification_screen.dart';
+import '../../models/user_verification_args.dart';
 
 class AppRoutes {
   // Route names
@@ -16,6 +19,8 @@ class AppRoutes {
   static const String loginSuccess = '/login-success';
   static const String homeMap = '/home-map';
   static const String forgotPassword = '/forgot-password';
+  static const String profileCompletion = '/profile-completion';
+  static const String userVerification = '/user-verification';
 
   // Generate routes
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -46,6 +51,18 @@ class AppRoutes {
 
       case forgotPassword:
         return MaterialPageRoute(builder: (_) => const ForgotPasswordScreen());
+
+      case profileCompletion:
+        return MaterialPageRoute(builder: (_) => const ProfileCompletionScreen());
+
+      case userVerification:
+        final args = settings.arguments;
+        if (args is! UserVerificationArgs) {
+          return _errorRoute('User verification details are missing');
+        }
+        return MaterialPageRoute(
+          builder: (_) => UserVerificationScreen(args: args),
+        );
 
       default:
         return _errorRoute('Route not found: ${settings.name}');

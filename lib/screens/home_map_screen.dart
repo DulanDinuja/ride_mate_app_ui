@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:math' as math;
+import '../core/routes/app_routes.dart';
 
 class HomeMapScreen extends StatefulWidget {
   const HomeMapScreen({super.key});
@@ -186,7 +187,7 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
                   height: 50,
                   child: ElevatedButton(
                     onPressed: () {
-                      // TODO: Navigate to Profile Completion Screen
+                      Navigator.pushNamed(context, AppRoutes.profileCompletion);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF03AF74),
