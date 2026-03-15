@@ -271,15 +271,43 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
                         ),
                       ],
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(22),
-                      child: AspectRatio(
-                        aspectRatio: 1.55,
-                        child: Image.memory(
-                          _capturedDocument!,
-                          fit: BoxFit.cover,
+                    child: Column(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(22),
+                          child: AspectRatio(
+                            aspectRatio: 1.55,
+                            child: Image.memory(
+                              _capturedDocument!,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(22),
+                          child: AspectRatio(
+                            aspectRatio: 1.55,
+                            child: Image.asset(
+                              'assets/images/backside_nic.png',
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: const Color(0xFFF4F4EA),
+                                  alignment: Alignment.center,
+                                  child: const Text(
+                                    'Backside image not found',
+                                    style: TextStyle(
+                                      color: _textSecondary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -310,30 +338,6 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
               ),
             ),
           ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: OutlinedButton.icon(
-              onPressed: _isOpeningCamera ? null : _openDocumentCamera,
-              icon: const Icon(Icons.camera_alt_outlined),
-              label: const Text(
-                'Take Again',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Colors.black, width: 1.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-              ),
-            ),
-          ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
@@ -348,14 +352,14 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: _accent,
+                backgroundColor: Colors.black,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
               ),
               child: const Text(
-                'Continue To Next Step',
+                'Capture Rear View',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
