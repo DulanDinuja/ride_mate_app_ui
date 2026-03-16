@@ -132,10 +132,26 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
   Future<void> _submitUserProfile() async {
     setState(() => _isSubmitting = true);
     try {
+      final willingToDrive = widget.args.userRole.trim().toUpperCase();
+
+      if (willingToDrive == 'YES') {
+        if (!mounted) return;
+        Navigator.of(context).pushNamed(AppRoutes.vehicleRegistration);
+        return;
+      }
+
+      if (willingToDrive != 'NO') {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid willing-to-drive value')),
+        );
+        return;
+      }
+
       final userIdStr = await TokenService.getUserId();
       final userId = int.tryParse(userIdStr ?? '') ?? 0;
 
-      // Convert gender to uppercase to match backend enum (e.g. "Male" → "MALE")
+      // Convert gender to uppercase to match backend enum (e.g. "Male" -> "MALE")
       final gender = widget.args.gender.toUpperCase();
 
       final body = <String, dynamic>{
@@ -143,7 +159,7 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
         'profileImageDocumentId': null,
         'dateOfBirth': widget.args.dateOfBirth,
         'gender': gender,
-        'willingToDrive': widget.args.userRole, // "YES" or "NO"
+        'willingToDrive': willingToDrive,
         'userIdentificationDetails': {
           'userId': userId,
           'identificationTypeId': widget.args.documentTypeId,
