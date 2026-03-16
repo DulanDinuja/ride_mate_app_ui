@@ -552,7 +552,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
         documentType: _selectedDocumentTypeName!,
         idNumber: idNumber,
         gender: _selectedGender!,
-        willingToDrive: _willingToDrive,
+        userRole: _willingToDrive ? 'YES' : 'NO',
       ),
     );
   }

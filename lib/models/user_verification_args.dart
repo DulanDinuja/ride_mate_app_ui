@@ -4,13 +4,13 @@ class UserVerificationArgs {
     required this.documentType,
     required this.idNumber,
     required this.gender,
-    required this.willingToDrive,
+    required this.userRole,
   });
 
   final int documentTypeId;
   final String documentType;
   final String idNumber;
   final String gender;
-  final bool willingToDrive;
+  final String userRole;
 }
 
