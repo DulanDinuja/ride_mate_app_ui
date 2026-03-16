@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../core/routes/app_routes.dart';
+
 class RevenueLicenseUploadScreen extends StatefulWidget {
   const RevenueLicenseUploadScreen({super.key});
 
@@ -97,9 +99,7 @@ class _RevenueLicenseUploadScreenState extends State<RevenueLicenseUploadScreen>
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Registration completed successfully')),
-    );
+    Navigator.of(context).pushNamed(AppRoutes.rideStart);
   }
 
   @override
