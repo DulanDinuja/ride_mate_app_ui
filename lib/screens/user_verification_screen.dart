@@ -35,7 +35,7 @@ class _UserVerificationScreenState extends State<UserVerificationScreen> {
 
     setState(() => _isUploading = true);
     try {
-      await FileService.uploadFile(
+      final selfieDocumentId = await FileService.uploadFile(
         bytes: _capturedSelfie!,
         fileName: 'selfie.jpg',
       );
@@ -43,7 +43,15 @@ class _UserVerificationScreenState extends State<UserVerificationScreen> {
       if (!mounted) return;
       Navigator.of(context).pushNamed(
         AppRoutes.identificationDocument,
-        arguments: widget.args,
+        arguments: UserVerificationArgs(
+          documentTypeId: widget.args.documentTypeId,
+          documentType: widget.args.documentType,
+          idNumber: widget.args.idNumber,
+          gender: widget.args.gender,
+          userRole: widget.args.userRole,
+          dateOfBirth: widget.args.dateOfBirth,
+          selfieDocumentId: selfieDocumentId,
+        ),
       );
     } catch (e) {
       if (!mounted) return;

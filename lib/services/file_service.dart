@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -19,9 +20,9 @@ class FileService {
   /// [bytes]    — raw file bytes (e.g. from `XFile.readAsBytes()`).
   /// [fileName] — file name including extension (e.g. "license_front.jpg").
   ///
-  /// Returns the raw response body string on success (2xx).
+  /// Returns the uploaded document ID from the server response.
   /// Throws [ApiException] on a non-2xx status, or [Exception] on network errors.
-  static Future<String> uploadFile({
+  static Future<int> uploadFile({
     required Uint8List bytes,
     required String fileName,
   }) async {
@@ -48,7 +49,8 @@ class FileService {
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        return response.body;
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return data['id'] as int;
       }
 
       throw ApiException(
@@ -64,11 +66,11 @@ class FileService {
   /// Convenience method to upload multiple files sequentially.
   ///
   /// [files] — map of fileName → bytes.
-  /// Returns a map of fileName → response body.
-  static Future<Map<String, String>> uploadFiles(
+  /// Returns a map of fileName → document ID.
+  static Future<Map<String, int>> uploadFiles(
     Map<String, Uint8List> files,
   ) async {
-    final results = <String, String>{};
+    final results = <String, int>{};
     for (final entry in files.entries) {
       results[entry.key] = await uploadFile(
         bytes: entry.value,
