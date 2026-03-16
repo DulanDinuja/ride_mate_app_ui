@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../core/routes/app_routes.dart';
 import '../models/user_verification_args.dart';
+import '../services/file_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import 'selfie_camera_screen.dart';
@@ -132,6 +133,16 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
   Future<void> _submitUserProfile() async {
     setState(() => _isSubmitting = true);
     try {
+      // Upload front and rear document images first
+      final frontDocumentId = await FileService.uploadFile(
+        bytes: _capturedDocument!,
+        fileName: 'id_front.jpg',
+      );
+      final rearDocumentId = await FileService.uploadFile(
+        bytes: _capturedRearDocument!,
+        fileName: 'id_rear.jpg',
+      );
+
       final willingToDrive = widget.args.userRole.trim().toUpperCase();
 
       if (willingToDrive == 'YES') {
@@ -157,6 +168,7 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
       final body = <String, dynamic>{
         'userId': userId,
         'profileImageDocumentId': null,
+        'userVerificationImageDocumentId': widget.args.selfieDocumentId,
         'dateOfBirth': widget.args.dateOfBirth,
         'gender': gender,
         'willingToDrive': willingToDrive,
@@ -164,8 +176,8 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
           'userId': userId,
           'identificationTypeId': widget.args.documentTypeId,
           'identificationNumber': widget.args.idNumber,
-          'frontImageDocumentId': null,
-          'backImageDocumentId': null,
+          'frontImageDocumentId': frontDocumentId,
+          'backImageDocumentId': rearDocumentId,
           'isVerified': 'YES',
           'verificationNotes': 'Verified successfully',
           'status': 'ACTIVE',

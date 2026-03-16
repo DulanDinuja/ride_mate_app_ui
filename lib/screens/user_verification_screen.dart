@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import '../core/routes/app_routes.dart';
 import '../models/user_verification_args.dart';
+import '../services/file_service.dart';
 import 'selfie_camera_screen.dart';
 
 class UserVerificationScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class UserVerificationScreen extends StatefulWidget {
 class _UserVerificationScreenState extends State<UserVerificationScreen> {
   Uint8List? _capturedSelfie;
   bool _isOpeningCamera = false;
+  bool _isUploading = false;
 
   static const Color _screenBackground = Colors.black;
   static const Color _panelBackground = Color(0xFFFFFFF0);
@@ -27,6 +29,42 @@ class _UserVerificationScreenState extends State<UserVerificationScreen> {
   static const Color _textSecondary = Color(0xFF5A6475);
   static const Color _cardBackground = Color(0xFFECEBDD);
   static const Color _accent = Color(0xFF10B47A);
+
+  Future<void> _uploadSelfie() async {
+    if (_capturedSelfie == null || _isUploading) return;
+
+    setState(() => _isUploading = true);
+    try {
+      final selfieDocumentId = await FileService.uploadFile(
+        bytes: _capturedSelfie!,
+        fileName: 'selfie.jpg',
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pushNamed(
+        AppRoutes.identificationDocument,
+        arguments: UserVerificationArgs(
+          documentTypeId: widget.args.documentTypeId,
+          documentType: widget.args.documentType,
+          idNumber: widget.args.idNumber,
+          gender: widget.args.gender,
+          userRole: widget.args.userRole,
+          dateOfBirth: widget.args.dateOfBirth,
+          selfieDocumentId: selfieDocumentId,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Upload failed: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
 
   Future<void> _openSelfieCamera() async {
     if (_isOpeningCamera) return;
@@ -372,12 +410,7 @@ class _UserVerificationScreenState extends State<UserVerificationScreen> {
             width: double.infinity,
             height: 58,
             child: ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pushNamed(
-                  AppRoutes.identificationDocument,
-                  arguments: widget.args,
-                );
-              },
+              onPressed: _isUploading ? null : _uploadSelfie,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _accent,
                 foregroundColor: Colors.white,
@@ -385,13 +418,22 @@ class _UserVerificationScreenState extends State<UserVerificationScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
               ),
-              child: const Text(
-                'Continue To Next Step',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              child: _isUploading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text(
+                      'Continue To Next Step',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
             ),
           ),
         ],

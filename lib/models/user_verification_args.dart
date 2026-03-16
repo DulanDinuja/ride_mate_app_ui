@@ -6,6 +6,7 @@ class UserVerificationArgs {
     required this.gender,
     required this.userRole,
     required this.dateOfBirth,
+    this.selfieDocumentId,
   });
 
   final int documentTypeId;
@@ -16,5 +17,8 @@ class UserVerificationArgs {
 
   /// ISO-8601 date string, e.g. "1995-06-15"
   final String dateOfBirth;
+
+  /// Document ID returned by the server after uploading the selfie.
+  final int? selfieDocumentId;
 }
 
