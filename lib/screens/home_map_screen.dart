@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import '../core/routes/app_routes.dart';
+import '../services/token_service.dart';
+import '../services/user_service.dart';
 
 class HomeMapScreen extends StatefulWidget {
   const HomeMapScreen({super.key});
@@ -11,7 +13,26 @@ class HomeMapScreen extends StatefulWidget {
 }
 
 class _HomeMapScreenState extends State<HomeMapScreen> {
-  bool _showProfileCard = true;
+  bool _showProfileCard = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkProfileStatus();
+  }
+
+  Future<void> _checkProfileStatus() async {
+    try {
+      final userId = await TokenService.getUserId();
+      if (userId == null) return;
+      final profile = await UserService.getUserProfileByUserId(userId);
+      if (mounted && !profile.isProfileCompleted) {
+        setState(() => _showProfileCard = true);
+      }
+    } catch (_) {
+      // Silently ignore — card simply won't show if fetch fails
+    }
+  }
 
   void _onMenuPressed() {
     // TODO: Open drawer/menu
