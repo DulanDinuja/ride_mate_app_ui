@@ -3,22 +3,20 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../core/routes/app_routes.dart';
-
-class VehicleInsuranceUploadScreen extends StatefulWidget {
-  const VehicleInsuranceUploadScreen({super.key});
+class RevenueLicenseUploadScreen extends StatefulWidget {
+  const RevenueLicenseUploadScreen({super.key});
 
   @override
-  State<VehicleInsuranceUploadScreen> createState() => _VehicleInsuranceUploadScreenState();
+  State<RevenueLicenseUploadScreen> createState() => _RevenueLicenseUploadScreenState();
 }
 
-enum _InsuranceSide { front, back }
+enum _RevenueLicenseSide { front, back }
 
-class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScreen> {
+class _RevenueLicenseUploadScreenState extends State<RevenueLicenseUploadScreen> {
   final ImagePicker _picker = ImagePicker();
-  final Map<_InsuranceSide, Uint8List?> _photos = {
-    _InsuranceSide.front: null,
-    _InsuranceSide.back: null,
+  final Map<_RevenueLicenseSide, Uint8List?> _photos = {
+    _RevenueLicenseSide.front: null,
+    _RevenueLicenseSide.back: null,
   };
 
   static const Color _screenBackground = Colors.black;
@@ -30,7 +28,7 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
   static const Color _accent = Color(0xFF10B47A);
   static const Color _buttonDark = Color(0xFF001A3A);
 
-  Future<void> _selectPhoto(_InsuranceSide side) async {
+  Future<void> _selectPhoto(_RevenueLicenseSide side) async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -86,7 +84,7 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
     }
   }
 
-  void _onNextPressed() {
+  void _onCompleteRegistrationPressed() {
     final missing = _photos.entries
         .where((entry) => entry.value == null)
         .map((entry) => _labelFor(entry.key))
@@ -99,7 +97,9 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
       return;
     }
 
-    Navigator.of(context).pushNamed(AppRoutes.revenueLicenseUpload);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Registration completed successfully')),
+    );
   }
 
   @override
@@ -123,7 +123,7 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
                   _buildStepper(),
                   const SizedBox(height: 44),
                   const Text(
-                    'Vehicle Insurance',
+                    'Revenue License',
                     style: TextStyle(
                       fontSize: 21,
                       fontWeight: FontWeight.w700,
@@ -141,15 +141,15 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
                     ),
                   ),
                   const SizedBox(height: 30),
-                  _buildPhotoCard(_InsuranceSide.front),
+                  _buildPhotoCard(_RevenueLicenseSide.front),
                   const SizedBox(height: 16),
-                  _buildPhotoCard(_InsuranceSide.back),
+                  _buildPhotoCard(_RevenueLicenseSide.back),
                   const SizedBox(height: 44),
                   SizedBox(
                     width: double.infinity,
                     height: 58,
                     child: ElevatedButton(
-                      onPressed: _onNextPressed,
+                      onPressed: _onCompleteRegistrationPressed,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _buttonDark,
                         foregroundColor: Colors.white,
@@ -158,7 +158,7 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
                         ),
                       ),
                       child: const Text(
-                        'Next',
+                        'Complete Registration',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w500,
@@ -230,7 +230,7 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
     );
   }
 
-  Widget _buildPhotoCard(_InsuranceSide side) {
+  Widget _buildPhotoCard(_RevenueLicenseSide side) {
     final image = _photos[side];
 
     return GestureDetector(
@@ -287,11 +287,11 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
     );
   }
 
-  String _labelFor(_InsuranceSide side) {
+  String _labelFor(_RevenueLicenseSide side) {
     switch (side) {
-      case _InsuranceSide.front:
+      case _RevenueLicenseSide.front:
         return 'Front';
-      case _InsuranceSide.back:
+      case _RevenueLicenseSide.back:
         return 'Back';
     }
   }
@@ -308,7 +308,7 @@ class _StepCircle extends StatelessWidget {
       width: 86,
       height: 86,
       decoration: const BoxDecoration(
-        color: _VehicleInsuranceUploadScreenState._accent,
+        color: _RevenueLicenseUploadScreenState._accent,
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
