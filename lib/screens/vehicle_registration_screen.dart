@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/routes/app_routes.dart';
 
 class VehicleRegistrationScreen extends StatefulWidget {
   const VehicleRegistrationScreen({super.key});
@@ -47,9 +48,7 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Vehicle details saved')),
-    );
+    Navigator.of(context).pushNamed(AppRoutes.vehiclePhotosUpload);
   }
 
   @override
