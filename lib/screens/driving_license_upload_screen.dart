@@ -3,24 +3,20 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../core/routes/app_routes.dart';
-
-class VehiclePhotosUploadScreen extends StatefulWidget {
-  const VehiclePhotosUploadScreen({super.key});
+class DrivingLicenseUploadScreen extends StatefulWidget {
+  const DrivingLicenseUploadScreen({super.key});
 
   @override
-  State<VehiclePhotosUploadScreen> createState() => _VehiclePhotosUploadScreenState();
+  State<DrivingLicenseUploadScreen> createState() => _DrivingLicenseUploadScreenState();
 }
 
-enum _VehiclePhotoSide { front, rear, left, right }
+enum _LicenseSide { front, back }
 
-class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
+class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen> {
   final ImagePicker _picker = ImagePicker();
-  final Map<_VehiclePhotoSide, Uint8List?> _photos = {
-    _VehiclePhotoSide.front: null,
-    _VehiclePhotoSide.rear: null,
-    _VehiclePhotoSide.left: null,
-    _VehiclePhotoSide.right: null,
+  final Map<_LicenseSide, Uint8List?> _photos = {
+    _LicenseSide.front: null,
+    _LicenseSide.back: null,
   };
 
   static const Color _screenBackground = Colors.black;
@@ -32,7 +28,7 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
   static const Color _accent = Color(0xFF10B47A);
   static const Color _buttonDark = Color(0xFF001A3A);
 
-  Future<void> _selectPhoto(_VehiclePhotoSide side) async {
+  Future<void> _selectPhoto(_LicenseSide side) async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -79,9 +75,7 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
       final bytes = await file.readAsBytes();
 
       if (!mounted) return;
-      setState(() {
-        _photos[side] = bytes;
-      });
+      setState(() => _photos[side] = bytes);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -98,12 +92,14 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
 
     if (missing.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please add: ${missing.join(', ')}')),
+        SnackBar(content: Text('Please add: ${missing.join(' and ')} side')),
       );
       return;
     }
 
-    Navigator.of(context).pushNamed(AppRoutes.drivingLicenseUpload);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Driving license photos uploaded successfully')),
+    );
   }
 
   @override
@@ -127,9 +123,9 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
                   _buildStepper(),
                   const SizedBox(height: 44),
                   const Text(
-                    'Vehicle Photos',
+                    'Driving License',
                     style: TextStyle(
-                      fontSize: 42 / 2,
+                      fontSize: 21,
                       fontWeight: FontWeight.w700,
                       color: _textPrimary,
                     ),
@@ -145,21 +141,9 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
                     ),
                   ),
                   const SizedBox(height: 30),
-                  Row(
-                    children: [
-                      Expanded(child: _buildPhotoCard(_VehiclePhotoSide.front)),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildPhotoCard(_VehiclePhotoSide.rear)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(child: _buildPhotoCard(_VehiclePhotoSide.left)),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildPhotoCard(_VehiclePhotoSide.right)),
-                    ],
-                  ),
+                  _buildPhotoCard(_LicenseSide.front),
+                  const SizedBox(height: 24),
+                  _buildPhotoCard(_LicenseSide.back),
                   const SizedBox(height: 44),
                   SizedBox(
                     width: double.infinity,
@@ -246,14 +230,14 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
     );
   }
 
-  Widget _buildPhotoCard(_VehiclePhotoSide side) {
+  Widget _buildPhotoCard(_LicenseSide side) {
     final image = _photos[side];
-    final label = _labelFor(side);
 
     return GestureDetector(
       onTap: () => _selectPhoto(side),
       child: Container(
-        height: 200,
+        width: double.infinity,
+        height: 250,
         decoration: BoxDecoration(
           color: image == null ? _cardMuted : _cardBackground,
           borderRadius: BorderRadius.circular(28),
@@ -265,14 +249,14 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
                 children: [
                   const Icon(
                     Icons.camera_alt_rounded,
-                    size: 48,
+                    size: 56,
                     color: Color(0xFFEFEFDF),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    '$label Side',
+                    '${_labelFor(side)} Side',
                     style: const TextStyle(
-                      fontSize: 17,
+                      fontSize: 35 / 2,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFF7E8388),
                     ),
@@ -282,10 +266,7 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
             : Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.memory(
-                    image,
-                    fit: BoxFit.cover,
-                  ),
+                  Image.memory(image, fit: BoxFit.cover),
                   Positioned(
                     top: 8,
                     right: 8,
@@ -306,16 +287,12 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
     );
   }
 
-  String _labelFor(_VehiclePhotoSide side) {
+  String _labelFor(_LicenseSide side) {
     switch (side) {
-      case _VehiclePhotoSide.front:
+      case _LicenseSide.front:
         return 'Front';
-      case _VehiclePhotoSide.rear:
-        return 'Rear';
-      case _VehiclePhotoSide.left:
-        return 'Left';
-      case _VehiclePhotoSide.right:
-        return 'Right';
+      case _LicenseSide.back:
+        return 'Back';
     }
   }
 }
@@ -331,7 +308,7 @@ class _StepCircle extends StatelessWidget {
       width: 86,
       height: 86,
       decoration: const BoxDecoration(
-        color: _VehiclePhotosUploadScreenState._accent,
+        color: _DrivingLicenseUploadScreenState._accent,
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
