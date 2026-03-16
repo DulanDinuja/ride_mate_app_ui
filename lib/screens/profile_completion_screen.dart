@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../core/routes/app_routes.dart';
+import '../models/identification_type.dart';
 import '../models/user_verification_args.dart';
+import '../services/identification_type_service.dart';
 
 class ProfileCompletionScreen extends StatefulWidget {
   const ProfileCompletionScreen({super.key});
@@ -12,13 +14,21 @@ class ProfileCompletionScreen extends StatefulWidget {
 class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   final TextEditingController _idNumberController = TextEditingController();
 
-  final List<String> _documentTypes = const ['NIC', 'Passport'];
+  List<IdentificationType> _documentTypes = const [];
   final List<String> _genders = const ['Male', 'Female', 'Other'];
 
   bool _willingToDrive = true;
-  String _selectedDocumentType = 'NIC';
+  int? _selectedDocumentTypeId;
+  String? _selectedDocumentTypeName;
   String? _selectedGender;
   DateTime? _selectedDateOfBirth;
+  bool _isLoadingDocumentTypes = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDocumentTypes();
+  }
 
   @override
   void dispose() {
@@ -102,14 +112,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildDropdownField(
-                        value: _selectedDocumentType,
-                        items: _documentTypes,
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setState(() => _selectedDocumentType = value);
-                        },
-                      ),
+                      _buildDocumentTypeDropdown(),
                       const SizedBox(height: 26),
                       const Text(
                         'NIC Number / Passport Number',
@@ -393,6 +396,102 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     );
   }
 
+  Widget _buildDocumentTypeDropdown() {
+    if (_isLoadingDocumentTypes) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE3E3D8),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Loading document types...',
+              style: TextStyle(fontSize: 16, color: Color(0xFF8D939D)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE3E3D8),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          isExpanded: true,
+          value: _selectedDocumentTypeId,
+          icon: const Icon(
+            Icons.keyboard_arrow_down,
+            color: Color(0xFFA8AAB0),
+            size: 36,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          style: const TextStyle(
+            fontSize: 17,
+            color: Color(0xFF8D939D),
+            fontWeight: FontWeight.w500,
+          ),
+          dropdownColor: const Color(0xFFFFFFF0),
+          items: _documentTypes
+              .map(
+                (item) => DropdownMenuItem<int>(
+                  value: item.id,
+                  child: Text(item.name),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            if (value == null) return;
+            final selected = _documentTypes.firstWhere((item) => item.id == value);
+            setState(() {
+              _selectedDocumentTypeId = selected.id;
+              _selectedDocumentTypeName = selected.name;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadDocumentTypes() async {
+    try {
+      final types = await IdentificationTypeService.getActiveIdentificationTypes();
+      if (!mounted) return;
+
+      setState(() {
+        _documentTypes = types;
+        _isLoadingDocumentTypes = false;
+        if (types.isNotEmpty) {
+          _selectedDocumentTypeId = types.first.id;
+          _selectedDocumentTypeName = types.first.name;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingDocumentTypes = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load document types: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
   Future<void> _pickDateOfBirth() async {
     final now = DateTime.now();
     final initialDate = _selectedDateOfBirth ?? DateTime(now.year - 18, now.month, now.day);
@@ -416,6 +515,13 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   }
 
   void _onNextPressed() {
+    if (_selectedDocumentTypeId == null || _selectedDocumentTypeName == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a document type')),
+      );
+      return;
+    }
+
     final idNumber = _idNumberController.text.trim();
     if (idNumber.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -442,7 +548,8 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       context,
       AppRoutes.userVerification,
       arguments: UserVerificationArgs(
-        documentType: _selectedDocumentType,
+        documentTypeId: _selectedDocumentTypeId!,
+        documentType: _selectedDocumentTypeName!,
         idNumber: idNumber,
         gender: _selectedGender!,
         willingToDrive: _willingToDrive,
