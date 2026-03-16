@@ -12,7 +12,7 @@ import 'token_service.dart';
 class AuthService {
   // ─── Register ─────────────────────────────────────────────────────
 
-  static Future<ApiResponse> registerUser(UserRegistrationRequest request) async {
+  static Future<LoginResponse> registerUser(UserRegistrationRequest request) async {
     try {
       final response = await ApiClient.publicPost(
         '/auth/register',
@@ -20,7 +20,11 @@ class AuthService {
       );
 
       if (response.statusCode == 201) {
-        return ApiResponse.fromJson(jsonDecode(response.body));
+        final loginResponse = LoginResponse.fromJson(jsonDecode(response.body));
+        if (loginResponse.success && loginResponse.accessToken != null) {
+          await TokenService.saveLoginResponse(loginResponse);
+        }
+        return loginResponse;
       } else {
         final error = jsonDecode(response.body);
         if (error.containsKey('errorMessage') && error['errorMessage'] != null) {
