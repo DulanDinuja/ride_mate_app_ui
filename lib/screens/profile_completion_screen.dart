@@ -544,6 +544,10 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       return;
     }
 
+    final dob = _selectedDateOfBirth!;
+    final dateOfBirthStr =
+        '${dob.year}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
+
     Navigator.pushNamed(
       context,
       AppRoutes.userVerification,
@@ -553,6 +557,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
         idNumber: idNumber,
         gender: _selectedGender!,
         userRole: _willingToDrive ? 'YES' : 'NO',
+        dateOfBirth: dateOfBirthStr,
       ),
     );
   }

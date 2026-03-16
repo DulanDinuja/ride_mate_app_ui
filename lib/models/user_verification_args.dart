@@ -5,6 +5,7 @@ class UserVerificationArgs {
     required this.idNumber,
     required this.gender,
     required this.userRole,
+    required this.dateOfBirth,
   });
 
   final int documentTypeId;
@@ -12,5 +13,8 @@ class UserVerificationArgs {
   final String idNumber;
   final String gender;
   final String userRole;
+
+  /// ISO-8601 date string, e.g. "1995-06-15"
+  final String dateOfBirth;
 }
 

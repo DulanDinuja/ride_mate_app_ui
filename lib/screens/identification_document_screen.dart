@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../core/routes/app_routes.dart';
 import '../models/user_verification_args.dart';
+import '../services/token_service.dart';
+import '../services/user_service.dart';
 import 'selfie_camera_screen.dart';
 
 class IdentificationDocumentScreen extends StatefulWidget {
@@ -23,6 +25,7 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
   Uint8List? _capturedDocument;
   Uint8List? _capturedRearDocument;
   bool _isOpeningCamera = false;
+  bool _isSubmitting = false;
 
   static const Color _screenBackground = Colors.black;
   static const Color _panelBackground = Color(0xFFFFFFF0);
@@ -126,8 +129,51 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
     );
   }
 
-  Widget _buildInstructionView(BuildContext context) {
-    return Padding(
+  Future<void> _submitUserProfile() async {
+    setState(() => _isSubmitting = true);
+    try {
+      final userIdStr = await TokenService.getUserId();
+      final userId = int.tryParse(userIdStr ?? '') ?? 0;
+
+      // Convert gender to uppercase to match backend enum (e.g. "Male" → "MALE")
+      final gender = widget.args.gender.toUpperCase();
+
+      final body = <String, dynamic>{
+        'userId': userId,
+        'profileImageDocumentId': null,
+        'dateOfBirth': widget.args.dateOfBirth,
+        'gender': gender,
+        'willingToDrive': widget.args.userRole, // "YES" or "NO"
+        'userIdentificationDetails': {
+          'userId': userId,
+          'identificationTypeId': widget.args.documentTypeId,
+          'identificationNumber': widget.args.idNumber,
+          'frontImageDocumentId': null,
+          'backImageDocumentId': null,
+          'isVerified': 'YES',
+          'verificationNotes': 'Verified successfully',
+          'status': 'ACTIVE',
+        },
+      };
+
+      await UserService.createUserProfile(body);
+
+      if (!mounted) return;
+      Navigator.of(context).pushNamed(AppRoutes.identificationSuccess);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save profile: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Widget _buildInstructionView(BuildContext context) {    return Padding(
       padding: const EdgeInsets.fromLTRB(22, 24, 22, 28),
       child: Column(
         children: [
@@ -495,9 +541,7 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
             width: double.infinity,
             height: 58,
             child: ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pushNamed(AppRoutes.identificationSuccess);
-              },
+              onPressed: _isSubmitting ? null : _submitUserProfile,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _accent,
                 foregroundColor: Colors.white,
@@ -505,13 +549,22 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
                   borderRadius: BorderRadius.circular(20),
                 ),
               ),
-              child: const Text(
-                'Continue To Next Step',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text(
+                      'Continue To Next Step',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
             ),
           ),
         ],
