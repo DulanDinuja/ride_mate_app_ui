@@ -3,22 +3,20 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../core/routes/app_routes.dart';
-
-class DrivingLicenseUploadScreen extends StatefulWidget {
-  const DrivingLicenseUploadScreen({super.key});
+class VehicleInsuranceUploadScreen extends StatefulWidget {
+  const VehicleInsuranceUploadScreen({super.key});
 
   @override
-  State<DrivingLicenseUploadScreen> createState() => _DrivingLicenseUploadScreenState();
+  State<VehicleInsuranceUploadScreen> createState() => _VehicleInsuranceUploadScreenState();
 }
 
-enum _LicenseSide { front, back }
+enum _InsuranceSide { front, back }
 
-class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen> {
+class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScreen> {
   final ImagePicker _picker = ImagePicker();
-  final Map<_LicenseSide, Uint8List?> _photos = {
-    _LicenseSide.front: null,
-    _LicenseSide.back: null,
+  final Map<_InsuranceSide, Uint8List?> _photos = {
+    _InsuranceSide.front: null,
+    _InsuranceSide.back: null,
   };
 
   static const Color _screenBackground = Colors.black;
@@ -30,7 +28,7 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
   static const Color _accent = Color(0xFF10B47A);
   static const Color _buttonDark = Color(0xFF001A3A);
 
-  Future<void> _selectPhoto(_LicenseSide side) async {
+  Future<void> _selectPhoto(_InsuranceSide side) async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -99,7 +97,9 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
       return;
     }
 
-    Navigator.of(context).pushNamed(AppRoutes.vehicleInsuranceUpload);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Vehicle insurance photos uploaded successfully')),
+    );
   }
 
   @override
@@ -123,7 +123,7 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
                   _buildStepper(),
                   const SizedBox(height: 44),
                   const Text(
-                    'Driving License',
+                    'Vehicle Insurance',
                     style: TextStyle(
                       fontSize: 21,
                       fontWeight: FontWeight.w700,
@@ -141,9 +141,9 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
                     ),
                   ),
                   const SizedBox(height: 30),
-                  _buildPhotoCard(_LicenseSide.front),
-                  const SizedBox(height: 24),
-                  _buildPhotoCard(_LicenseSide.back),
+                  _buildPhotoCard(_InsuranceSide.front),
+                  const SizedBox(height: 16),
+                  _buildPhotoCard(_InsuranceSide.back),
                   const SizedBox(height: 44),
                   SizedBox(
                     width: double.infinity,
@@ -230,7 +230,7 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
     );
   }
 
-  Widget _buildPhotoCard(_LicenseSide side) {
+  Widget _buildPhotoCard(_InsuranceSide side) {
     final image = _photos[side];
 
     return GestureDetector(
@@ -287,11 +287,11 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
     );
   }
 
-  String _labelFor(_LicenseSide side) {
+  String _labelFor(_InsuranceSide side) {
     switch (side) {
-      case _LicenseSide.front:
+      case _InsuranceSide.front:
         return 'Front';
-      case _LicenseSide.back:
+      case _InsuranceSide.back:
         return 'Back';
     }
   }
@@ -308,7 +308,7 @@ class _StepCircle extends StatelessWidget {
       width: 86,
       height: 86,
       decoration: const BoxDecoration(
-        color: _DrivingLicenseUploadScreenState._accent,
+        color: _VehicleInsuranceUploadScreenState._accent,
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
