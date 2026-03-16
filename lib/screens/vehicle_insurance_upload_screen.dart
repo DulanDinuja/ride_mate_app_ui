@@ -1,9 +1,12 @@
 import 'dart:typed_data';
 
+
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/routes/app_routes.dart';
+import 'selfie_camera_screen.dart';
 
 class VehicleInsuranceUploadScreen extends StatefulWidget {
   const VehicleInsuranceUploadScreen({super.key});
@@ -70,13 +73,28 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
     );
 
     if (source == null) return;
+    if (!mounted) return;
 
     try {
-      final file = await _picker.pickImage(source: source, imageQuality: 80);
-      if (file == null) return;
-      final bytes = await file.readAsBytes();
+      Uint8List? bytes;
+      if (source == ImageSource.camera) {
+        bytes = await Navigator.of(context).push<Uint8List>(
+          MaterialPageRoute(
+            builder: (_) => const SelfieCameraScreen(
+              title: 'Capture Vehicle Insurance',
+              preferredLensDirection: CameraLensDirection.back,
+              overlayShape: BoxShape.rectangle,
+            ),
+          ),
+        );
+      } else {
+        final file = await _picker.pickImage(source: source, imageQuality: 80);
+        if (file != null) {
+          bytes = await file.readAsBytes();
+        }
+      }
 
-      if (!mounted) return;
+      if (bytes == null || !mounted) return;
       setState(() => _photos[side] = bytes);
     } catch (e) {
       if (!mounted) return;
