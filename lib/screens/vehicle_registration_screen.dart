@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../core/routes/app_routes.dart';
+import '../models/vehicle_type.dart';
+import '../models/vehicle_make.dart';
+import '../services/vehicle_service.dart';
 
 class VehicleRegistrationScreen extends StatefulWidget {
   const VehicleRegistrationScreen({super.key});
@@ -8,19 +11,40 @@ class VehicleRegistrationScreen extends StatefulWidget {
   State<VehicleRegistrationScreen> createState() => _VehicleRegistrationScreenState();
 }
 
-enum VehicleType { bike, tuk, car, van }
+IconData _iconForVehicleCode(String code) {
+  switch (code.toUpperCase()) {
+    case 'BIKE':
+      return Icons.two_wheeler_rounded;
+    case 'TUK':
+      return Icons.electric_rickshaw_rounded;
+    case 'CAR':
+      return Icons.directions_car_filled_rounded;
+    case 'VAN':
+      return Icons.airport_shuttle_rounded;
+    default:
+      return Icons.directions_car_outlined;
+  }
+}
 
 class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
   final TextEditingController _registrationController =
-      TextEditingController(text: 'CAR-1515');
+      TextEditingController();
 
-  final List<String> _makes = const ['Toyota', 'Suzuki', 'Honda', 'Nissan'];
+  // API-loaded data
+  List<VehicleType> _vehicleTypes = [];
+  List<VehicleMake> _vehicleMakes = [];
+  bool _isLoadingTypes = true;
+  bool _isLoadingMakes = true;
+  String? _typesError;
+  String? _makesError;
+
+  VehicleType? _selectedVehicleType;
+  VehicleMake? _selectedMake;
+
   final List<String> _models = const ['Yaris', 'Prius', 'Alto', 'WagonR'];
   final List<String> _years = const ['2025', '2024', '2023', '2022'];
   final List<String> _colours = const ['Black', 'White', 'Silver', 'Blue'];
 
-  VehicleType _selectedVehicleType = VehicleType.car;
-  String _selectedMake = 'Toyota';
   String _selectedModel = 'Yaris';
   String _selectedYear = '2025';
   String _selectedColour = 'Black';
@@ -35,12 +59,80 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
   static const Color _buttonDark = Color(0xFF061324);
 
   @override
+  void initState() {
+    super.initState();
+    _loadVehicleTypes();
+    _loadVehicleMakes();
+  }
+
+  Future<void> _loadVehicleTypes() async {
+    setState(() {
+      _isLoadingTypes = true;
+      _typesError = null;
+    });
+    try {
+      final types = await VehicleService.getActiveVehicleTypes();
+      if (mounted) {
+        setState(() {
+          _vehicleTypes = types;
+          _isLoadingTypes = false;
+          if (types.isNotEmpty) _selectedVehicleType = types.first;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _typesError = e.toString().replaceFirst('Exception: ', '');
+          _isLoadingTypes = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadVehicleMakes() async {
+    setState(() {
+      _isLoadingMakes = true;
+      _makesError = null;
+    });
+    try {
+      final makes = await VehicleService.getVehicleMakesByStatus('ACTIVE');
+      if (mounted) {
+        setState(() {
+          _vehicleMakes = makes;
+          _isLoadingMakes = false;
+          if (makes.isNotEmpty) _selectedMake = makes.first;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _makesError = e.toString().replaceFirst('Exception: ', '');
+          _isLoadingMakes = false;
+        });
+      }
+    }
+  }
+
+
+  @override
   void dispose() {
     _registrationController.dispose();
     super.dispose();
   }
 
   void _onNextPressed() {
+    if (_selectedVehicleType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a vehicle type')),
+      );
+      return;
+    }
+    if (_selectedMake == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a vehicle make')),
+      );
+      return;
+    }
     if (_registrationController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter registration number')),
@@ -82,45 +174,7 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _VehicleTypeCard(
-                          label: 'Bike',
-                          icon: Icons.two_wheeler_rounded,
-                          isSelected: _selectedVehicleType == VehicleType.bike,
-                          onTap: () => setState(() => _selectedVehicleType = VehicleType.bike),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: _VehicleTypeCard(
-                          label: 'Tuk',
-                          icon: Icons.electric_rickshaw_rounded,
-                          isSelected: _selectedVehicleType == VehicleType.tuk,
-                          onTap: () => setState(() => _selectedVehicleType = VehicleType.tuk),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: _VehicleTypeCard(
-                          label: 'Car',
-                          icon: Icons.directions_car_filled_rounded,
-                          isSelected: _selectedVehicleType == VehicleType.car,
-                          onTap: () => setState(() => _selectedVehicleType = VehicleType.car),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: _VehicleTypeCard(
-                          label: 'Van',
-                          icon: Icons.airport_shuttle_rounded,
-                          isSelected: _selectedVehicleType == VehicleType.van,
-                          onTap: () => setState(() => _selectedVehicleType = VehicleType.van),
-                        ),
-                      ),
-                    ],
-                  ),
+                  _buildVehicleTypeSelector(),
                   const SizedBox(height: 32),
                   const Text(
                     'Make',
@@ -131,14 +185,7 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _buildDropdownField(
-                    value: _selectedMake,
-                    items: _makes,
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() => _selectedMake = value);
-                    },
-                  ),
+                  _buildMakeDropdown(),
                   const SizedBox(height: 26),
                   const Text(
                     'Model',
@@ -358,6 +405,124 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildVehicleTypeSelector() {
+    if (_isLoadingTypes) {
+      return const SizedBox(
+        height: 90,
+        child: Center(child: CircularProgressIndicator(color: _accent)),
+      );
+    }
+    if (_typesError != null) {
+      return Row(
+        children: [
+          Expanded(
+            child: Text(
+              _typesError!,
+              style: const TextStyle(color: Colors.red, fontSize: 13),
+            ),
+          ),
+          TextButton(
+            onPressed: _loadVehicleTypes,
+            child: const Text('Retry', style: TextStyle(color: _accent)),
+          ),
+        ],
+      );
+    }
+    if (_vehicleTypes.isEmpty) {
+      return const Text('No vehicle types available.',
+          style: TextStyle(color: _textPrimary));
+    }
+
+    final children = <Widget>[];
+    for (int i = 0; i < _vehicleTypes.length; i++) {
+      if (i > 0) children.add(const SizedBox(width: 14));
+      final vt = _vehicleTypes[i];
+      children.add(
+        Expanded(
+          child: _VehicleTypeCard(
+            label: vt.name,
+            icon: _iconForVehicleCode(vt.code),
+            isSelected: _selectedVehicleType?.id == vt.id,
+            onTap: () => setState(() => _selectedVehicleType = vt),
+          ),
+        ),
+      );
+    }
+    return Row(children: children);
+  }
+
+  Widget _buildMakeDropdown() {
+    if (_isLoadingMakes) {
+      return const SizedBox(
+        height: 62,
+        child: Center(child: CircularProgressIndicator(color: _accent)),
+      );
+    }
+    if (_makesError != null) {
+      return Row(
+        children: [
+          Expanded(
+            child: Text(
+              _makesError!,
+              style: const TextStyle(color: Colors.red, fontSize: 13),
+            ),
+          ),
+          TextButton(
+            onPressed: _loadVehicleMakes,
+            child: const Text('Retry', style: TextStyle(color: _accent)),
+          ),
+        ],
+      );
+    }
+    if (_vehicleMakes.isEmpty) {
+      return const Text('No vehicle makes available.',
+          style: TextStyle(color: _textPrimary));
+    }
+
+    return DropdownButtonFormField<VehicleMake>(
+      value: _selectedMake,
+      icon: const Icon(
+        Icons.keyboard_arrow_down_rounded,
+        color: Color(0xFFB5B6B8),
+        size: 32,
+      ),
+      dropdownColor: Colors.white,
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: _fieldBackground,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: const BorderSide(color: _accent, width: 1.5),
+        ),
+      ),
+      style: const TextStyle(
+        fontSize: 17,
+        color: Color(0xFF8F95A1),
+        fontWeight: FontWeight.w400,
+      ),
+      items: _vehicleMakes
+          .map((m) => DropdownMenuItem<VehicleMake>(
+                value: m,
+                child: Text(m.name),
+              ))
+          .toList(),
+      onChanged: (value) {
+        if (value == null) return;
+        setState(() => _selectedMake = value);
+      },
     );
   }
 
