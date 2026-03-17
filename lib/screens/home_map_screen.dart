@@ -379,6 +379,11 @@ class HomeMapScreenState extends State<HomeMapScreen> {
   }
 
   Widget _buildPickupDropCard() {
+    final scheme = Theme.of(context).colorScheme;
+    final panelColor = scheme.surface.withOpacity(0.92);
+    final borderColor = scheme.outline.withOpacity(0.35);
+    final inputColor = scheme.surfaceContainerHighest.withOpacity(0.75);
+
     return SafeArea(
       child: Align(
         alignment: Alignment.bottomCenter,
@@ -391,9 +396,9 @@ class HomeMapScreenState extends State<HomeMapScreen> {
               child: Container(
                 padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0B1522).withOpacity(0.9),
+                  color: panelColor,
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  border: Border.all(color: borderColor),
                   boxShadow: const [
                     BoxShadow(
                       color: Color(0x55000000),
@@ -409,17 +414,17 @@ class HomeMapScreenState extends State<HomeMapScreen> {
                       width: 44,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.white30,
+                        color: scheme.outline.withOpacity(0.6),
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                     const SizedBox(height: 10),
-                    const Align(
+                    Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
                         'Set your route',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: scheme.onSurface,
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
                         ),
@@ -432,7 +437,7 @@ class HomeMapScreenState extends State<HomeMapScreen> {
                       label: 'Pickup',
                       value: _pickupAddress,
                       trailing: IconButton(
-                        icon: const Icon(Icons.gps_fixed, color: Colors.white),
+                        icon: Icon(Icons.gps_fixed, color: scheme.primary),
                         onPressed: _isLocating ? null : refreshCurrentLocation,
                       ),
                     ),
@@ -440,34 +445,34 @@ class HomeMapScreenState extends State<HomeMapScreen> {
                     Container(
                       padding: const EdgeInsets.fromLTRB(10, 2, 8, 2),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.08),
+                        color: inputColor,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.white.withOpacity(0.08)),
+                        border: Border.all(color: borderColor),
                       ),
                       child: TextField(
                         controller: _dropSearchController,
                         textInputAction: TextInputAction.search,
                         onSubmitted: _searchDropLocation,
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(color: scheme.onSurface),
                         decoration: InputDecoration(
                           labelText: 'Drop location',
-                          labelStyle: const TextStyle(color: Colors.white70),
+                          labelStyle: TextStyle(color: scheme.onSurfaceVariant),
                           hintText: 'Search destination',
-                          hintStyle: const TextStyle(color: Colors.white38),
+                          hintStyle: TextStyle(color: scheme.onSurfaceVariant.withOpacity(0.7)),
                           border: InputBorder.none,
-                          prefixIcon: const Icon(Icons.location_on, color: Colors.redAccent),
+                          prefixIcon: Icon(Icons.location_on, color: scheme.error),
                           suffixIcon: _isSearchingDrop
-                              ? const Padding(
-                                  padding: EdgeInsets.all(12),
+                              ? Padding(
+                                  padding: const EdgeInsets.all(12),
                                   child: SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: scheme.primary),
                                   ),
                                 )
                               : IconButton(
                                   onPressed: () => _searchDropLocation(_dropSearchController.text),
-                                  icon: const Icon(Icons.search, color: Colors.white),
+                                  icon: Icon(Icons.search, color: scheme.primary),
                                 ),
                         ),
                       ),
@@ -479,15 +484,15 @@ class HomeMapScreenState extends State<HomeMapScreen> {
                         _dropAddress,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12, color: Colors.white70),
+                        style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Align(
+                    Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
                         'Tip: Tap anywhere on the map to set drop location.',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF8BC7FF)),
+                        style: TextStyle(fontSize: 12, color: scheme.primary),
                       ),
                     ),
                   ],
@@ -507,12 +512,14 @@ class HomeMapScreenState extends State<HomeMapScreen> {
     required String value,
     Widget? trailing,
   }) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
+        color: scheme.surfaceContainerHighest.withOpacity(0.7),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: scheme.outline.withOpacity(0.35)),
       ),
       child: Row(
       children: [
@@ -521,7 +528,7 @@ class HomeMapScreenState extends State<HomeMapScreen> {
           height: 34,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withOpacity(0.1),
+            color: scheme.primary.withOpacity(0.14),
           ),
           child: Icon(icon, color: iconColor, size: 18),
         ),
@@ -530,13 +537,13 @@ class HomeMapScreenState extends State<HomeMapScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+              Text(label, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
               const SizedBox(height: 2),
               Text(
                 value,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: scheme.onSurface),
               ),
             ],
           ),
