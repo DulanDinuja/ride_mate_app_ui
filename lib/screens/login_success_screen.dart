@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../core/routes/app_routes.dart';
+import '../services/token_service.dart';
+import '../services/user_service.dart';
 import '../widgets/custom_button.dart';
 
 class LoginSuccessScreen extends StatefulWidget {
@@ -37,8 +39,24 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen>
 
   Future<void> _onLetsExplore() async {
     setState(() => _isLoading = true);
-    if (!mounted) return;
-    Navigator.pushReplacementNamed(context, AppRoutes.userHomeMap);
+    try {
+      final userId = await TokenService.getUserId();
+      if (!mounted) return;
+      if (userId != null) {
+        final profile = await UserService.getUserProfileByUserId(userId);
+        if (!mounted) return;
+        if (profile.isProfileCompleted) {
+          Navigator.pushReplacementNamed(context, AppRoutes.userHomeMap);
+        } else {
+          Navigator.pushReplacementNamed(context, AppRoutes.homeMap);
+        }
+        return;
+      }
+    } catch (_) {}
+    if (mounted) {
+      setState(() => _isLoading = false);
+      Navigator.pushReplacementNamed(context, AppRoutes.homeMap);
+    }
   }
 
   @override
