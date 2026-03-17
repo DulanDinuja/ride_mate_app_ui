@@ -84,7 +84,7 @@ class HomeMapScreenState extends State<HomeMapScreen> {
         setState(() => _showProfileCard = true);
       }
     } catch (_) {
-      // Silently ignore so map remains usable.
+      if (mounted) setState(() => _showProfileCard = true);
     }
   }
 
