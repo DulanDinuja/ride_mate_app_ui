@@ -1,7 +1,6 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -11,12 +10,10 @@ import '../services/user_service.dart';
 
 class HomeMapScreen extends StatefulWidget {
   final bool showProfilePrompt;
-  final bool showMenuButton;
 
   const HomeMapScreen({
     super.key,
     this.showProfilePrompt = true,
-    this.showMenuButton = true,
   });
 
   @override
@@ -25,7 +22,6 @@ class HomeMapScreen extends StatefulWidget {
 
 class HomeMapScreenState extends State<HomeMapScreen> {
   static const LatLng _defaultCenter = LatLng(6.9271, 79.8612);
-  static const double _bottomCardSpace = 255;
   static const String _darkMapStyle = '''
 [
   {"elementType":"geometry","stylers":[{"color":"#1d1f24"}]},
@@ -46,17 +42,10 @@ class HomeMapScreenState extends State<HomeMapScreen> {
 
   bool _showProfileCard = false;
   bool _isLocating = true;
-  bool _isSearchingDrop = false;
   String? _locationError;
-  String _pickupAddress = 'Detecting current location...';
-  String _dropAddress = 'Choose drop location by map tap or search.';
 
   GoogleMapController? _mapController;
   LatLng? _currentLatLng;
-  LatLng? _pickupLatLng;
-  LatLng? _dropLatLng;
-
-  final TextEditingController _dropSearchController = TextEditingController();
 
   @override
   void initState() {
@@ -68,7 +57,6 @@ class HomeMapScreenState extends State<HomeMapScreen> {
   @override
   void dispose() {
     _mapController?.dispose();
-    _dropSearchController.dispose();
     super.dispose();
   }
 
@@ -125,7 +113,7 @@ class HomeMapScreenState extends State<HomeMapScreen> {
       final latLng = LatLng(position.latitude, position.longitude);
       if (!mounted) return;
 
-      await _setPickupLocation(latLng);
+      await _setCurrentLocation(latLng);
 
       if (_mapController != null) {
         await _mapController!.animateCamera(
@@ -144,85 +132,9 @@ class HomeMapScreenState extends State<HomeMapScreen> {
     }
   }
 
-  Future<void> _setPickupLocation(LatLng latLng) async {
-    final readable = await _resolveAddress(latLng);
+  Future<void> _setCurrentLocation(LatLng latLng) async {
     if (!mounted) return;
-
-    setState(() {
-      _currentLatLng = latLng;
-      _pickupLatLng = latLng;
-      _pickupAddress = readable;
-    });
-  }
-
-  Future<void> _setDropLocation(LatLng latLng, {String? knownAddress}) async {
-    final readable = knownAddress ?? await _resolveAddress(latLng);
-    if (!mounted) return;
-
-    setState(() {
-      _dropLatLng = latLng;
-      _dropAddress = readable;
-      _dropSearchController.text = readable;
-    });
-
-    if (_mapController != null) {
-      await _mapController!.animateCamera(
-        CameraUpdate.newLatLngZoom(latLng, 16),
-      );
-    }
-  }
-
-  Future<void> _searchDropLocation(String query) async {
-    final input = query.trim();
-    if (input.isEmpty) return;
-
-    setState(() => _isSearchingDrop = true);
-    try {
-      final locations = await locationFromAddress(input);
-      if (locations.isEmpty) {
-        throw Exception('No location found for "$input".');
-      }
-
-      final first = locations.first;
-      await _setDropLocation(
-        LatLng(first.latitude, first.longitude),
-        knownAddress: input,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Drop search failed: ${e.toString().replaceFirst('Exception: ', '')}'),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isSearchingDrop = false);
-      }
-    }
-  }
-
-  Future<String> _resolveAddress(LatLng latLng) async {
-    try {
-      final places = await placemarkFromCoordinates(latLng.latitude, latLng.longitude);
-      if (places.isEmpty) {
-        return '${latLng.latitude.toStringAsFixed(5)}, ${latLng.longitude.toStringAsFixed(5)}';
-      }
-
-      final p = places.first;
-      final parts = <String>[
-        if ((p.name ?? '').trim().isNotEmpty) p.name!.trim(),
-        if ((p.locality ?? '').trim().isNotEmpty) p.locality!.trim(),
-        if ((p.administrativeArea ?? '').trim().isNotEmpty) p.administrativeArea!.trim(),
-      ];
-      if (parts.isEmpty) {
-        return '${latLng.latitude.toStringAsFixed(5)}, ${latLng.longitude.toStringAsFixed(5)}';
-      }
-      return parts.join(', ');
-    } catch (_) {
-      return '${latLng.latitude.toStringAsFixed(5)}, ${latLng.longitude.toStringAsFixed(5)}';
-    }
+    setState(() => _currentLatLng = latLng);
   }
 
   void _onMapCreated(GoogleMapController controller) {
@@ -232,35 +144,15 @@ class HomeMapScreenState extends State<HomeMapScreen> {
     }
   }
 
-  void _onMenuPressed() {
-    // Placeholder for future drawer/menu action.
-  }
-
   @override
   Widget build(BuildContext context) {
     final current = _currentLatLng;
-    final markers = <Marker>{
-      if (_pickupLatLng != null)
-        Marker(
-          markerId: const MarkerId('pickup_location'),
-          position: _pickupLatLng!,
-          infoWindow: const InfoWindow(title: 'Pickup location'),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        ),
-      if (_dropLatLng != null)
-        Marker(
-          markerId: const MarkerId('drop_location'),
-          position: _dropLatLng!,
-          infoWindow: const InfoWindow(title: 'Drop location'),
-        ),
-    };
 
     return Scaffold(
       body: Stack(
         children: [
           GoogleMap(
             onMapCreated: _onMapCreated,
-            onTap: _setDropLocation,
             style: _darkMapStyle,
             initialCameraPosition: CameraPosition(
               target: current ?? _defaultCenter,
@@ -269,10 +161,8 @@ class HomeMapScreenState extends State<HomeMapScreen> {
             myLocationEnabled: current != null,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
-            markers: markers,
           ),
-          _buildTopPanel(),
-          _buildConfirmButton(),
+          _buildLocationButton(),
           if (_isLocating) _buildStatusBanner('Getting your current location...'),
           if (_locationError != null) _buildErrorBanner(_locationError!),
           if (_showProfileCard) _buildCompleteProfileCard(),
@@ -281,127 +171,27 @@ class HomeMapScreenState extends State<HomeMapScreen> {
     );
   }
 
-  Widget _buildTopPanel() {
-    final scheme = Theme.of(context).colorScheme;
-    final borderColor = scheme.outline.withOpacity(0.35);
-    final inputColor = scheme.surfaceContainerHighest.withOpacity(0.75);
-
+  Widget _buildLocationButton() {
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: GestureDetector(
+            onTap: _isLocating ? null : refreshCurrentLocation,
             child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: scheme.surface.withOpacity(0.92),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: borderColor),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x55000000), blurRadius: 14, offset: Offset(0, 4)),
-                ],
+                shape: BoxShape.circle,
+                color: const Color(0xFF040F1B).withOpacity(0.9),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Menu row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      GestureDetector(
-                        onTap: _isLocating ? null : refreshCurrentLocation,
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFF040F1B).withOpacity(0.9),
-                          ),
-                          child: _isLocating
-                              ? const Padding(
-                                  padding: EdgeInsets.all(10),
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Icon(Icons.my_location, color: Colors.white, size: 20),
-                        ),
-                      ),
-                      if (widget.showMenuButton)
-                        GestureDetector(
-                          onTap: _onMenuPressed,
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: const Color(0xFF040F1B).withOpacity(0.9),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                _buildMenuLine(),
-                                const SizedBox(height: 4),
-                                _buildMenuLine(),
-                                const SizedBox(height: 4),
-                                _buildMenuLine(),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  // Pickup row
-                  _buildLocationRow(
-                    icon: Icons.my_location,
-                    iconColor: const Color(0xFF03AF74),
-                    label: 'Pickup',
-                    value: _pickupAddress,
-                    trailing: IconButton(
-                      icon: Icon(Icons.gps_fixed, color: scheme.primary, size: 20),
-                      onPressed: _isLocating ? null : refreshCurrentLocation,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // Drop search field
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(10, 2, 8, 2),
-                    decoration: BoxDecoration(
-                      color: inputColor,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: borderColor),
-                    ),
-                    child: TextField(
-                      controller: _dropSearchController,
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: _searchDropLocation,
-                      style: TextStyle(color: scheme.onSurface),
-                      decoration: InputDecoration(
-                        labelText: 'Drop location',
-                        labelStyle: TextStyle(color: scheme.onSurfaceVariant),
-                        hintText: 'Search destination',
-                        hintStyle: TextStyle(color: scheme.onSurfaceVariant.withOpacity(0.7)),
-                        border: InputBorder.none,
-                        prefixIcon: Icon(Icons.location_on, color: scheme.error),
-                        suffixIcon: _isSearchingDrop
-                            ? const Padding(
-                                padding: EdgeInsets.all(12),
-                                child: SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                              )
-                            : IconButton(
-                                onPressed: () => _searchDropLocation(_dropSearchController.text),
-                                icon: Icon(Icons.search, color: scheme.primary),
-                              ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              child: _isLocating
+                  ? const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.my_location, color: Colors.white, size: 20),
             ),
           ),
         ),
@@ -414,7 +204,7 @@ class HomeMapScreenState extends State<HomeMapScreen> {
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Container(
-          margin: const EdgeInsets.only(bottom: _bottomCardSpace),
+          margin: const EdgeInsets.only(bottom: 20),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: Colors.black87,
@@ -431,7 +221,7 @@ class HomeMapScreenState extends State<HomeMapScreen> {
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Container(
-          margin: const EdgeInsets.only(bottom: _bottomCardSpace),
+          margin: const EdgeInsets.only(bottom: 20),
           padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
           decoration: BoxDecoration(
             color: Colors.red.shade700,
@@ -440,12 +230,7 @@ class HomeMapScreenState extends State<HomeMapScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Flexible(
-                child: Text(
-                  message,
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
+              Flexible(child: Text(message, style: const TextStyle(color: Colors.white))),
               TextButton(
                 onPressed: refreshCurrentLocation,
                 child: const Text('Retry', style: TextStyle(color: Colors.white)),
@@ -455,85 +240,6 @@ class HomeMapScreenState extends State<HomeMapScreen> {
         ),
       ),
     );
-  }
-
-  Widget _buildConfirmButton() {
-    return SafeArea(
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          child: SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: (_pickupLatLng != null && _dropLatLng != null) ? _onConfirmPressed : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF03AF74),
-                disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              child: const Text(
-                'Confirm',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _onConfirmPressed() {
-    // TODO: Navigate or proceed with pickup & drop locations
-  }
-
-  Widget _buildLocationRow({
-    required IconData icon,
-    required Color iconColor,
-    required String label,
-    required String value,
-    Widget? trailing,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outline.withOpacity(0.35)),
-      ),
-      child: Row(
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: scheme.primary.withOpacity(0.14),
-          ),
-          child: Icon(icon, color: iconColor, size: 18),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: scheme.onSurface),
-              ),
-            ],
-          ),
-        ),
-        if (trailing != null) trailing,
-      ],
-    ));
   }
 
   Widget _buildCompleteProfileCard() {
@@ -640,15 +346,5 @@ class HomeMapScreenState extends State<HomeMapScreen> {
     );
   }
 
-  Widget _buildMenuLine() {
-    return Container(
-      width: 22,
-      height: 3,
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFFF0),
-        borderRadius: BorderRadius.circular(20),
-      ),
-    );
-  }
 }
 

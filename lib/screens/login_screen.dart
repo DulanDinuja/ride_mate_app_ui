@@ -32,57 +32,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  bool _requiresProfileCompletion(String? message) {
-    if (message == null) return false;
-    final normalized = message.toLowerCase();
-    return normalized.contains('complete your profile') ||
-        normalized.contains('complete profile') ||
-        normalized.contains('complete your registration') ||
-        normalized.contains('complete registration') ||
-        normalized.contains('profile incomplete') ||
-        normalized.contains('registration incomplete') ||
-        normalized.contains('finish registration') ||
-        normalized.contains('finish profile');
-  }
-
-  bool _requiresProfileCompletionFromResponse(LoginResponse response) {
-    final completionFlagIndicatesIncomplete =
-        response.profileCompleted == false || response.registrationCompleted == false;
-
-    return completionFlagIndicatesIncomplete ||
-        _requiresProfileCompletion(response.message) ||
-        _requiresProfileCompletion(response.details) ||
-        _requiresProfileCompletion(response.code);
-  }
-
-  String _profileCompletionMessage(LoginResponse response) {
-    if (response.message.trim().isNotEmpty) return response.message;
-    if ((response.details ?? '').trim().isNotEmpty) return response.details!;
-    return 'Please complete your profile to continue.';
-  }
-
-  void _redirectToRegistrationScreen(String message) {
-    if (!mounted) return;
-
-    setState(() => _isLoading = false);
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const SignupScreen()),
-    );
-
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    });
-  }
-
   void _handleLogin() async {
     // Validate fields
     if (_emailController.text.trim().isEmpty) {
@@ -109,14 +58,6 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       final response = await AuthService.loginUser(request);
-      final responseMessage = _profileCompletionMessage(response);
-      final requiresProfileCompletion = _requiresProfileCompletionFromResponse(response);
-
-      if (mounted && requiresProfileCompletion) {
-        _redirectToRegistrationScreen(responseMessage);
-        return;
-      }
-
 
       if (mounted && response.success) {
         // Login successful - proceed to success screen
@@ -150,11 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
             .replaceAll('Exception: ', '')
             .replaceAll('Network error: Exception: ', '');
 
-        if (_requiresProfileCompletion(errorMessage)) {
-          _redirectToRegistrationScreen(errorMessage);
-
-        // Check if error is about email not verified
-        } else if (errorMessage.toLowerCase().contains('email not verified') ||
+        if (errorMessage.toLowerCase().contains('email not verified') ||
             errorMessage.toLowerCase().contains('verify your email')) {
 
           // Step 2: Email not verified - send verification code automatically

@@ -364,7 +364,6 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
       HomeMapScreen(
         key: _homeMapKey,
         showProfilePrompt: false,
-        showMenuButton: false,
       ),
     ];
 
