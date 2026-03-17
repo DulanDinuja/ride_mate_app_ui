@@ -1,11 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../core/routes/app_routes.dart';
 import '../widgets/custom_button.dart';
-import '../services/token_service.dart';
-import '../services/user_service.dart';
-import '../utils/snackbar_helper.dart';
-import 'home_map_screen.dart';
-import 'profile_completion_screen.dart';
 
 class LoginSuccessScreen extends StatefulWidget {
   const LoginSuccessScreen({super.key});
@@ -19,8 +15,7 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen>
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
-  bool _isLoading = false;
-  bool? _profileCompleted; // null = still loading
+  final bool _isLoading = false;
 
   @override
   void initState() {
@@ -38,33 +33,10 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen>
       curve: Curves.easeIn,
     );
     _controller.forward();
-    _loadProfileStatus();
-  }
-
-  Future<void> _loadProfileStatus() async {
-    try {
-      final userId = await TokenService.getUserId();
-      if (userId == null) return;
-      final profile = await UserService.getUserProfileByUserId(userId);
-      if (mounted) {
-        setState(() => _profileCompleted = profile.isProfileCompleted);
-      }
-    } catch (_) {
-      // Silently ignore — profile status banner is optional
-      if (mounted) setState(() => _profileCompleted = true);
-    }
   }
 
   void _onLetsExplore() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeMapScreen()),
-    );
-  }
-
-  void _onCompleteProfile() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const ProfileCompletionScreen()),
-    );
+    Navigator.pushReplacementNamed(context, AppRoutes.userHomeMap);
   }
 
   @override

@@ -5,6 +5,7 @@ import '../../screens/signup_screen.dart';
 import '../../screens/email_verification_screen.dart';
 import '../../screens/login_success_screen.dart';
 import '../../screens/home_map_screen.dart';
+import '../../screens/user_home_map_screen.dart';
 import '../../screens/forgot_password_screen.dart';
 import '../../screens/profile_completion_screen.dart';
 import '../../screens/user_verification_screen.dart';
@@ -26,6 +27,7 @@ class AppRoutes {
   static const String emailVerification = '/email-verification';
   static const String loginSuccess = '/login-success';
   static const String homeMap = '/home-map';
+  static const String userHomeMap = '/user-home-map';
   static const String forgotPassword = '/forgot-password';
   static const String profileCompletion = '/profile-completion';
   static const String userVerification = '/user-verification';
@@ -64,6 +66,9 @@ class AppRoutes {
       
       case homeMap:
         return MaterialPageRoute(builder: (_) => const HomeMapScreen());
+
+      case userHomeMap:
+        return MaterialPageRoute(builder: (_) => const UserHomeMapScreen());
 
       case forgotPassword:
         return MaterialPageRoute(builder: (_) => const ForgotPasswordScreen());
