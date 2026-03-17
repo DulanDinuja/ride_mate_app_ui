@@ -466,8 +466,8 @@ class HomeMapScreenState extends State<HomeMapScreen> {
             child: ElevatedButton(
               onPressed: (_pickupLatLng != null && _dropLatLng != null) ? _onConfirmPressed : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                disabledBackgroundColor: Colors.black45,
+                backgroundColor: const Color(0xFF03AF74),
+                disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
               child: const Text(
