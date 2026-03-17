@@ -18,6 +18,7 @@ class UserHomeMapScreen extends StatefulWidget {
 
 class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   final ImagePicker _imagePicker = ImagePicker();
+  final GlobalKey<HomeMapScreenState> _homeMapKey = GlobalKey<HomeMapScreenState>();
 
   int _selectedIndex = 3;
   bool _isLoadingProfile = true;
@@ -360,7 +361,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
       _buildAccountTab(),
       _buildNotificationsTab(),
       _buildActiveRidesTab(),
-      const HomeMapScreen(showProfilePrompt: false),
+      HomeMapScreen(key: _homeMapKey, showProfilePrompt: false),
     ];
 
     return Scaffold(
@@ -379,6 +380,9 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
           setState(() => _selectedIndex = index);
+          if (index == 3) {
+            _homeMapKey.currentState?.refreshCurrentLocation();
+          }
         },
         destinations: const [
           NavigationDestination(
