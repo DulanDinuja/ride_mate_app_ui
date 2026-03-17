@@ -361,7 +361,11 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
       _buildAccountTab(),
       _buildNotificationsTab(),
       _buildActiveRidesTab(),
-      HomeMapScreen(key: _homeMapKey, showProfilePrompt: false),
+      HomeMapScreen(
+        key: _homeMapKey,
+        showProfilePrompt: false,
+        showMenuButton: false,
+      ),
     ];
 
     return Scaffold(

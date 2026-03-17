@@ -11,10 +11,12 @@ import '../services/user_service.dart';
 
 class HomeMapScreen extends StatefulWidget {
   final bool showProfilePrompt;
+  final bool showMenuButton;
 
   const HomeMapScreen({
     super.key,
     this.showProfilePrompt = true,
+    this.showMenuButton = true,
   });
 
   @override
@@ -325,27 +327,28 @@ class HomeMapScreenState extends State<HomeMapScreen> {
                               : const Icon(Icons.my_location, color: Colors.white, size: 20),
                         ),
                       ),
-                      GestureDetector(
-                        onTap: _onMenuPressed,
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFF040F1B).withOpacity(0.9),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _buildMenuLine(),
-                              const SizedBox(height: 4),
-                              _buildMenuLine(),
-                              const SizedBox(height: 4),
-                              _buildMenuLine(),
-                            ],
+                      if (widget.showMenuButton)
+                        GestureDetector(
+                          onTap: _onMenuPressed,
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF040F1B).withOpacity(0.9),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _buildMenuLine(),
+                                const SizedBox(height: 4),
+                                _buildMenuLine(),
+                                const SizedBox(height: 4),
+                                _buildMenuLine(),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 10),
