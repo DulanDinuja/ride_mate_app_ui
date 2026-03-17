@@ -107,19 +107,29 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
   }
 
-  List<String> _missingProfileDetails(UserProfile profile) {
-    final missing = <String>[];
+  void _showComingSoon(String featureName) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$featureName is coming soon.')),
+    );
+  }
 
-    if (profile.firstName.trim().isEmpty) missing.add('First name');
-    if (profile.lastName.trim().isEmpty) missing.add('Last name');
-    if (profile.phoneNumber.trim().isEmpty) missing.add('Phone number');
-    if (profile.dateOfBirth.trim().isEmpty) missing.add('Date of birth');
-    if (profile.gender.trim().isEmpty) missing.add('Gender');
-    if ((profile.userVerificationImageUrl ?? '').trim().isEmpty) {
-      missing.add('Verification selfie/photo');
-    }
+  String _safeValue(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? 'Not set' : trimmed;
+  }
 
-    return missing;
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: Colors.black54,
+        ),
+      ),
+    );
   }
 
   Widget _buildAccountTab() {
@@ -153,8 +163,6 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     }
 
     final profile = _userProfile;
-    final missingFields = profile == null ? const <String>[] : _missingProfileDetails(profile);
-
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -186,14 +194,6 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(profile.email, style: const TextStyle(color: Colors.black54)),
-                        const SizedBox(height: 4),
-                        Text(
-                          profile.isProfileCompleted ? 'Profile Complete' : 'Profile Incomplete',
-                          style: TextStyle(
-                            color: profile.isProfileCompleted ? Colors.green.shade700 : Colors.orange.shade700,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -202,10 +202,61 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
             ),
           ),
         const SizedBox(height: 12),
+        _buildSectionTitle('Account Details'),
         Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Column(
             children: [
+              ListTile(
+                leading: const Icon(Icons.phone_outlined),
+                title: const Text('Phone Number'),
+                subtitle: Text(profile == null ? 'Not available' : _safeValue(profile.phoneNumber)),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.badge_outlined),
+                title: const Text('Role'),
+                subtitle: Text(profile == null ? 'Not available' : _safeValue(profile.role)),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.verified_user_outlined),
+                title: const Text('Account Status'),
+                subtitle: Text(profile == null ? 'Not available' : _safeValue(profile.status)),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.calendar_today_outlined),
+                title: const Text('Date of Birth'),
+                subtitle: Text(profile == null ? 'Not available' : _safeValue(profile.dateOfBirth)),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: const Text('Gender'),
+                subtitle: Text(profile == null ? 'Not available' : _safeValue(profile.gender)),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.language_outlined),
+                title: const Text('Preferred Language'),
+                subtitle: Text(profile == null ? 'Not available' : _safeValue(profile.preferredLanguage)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSectionTitle('Profile & Security'),
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Update Profile Details'),
+                onTap: () => Navigator.pushNamed(context, AppRoutes.profileCompletion),
+              ),
+              const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.lock_reset),
                 title: const Text('Reset Password'),
@@ -225,10 +276,39 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
                 onTap: _isUploadingPhoto ? null : _onChangeProfilePhoto,
               ),
               const Divider(height: 1),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSectionTitle('Preferences & Support'),
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Column(
+            children: [
               ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('Update Profile Details'),
-                onTap: () => Navigator.pushNamed(context, AppRoutes.profileCompletion),
+                leading: const Icon(Icons.notifications_active_outlined),
+                title: const Text('Notification Settings'),
+                onTap: () {
+                  setState(() => _selectedIndex = 1);
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.tune_outlined),
+                title: const Text('Ride Preferences'),
+                onTap: () => _showComingSoon('Ride preferences'),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.help_outline),
+                title: const Text('Help & Support'),
+                onTap: () => _showComingSoon('Help & support'),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.privacy_tip_outlined),
+                title: const Text('Privacy & Terms'),
+                onTap: () => _showComingSoon('Privacy & terms'),
               ),
               const Divider(height: 1),
               ListTile(
@@ -239,37 +319,6 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
             ],
           ),
         ),
-        if (missingFields.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Missing Profile Details',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Complete these to unlock all features:',
-                    style: TextStyle(color: Colors.grey.shade700),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final item in missingFields) Chip(label: Text(item)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -311,7 +360,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
       _buildAccountTab(),
       _buildNotificationsTab(),
       _buildActiveRidesTab(),
-      const HomeMapScreen(),
+      const HomeMapScreen(showProfilePrompt: false),
     ];
 
     return Scaffold(

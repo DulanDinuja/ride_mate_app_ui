@@ -6,7 +6,12 @@ import '../services/token_service.dart';
 import '../services/user_service.dart';
 
 class HomeMapScreen extends StatefulWidget {
-  const HomeMapScreen({super.key});
+  final bool showProfilePrompt;
+
+  const HomeMapScreen({
+    super.key,
+    this.showProfilePrompt = true,
+  });
 
   @override
   State<HomeMapScreen> createState() => _HomeMapScreenState();
@@ -22,6 +27,7 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
   }
 
   Future<void> _checkProfileStatus() async {
+    if (!widget.showProfilePrompt) return;
     try {
       final userId = await TokenService.getUserId();
       if (userId == null) return;
