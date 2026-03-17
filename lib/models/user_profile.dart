@@ -37,6 +37,10 @@ class UserProfile {
 
   bool get isProfileCompleted => userProfileCompleted == 'YES';
 
+  // bool get isProfileCompleted =>
+  //     userProfileCompleted == 'YES' ||
+  //         (dateOfBirth.trim().isNotEmpty && gender.trim().isNotEmpty);
+
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
       id: json['id'] as int,
