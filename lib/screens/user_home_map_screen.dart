@@ -1,4 +1,9 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/routes/app_routes.dart';
@@ -7,7 +12,6 @@ import '../services/auth_service.dart';
 import '../services/file_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
-import 'home_map_screen.dart';
 
 class UserHomeMapScreen extends StatefulWidget {
   const UserHomeMapScreen({super.key});
@@ -18,18 +22,153 @@ class UserHomeMapScreen extends StatefulWidget {
 
 class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   final ImagePicker _imagePicker = ImagePicker();
-  final GlobalKey<HomeMapScreenState> _homeMapKey = GlobalKey<HomeMapScreenState>();
 
+  // ── bottom nav ──
   int _selectedIndex = 3;
+
+  // ── profile ──
   bool _isLoadingProfile = true;
   bool _isUploadingPhoto = false;
   String? _loadError;
   UserProfile? _userProfile;
 
+  // ── map / ride ──
+  static const LatLng _defaultCenter = LatLng(6.9271, 79.8612);
+  static const String _darkMapStyle = '''
+[
+  {"elementType":"geometry","stylers":[{"color":"#1d1f24"}]},
+  {"elementType":"labels.text.fill","stylers":[{"color":"#8a8f98"}]},
+  {"elementType":"labels.text.stroke","stylers":[{"color":"#1d1f24"}]},
+  {"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#3b3f47"}]},
+  {"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#6f7682"}]},
+  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#3a3f48"}]},
+  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#2a2e36"}]},
+  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#525861"}]},
+  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#5f6670"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#474e57"}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2d3139"}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#0f2a36"}]},
+  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#4d7a8d"}]}
+]
+''';
+
+  GoogleMapController? _mapController;
+  LatLng? _pickupLatLng;
+  LatLng? _dropLatLng;
+  String _pickupAddress = 'Detecting current location...';
+  String _dropAddress = '';
+  bool _isLocating = true;
+  bool _isSearchingDrop = false;
+  String? _locationError;
+  final TextEditingController _dropController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     _loadUserProfile();
+    _loadCurrentLocation();
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    _dropController.dispose();
+    super.dispose();
+  }
+
+  // ── location ──────────────────────────────────────────────────────
+
+  Future<void> _loadCurrentLocation() async {
+    if (!mounted) return;
+    setState(() { _isLocating = true; _locationError = null; });
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw Exception('Location services disabled. Please enable GPS.');
+      }
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+        throw Exception('Location permission denied.');
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      final latLng = LatLng(pos.latitude, pos.longitude);
+      final address = await _resolveAddress(latLng);
+      if (!mounted) return;
+      setState(() {
+        _pickupLatLng = latLng;
+        _pickupAddress = address;
+      });
+      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 16));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _locationError = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _isLocating = false);
+    }
+  }
+
+  Future<String> _resolveAddress(LatLng latLng) async {
+    try {
+      final places = await placemarkFromCoordinates(latLng.latitude, latLng.longitude);
+      if (places.isEmpty) return _coordString(latLng);
+      final p = places.first;
+      final parts = [
+        if ((p.name ?? '').trim().isNotEmpty) p.name!.trim(),
+        if ((p.locality ?? '').trim().isNotEmpty) p.locality!.trim(),
+        if ((p.administrativeArea ?? '').trim().isNotEmpty) p.administrativeArea!.trim(),
+      ];
+      return parts.isEmpty ? _coordString(latLng) : parts.join(', ');
+    } catch (_) {
+      return _coordString(latLng);
+    }
+  }
+
+  String _coordString(LatLng l) =>
+      '${l.latitude.toStringAsFixed(5)}, ${l.longitude.toStringAsFixed(5)}';
+
+  Future<void> _searchDrop(String query) async {
+    final input = query.trim();
+    if (input.isEmpty) return;
+    setState(() => _isSearchingDrop = true);
+    try {
+      final locations = await locationFromAddress(input);
+      if (locations.isEmpty) throw Exception('No location found for "$input".');
+      final latLng = LatLng(locations.first.latitude, locations.first.longitude);
+      if (!mounted) return;
+      setState(() {
+        _dropLatLng = latLng;
+        _dropAddress = input;
+        _dropController.text = input;
+      });
+      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 15));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e.toString().replaceFirst('Exception: ', '')),
+        backgroundColor: Colors.red.shade700,
+      ));
+    } finally {
+      if (mounted) setState(() => _isSearchingDrop = false);
+    }
+  }
+
+  Future<void> _onMapTap(LatLng latLng) async {
+    final address = await _resolveAddress(latLng);
+    if (!mounted) return;
+    setState(() {
+      _dropLatLng = latLng;
+      _dropAddress = address;
+      _dropController.text = address;
+    });
+  }
+
+  void _onConfirm() {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Ride confirmed! Looking for drivers...'),
+      backgroundColor: Color(0xFF03AF74),
+    ));
   }
 
   Future<void> _loadUserProfile() async {
@@ -355,16 +494,262 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     }
   }
 
+  // ── map tab ───────────────────────────────────────────────────────
+
+  Widget _buildMapTab() {
+    final markers = <Marker>{
+      if (_pickupLatLng != null)
+        Marker(
+          markerId: const MarkerId('pickup'),
+          position: _pickupLatLng!,
+          infoWindow: const InfoWindow(title: 'Pickup'),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        ),
+      if (_dropLatLng != null)
+        Marker(
+          markerId: const MarkerId('drop'),
+          position: _dropLatLng!,
+          infoWindow: const InfoWindow(title: 'Drop'),
+        ),
+    };
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          GoogleMap(
+            onMapCreated: (c) {
+              _mapController = c;
+              if (_pickupLatLng != null) {
+                c.animateCamera(CameraUpdate.newLatLngZoom(_pickupLatLng!, 16));
+              }
+            },
+            onTap: _onMapTap,
+            style: _darkMapStyle,
+            initialCameraPosition: CameraPosition(
+              target: _pickupLatLng ?? _defaultCenter,
+              zoom: _pickupLatLng == null ? 11 : 16,
+            ),
+            myLocationEnabled: _pickupLatLng != null,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            markers: markers,
+          ),
+          _buildRidePanel(),
+          if (_isLocating)
+            _buildBanner('Getting your current location...', Colors.black87),
+          if (!_isLocating && _locationError != null)
+            _buildErrorBanner(_locationError!),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRidePanel() {
+    final scheme = Theme.of(context).colorScheme;
+    final border = scheme.outline.withOpacity(0.3);
+    final fill = scheme.surfaceContainerHighest.withOpacity(0.75);
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // ── top card: pickup + drop ──
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  decoration: BoxDecoration(
+                    color: scheme.surface.withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: border),
+                    boxShadow: const [
+                      BoxShadow(color: Color(0x55000000), blurRadius: 14, offset: Offset(0, 4)),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // GPS refresh button
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: GestureDetector(
+                          onTap: _isLocating ? null : _loadCurrentLocation,
+                          child: Container(
+                            width: 38, height: 38,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF040F1B).withOpacity(0.9),
+                            ),
+                            child: _isLocating
+                                ? const Padding(
+                                    padding: EdgeInsets.all(9),
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Icon(Icons.my_location, color: Colors.white, size: 18),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Pickup row
+                      _buildLocationRow(
+                        icon: Icons.my_location,
+                        iconColor: const Color(0xFF03AF74),
+                        label: 'Pickup',
+                        value: _pickupAddress,
+                        scheme: scheme,
+                      ),
+                      const SizedBox(height: 8),
+                      // Drop search field
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(10, 2, 8, 2),
+                        decoration: BoxDecoration(
+                          color: fill,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: border),
+                        ),
+                        child: TextField(
+                          controller: _dropController,
+                          textInputAction: TextInputAction.search,
+                          onSubmitted: _searchDrop,
+                          style: TextStyle(color: scheme.onSurface),
+                          decoration: InputDecoration(
+                            labelText: 'Drop location',
+                            labelStyle: TextStyle(color: scheme.onSurfaceVariant),
+                            hintText: 'Search or tap map',
+                            hintStyle: TextStyle(color: scheme.onSurfaceVariant.withOpacity(0.7)),
+                            border: InputBorder.none,
+                            prefixIcon: Icon(Icons.location_on, color: scheme.error),
+                            suffixIcon: _isSearchingDrop
+                                ? const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: SizedBox(width: 16, height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2)),
+                                  )
+                                : IconButton(
+                                    icon: Icon(Icons.search, color: scheme.primary),
+                                    onPressed: () => _searchDrop(_dropController.text),
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // ── confirm button ──
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: (_pickupLatLng != null && _dropLatLng != null) ? _onConfirm : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF03AF74),
+                  disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: const Text(
+                  'Confirm Ride',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationRow({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+    required ColorScheme scheme,
+  }) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outline.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: scheme.primary.withOpacity(0.14),
+            ),
+            child: Icon(icon, color: iconColor, size: 16),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+                const SizedBox(height: 2),
+                Text(value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: scheme.onSurface),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBanner(String text, Color bg) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 80),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+        child: Text(text, style: const TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner(String message) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 80),
+        padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+        decoration: BoxDecoration(color: Colors.red.shade700, borderRadius: BorderRadius.circular(12)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(child: Text(message, style: const TextStyle(color: Colors.white))),
+            TextButton(
+              onPressed: _loadCurrentLocation,
+              child: const Text('Retry', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── build ─────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final pages = [
       _buildAccountTab(),
       _buildNotificationsTab(),
       _buildActiveRidesTab(),
-      HomeMapScreen(
-        key: _homeMapKey,
-        showProfilePrompt: false,
-      ),
+      _buildMapTab(),
     ];
 
     return Scaffold(
@@ -383,8 +768,10 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
           setState(() => _selectedIndex = index);
-          if (index == 3) {
-            _homeMapKey.currentState?.refreshCurrentLocation();
+          if (index == 3 && _pickupLatLng != null) {
+            _mapController?.animateCamera(
+              CameraUpdate.newLatLngZoom(_pickupLatLng!, 16),
+            );
           }
         },
         destinations: const [
