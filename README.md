@@ -15,3 +15,17 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+## Google Maps setup
+
+This app uses Google Maps on Android and Web.
+
+- Android key is configured in `android/app/src/main/AndroidManifest.xml`.
+- Web key is loaded in `web/index.html` using the Google Maps JavaScript API script.
+
+If map fails on web, verify your API key allows:
+
+- Maps JavaScript API enabled in Google Cloud.
+- HTTP referrer restrictions for `http://localhost:*` during local development.
+- Your production domain referrers when deployed.
+
