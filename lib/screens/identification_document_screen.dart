@@ -145,20 +145,6 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
 
       final willingToDrive = widget.args.userRole.trim().toUpperCase();
 
-      if (willingToDrive == 'YES') {
-        if (!mounted) return;
-        Navigator.of(context).pushNamed(AppRoutes.vehicleRegistration);
-        return;
-      }
-
-      if (willingToDrive != 'NO') {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid willing-to-drive value')),
-        );
-        return;
-      }
-
       final userIdStr = await TokenService.getUserId();
       final userId = int.tryParse(userIdStr ?? '') ?? 0;
 
@@ -187,7 +173,11 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
       await UserService.createUserProfile(body);
 
       if (!mounted) return;
-      Navigator.of(context).pushNamed(AppRoutes.identificationSuccess);
+      if (willingToDrive == 'YES') {
+        Navigator.of(context).pushNamed(AppRoutes.vehicleRegistration);
+      } else {
+        Navigator.of(context).pushNamed(AppRoutes.identificationSuccess);
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
