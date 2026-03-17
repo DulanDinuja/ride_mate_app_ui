@@ -269,8 +269,8 @@ class HomeMapScreenState extends State<HomeMapScreen> {
             zoomControlsEnabled: false,
             markers: markers,
           ),
-          _buildTopControls(),
-          _buildPickupDropCard(),
+          _buildTopPanel(),
+          _buildConfirmButton(),
           if (_isLocating) _buildStatusBanner('Getting your current location...'),
           if (_locationError != null) _buildErrorBanner(_locationError!),
           if (_showProfileCard) _buildCompleteProfileCard(),
@@ -279,52 +279,128 @@ class HomeMapScreenState extends State<HomeMapScreen> {
     );
   }
 
-  Widget _buildTopControls() {
+  Widget _buildTopPanel() {
+    final scheme = Theme.of(context).colorScheme;
+    final borderColor = scheme.outline.withOpacity(0.35);
+    final inputColor = scheme.surfaceContainerHighest.withOpacity(0.75);
+
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            GestureDetector(
-              onTap: _isLocating ? null : refreshCurrentLocation,
-              child: Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF040F1B).withOpacity(0.9),
-                ),
-                child: _isLocating
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.my_location, color: Colors.white),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              decoration: BoxDecoration(
+                color: scheme.surface.withOpacity(0.92),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: borderColor),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x55000000), blurRadius: 14, offset: Offset(0, 4)),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Menu row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      GestureDetector(
+                        onTap: _isLocating ? null : refreshCurrentLocation,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFF040F1B).withOpacity(0.9),
+                          ),
+                          child: _isLocating
+                              ? const Padding(
+                                  padding: EdgeInsets.all(10),
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.my_location, color: Colors.white, size: 20),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: _onMenuPressed,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFF040F1B).withOpacity(0.9),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildMenuLine(),
+                              const SizedBox(height: 4),
+                              _buildMenuLine(),
+                              const SizedBox(height: 4),
+                              _buildMenuLine(),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  // Pickup row
+                  _buildLocationRow(
+                    icon: Icons.my_location,
+                    iconColor: const Color(0xFF03AF74),
+                    label: 'Pickup',
+                    value: _pickupAddress,
+                    trailing: IconButton(
+                      icon: Icon(Icons.gps_fixed, color: scheme.primary, size: 20),
+                      onPressed: _isLocating ? null : refreshCurrentLocation,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Drop search field
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(10, 2, 8, 2),
+                    decoration: BoxDecoration(
+                      color: inputColor,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: TextField(
+                      controller: _dropSearchController,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: _searchDropLocation,
+                      style: TextStyle(color: scheme.onSurface),
+                      decoration: InputDecoration(
+                        labelText: 'Drop location',
+                        labelStyle: TextStyle(color: scheme.onSurfaceVariant),
+                        hintText: 'Search destination',
+                        hintStyle: TextStyle(color: scheme.onSurfaceVariant.withOpacity(0.7)),
+                        border: InputBorder.none,
+                        prefixIcon: Icon(Icons.location_on, color: scheme.error),
+                        suffixIcon: _isSearchingDrop
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : IconButton(
+                                onPressed: () => _searchDropLocation(_dropSearchController.text),
+                                icon: Icon(Icons.search, color: scheme.primary),
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            GestureDetector(
-              onTap: _onMenuPressed,
-              child: Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF040F1B).withOpacity(0.9),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildMenuLine(),
-                    const SizedBox(height: 5),
-                    _buildMenuLine(),
-                    const SizedBox(height: 5),
-                    _buildMenuLine(),
-                  ],
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -378,131 +454,35 @@ class HomeMapScreenState extends State<HomeMapScreen> {
     );
   }
 
-  Widget _buildPickupDropCard() {
-    final scheme = Theme.of(context).colorScheme;
-    final panelColor = scheme.surface.withOpacity(0.92);
-    final borderColor = scheme.outline.withOpacity(0.35);
-    final inputColor = scheme.surfaceContainerHighest.withOpacity(0.75);
-
+  Widget _buildConfirmButton() {
     return SafeArea(
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-                decoration: BoxDecoration(
-                  color: panelColor,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: borderColor),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x55000000),
-                      blurRadius: 14,
-                      offset: Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: scheme.outline.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Set your route',
-                        style: TextStyle(
-                          color: scheme.onSurface,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildLocationRow(
-                      icon: Icons.my_location,
-                      iconColor: const Color(0xFF03AF74),
-                      label: 'Pickup',
-                      value: _pickupAddress,
-                      trailing: IconButton(
-                        icon: Icon(Icons.gps_fixed, color: scheme.primary),
-                        onPressed: _isLocating ? null : refreshCurrentLocation,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(10, 2, 8, 2),
-                      decoration: BoxDecoration(
-                        color: inputColor,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: borderColor),
-                      ),
-                      child: TextField(
-                        controller: _dropSearchController,
-                        textInputAction: TextInputAction.search,
-                        onSubmitted: _searchDropLocation,
-                        style: TextStyle(color: scheme.onSurface),
-                        decoration: InputDecoration(
-                          labelText: 'Drop location',
-                          labelStyle: TextStyle(color: scheme.onSurfaceVariant),
-                          hintText: 'Search destination',
-                          hintStyle: TextStyle(color: scheme.onSurfaceVariant.withOpacity(0.7)),
-                          border: InputBorder.none,
-                          prefixIcon: Icon(Icons.location_on, color: scheme.error),
-                          suffixIcon: _isSearchingDrop
-                              ? Padding(
-                                  padding: const EdgeInsets.all(12),
-                                  child: SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: scheme.primary),
-                                  ),
-                                )
-                              : IconButton(
-                                  onPressed: () => _searchDropLocation(_dropSearchController.text),
-                                  icon: Icon(Icons.search, color: scheme.primary),
-                                ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        _dropAddress,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Tip: Tap anywhere on the map to set drop location.',
-                        style: TextStyle(fontSize: 12, color: scheme.primary),
-                      ),
-                    ),
-                  ],
-                ),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: (_pickupLatLng != null && _dropLatLng != null) ? _onConfirmPressed : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                disabledBackgroundColor: Colors.black45,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              child: const Text(
+                'Confirm',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
               ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  void _onConfirmPressed() {
+    // TODO: Navigate or proceed with pickup & drop locations
   }
 
   Widget _buildLocationRow({
