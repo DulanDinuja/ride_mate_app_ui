@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -22,13 +23,38 @@ class HomeMapScreen extends StatefulWidget {
 
 class HomeMapScreenState extends State<HomeMapScreen> {
   static const LatLng _defaultCenter = LatLng(6.9271, 79.8612);
+  static const double _bottomCardSpace = 255;
+  static const String _darkMapStyle = '''
+[
+  {"elementType":"geometry","stylers":[{"color":"#1d1f24"}]},
+  {"elementType":"labels.text.fill","stylers":[{"color":"#8a8f98"}]},
+  {"elementType":"labels.text.stroke","stylers":[{"color":"#1d1f24"}]},
+  {"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#3b3f47"}]},
+  {"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#6f7682"}]},
+  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#3a3f48"}]},
+  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#2a2e36"}]},
+  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#525861"}]},
+  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#5f6670"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#474e57"}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2d3139"}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#0f2a36"}]},
+  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#4d7a8d"}]}
+]
+''';
 
   bool _showProfileCard = false;
   bool _isLocating = true;
+  bool _isSearchingDrop = false;
   String? _locationError;
+  String _pickupAddress = 'Detecting current location...';
+  String _dropAddress = 'Choose drop location by map tap or search.';
 
   GoogleMapController? _mapController;
   LatLng? _currentLatLng;
+  LatLng? _pickupLatLng;
+  LatLng? _dropLatLng;
+
+  final TextEditingController _dropSearchController = TextEditingController();
 
   @override
   void initState() {
@@ -40,6 +66,7 @@ class HomeMapScreenState extends State<HomeMapScreen> {
   @override
   void dispose() {
     _mapController?.dispose();
+    _dropSearchController.dispose();
     super.dispose();
   }
 
@@ -96,9 +123,7 @@ class HomeMapScreenState extends State<HomeMapScreen> {
       final latLng = LatLng(position.latitude, position.longitude);
       if (!mounted) return;
 
-      setState(() {
-        _currentLatLng = latLng;
-      });
+      await _setPickupLocation(latLng);
 
       if (_mapController != null) {
         await _mapController!.animateCamera(
@@ -117,6 +142,87 @@ class HomeMapScreenState extends State<HomeMapScreen> {
     }
   }
 
+  Future<void> _setPickupLocation(LatLng latLng) async {
+    final readable = await _resolveAddress(latLng);
+    if (!mounted) return;
+
+    setState(() {
+      _currentLatLng = latLng;
+      _pickupLatLng = latLng;
+      _pickupAddress = readable;
+    });
+  }
+
+  Future<void> _setDropLocation(LatLng latLng, {String? knownAddress}) async {
+    final readable = knownAddress ?? await _resolveAddress(latLng);
+    if (!mounted) return;
+
+    setState(() {
+      _dropLatLng = latLng;
+      _dropAddress = readable;
+      _dropSearchController.text = readable;
+    });
+
+    if (_mapController != null) {
+      await _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(latLng, 16),
+      );
+    }
+  }
+
+  Future<void> _searchDropLocation(String query) async {
+    final input = query.trim();
+    if (input.isEmpty) return;
+
+    setState(() => _isSearchingDrop = true);
+    try {
+      final locations = await locationFromAddress(input);
+      if (locations.isEmpty) {
+        throw Exception('No location found for "$input".');
+      }
+
+      final first = locations.first;
+      await _setDropLocation(
+        LatLng(first.latitude, first.longitude),
+        knownAddress: input,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Drop search failed: ${e.toString().replaceFirst('Exception: ', '')}'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSearchingDrop = false);
+      }
+    }
+  }
+
+  Future<String> _resolveAddress(LatLng latLng) async {
+    try {
+      final places = await placemarkFromCoordinates(latLng.latitude, latLng.longitude);
+      if (places.isEmpty) {
+        return '${latLng.latitude.toStringAsFixed(5)}, ${latLng.longitude.toStringAsFixed(5)}';
+      }
+
+      final p = places.first;
+      final parts = <String>[
+        if ((p.name ?? '').trim().isNotEmpty) p.name!.trim(),
+        if ((p.locality ?? '').trim().isNotEmpty) p.locality!.trim(),
+        if ((p.administrativeArea ?? '').trim().isNotEmpty) p.administrativeArea!.trim(),
+      ];
+      if (parts.isEmpty) {
+        return '${latLng.latitude.toStringAsFixed(5)}, ${latLng.longitude.toStringAsFixed(5)}';
+      }
+      return parts.join(', ');
+    } catch (_) {
+      return '${latLng.latitude.toStringAsFixed(5)}, ${latLng.longitude.toStringAsFixed(5)}';
+    }
+  }
+
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
     if (_currentLatLng != null) {
@@ -131,12 +237,29 @@ class HomeMapScreenState extends State<HomeMapScreen> {
   @override
   Widget build(BuildContext context) {
     final current = _currentLatLng;
+    final markers = <Marker>{
+      if (_pickupLatLng != null)
+        Marker(
+          markerId: const MarkerId('pickup_location'),
+          position: _pickupLatLng!,
+          infoWindow: const InfoWindow(title: 'Pickup location'),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        ),
+      if (_dropLatLng != null)
+        Marker(
+          markerId: const MarkerId('drop_location'),
+          position: _dropLatLng!,
+          infoWindow: const InfoWindow(title: 'Drop location'),
+        ),
+    };
 
     return Scaffold(
       body: Stack(
         children: [
           GoogleMap(
             onMapCreated: _onMapCreated,
+            onTap: _setDropLocation,
+            style: _darkMapStyle,
             initialCameraPosition: CameraPosition(
               target: current ?? _defaultCenter,
               zoom: current == null ? 11 : 16,
@@ -144,17 +267,10 @@ class HomeMapScreenState extends State<HomeMapScreen> {
             myLocationEnabled: current != null,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
-            markers: current == null
-                ? const {}
-                : {
-                    Marker(
-                      markerId: const MarkerId('current_location'),
-                      position: current,
-                      infoWindow: const InfoWindow(title: 'You are here'),
-                    ),
-                  },
+            markers: markers,
           ),
           _buildTopControls(),
+          _buildPickupDropCard(),
           if (_isLocating) _buildStatusBanner('Getting your current location...'),
           if (_locationError != null) _buildErrorBanner(_locationError!),
           if (_showProfileCard) _buildCompleteProfileCard(),
@@ -217,9 +333,9 @@ class HomeMapScreenState extends State<HomeMapScreen> {
   Widget _buildStatusBanner(String text) {
     return SafeArea(
       child: Align(
-        alignment: Alignment.topCenter,
+        alignment: Alignment.bottomCenter,
         child: Container(
-          margin: const EdgeInsets.only(top: 80),
+          margin: const EdgeInsets.only(bottom: _bottomCardSpace),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: Colors.black87,
@@ -234,9 +350,9 @@ class HomeMapScreenState extends State<HomeMapScreen> {
   Widget _buildErrorBanner(String message) {
     return SafeArea(
       child: Align(
-        alignment: Alignment.topCenter,
+        alignment: Alignment.bottomCenter,
         child: Container(
-          margin: const EdgeInsets.only(top: 80),
+          margin: const EdgeInsets.only(bottom: _bottomCardSpace),
           padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
           decoration: BoxDecoration(
             color: Colors.red.shade700,
@@ -260,6 +376,174 @@ class HomeMapScreenState extends State<HomeMapScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildPickupDropCard() {
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0B1522).withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x55000000),
+                      blurRadius: 14,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white30,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Set your route',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildLocationRow(
+                      icon: Icons.my_location,
+                      iconColor: const Color(0xFF03AF74),
+                      label: 'Pickup',
+                      value: _pickupAddress,
+                      trailing: IconButton(
+                        icon: const Icon(Icons.gps_fixed, color: Colors.white),
+                        onPressed: _isLocating ? null : refreshCurrentLocation,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(10, 2, 8, 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.white.withOpacity(0.08)),
+                      ),
+                      child: TextField(
+                        controller: _dropSearchController,
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: _searchDropLocation,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: 'Drop location',
+                          labelStyle: const TextStyle(color: Colors.white70),
+                          hintText: 'Search destination',
+                          hintStyle: const TextStyle(color: Colors.white38),
+                          border: InputBorder.none,
+                          prefixIcon: const Icon(Icons.location_on, color: Colors.redAccent),
+                          suffixIcon: _isSearchingDrop
+                              ? const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  ),
+                                )
+                              : IconButton(
+                                  onPressed: () => _searchDropLocation(_dropSearchController.text),
+                                  icon: const Icon(Icons.search, color: Colors.white),
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        _dropAddress,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12, color: Colors.white70),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Tip: Tap anywhere on the map to set drop location.',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF8BC7FF)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationRow({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+    Widget? trailing,
+  }) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Row(
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withOpacity(0.1),
+          ),
+          child: Icon(icon, color: iconColor, size: 18),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) trailing,
+      ],
+    ));
   }
 
   Widget _buildCompleteProfileCard() {
