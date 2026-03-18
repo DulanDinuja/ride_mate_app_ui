@@ -784,7 +784,17 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
                 Align(
                   alignment: Alignment.topRight,
                   child: GestureDetector(
-                    onTap: () => setState(() => _showDriverProfileCard = false),
+                    onTap: () async {
+                      setState(() => _showDriverProfileCard = false);
+                      try {
+                        final userId = await TokenService.getUserId();
+                        if (userId != null) {
+                          await UserService.updateWillingToDrive(userId, 'NO');
+                        }
+                      } catch (_) {
+                        // Best-effort — popup is already dismissed
+                      }
+                    },
                     child: Container(
                       width: 32,
                       height: 32,
@@ -833,36 +843,6 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: MediaQuery.of(context).size.width * 0.8 * 0.6,
-                  height: 50,
-                  child: TextButton(
-                    onPressed: () async {
-                      setState(() => _showDriverProfileCard = false);
-                      try {
-                        final userId = await TokenService.getUserId();
-                        if (userId != null) {
-                          await UserService.updateWillingToDrive(userId, 'NO');
-                        }
-                      } catch (_) {
-                        // Best-effort — popup is already dismissed
-                      }
-                    },
-                    style: TextButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                    ),
-                    child: const Text(
-                      'Do it later',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white70,
                       ),
                     ),
                   ),
