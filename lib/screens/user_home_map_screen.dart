@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
@@ -109,20 +111,189 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     }
   }
 
+  static const String _gMapsKey = 'AIzaSyAaIKIFaESxfhuchdlrRRQh7r6y9UhU9Uo';
+
   Future<String> _resolveAddress(LatLng latLng) async {
+    // ── Method 1: Native platform geocoder (free, no API key needed) ──
     try {
-      final places = await placemarkFromCoordinates(latLng.latitude, latLng.longitude);
-      if (places.isEmpty) return _coordString(latLng);
-      final p = places.first;
-      final parts = [
-        if ((p.name ?? '').trim().isNotEmpty) p.name!.trim(),
-        if ((p.locality ?? '').trim().isNotEmpty) p.locality!.trim(),
-        if ((p.administrativeArea ?? '').trim().isNotEmpty) p.administrativeArea!.trim(),
-      ];
-      return parts.isEmpty ? _coordString(latLng) : parts.join(', ');
-    } catch (_) {
-      return _coordString(latLng);
+      final placemarks = await placemarkFromCoordinates(
+        latLng.latitude,
+        latLng.longitude,
+      );
+      if (placemarks.isNotEmpty) {
+        final address = _buildShortAddress(placemarks.first);
+        if (address.isNotEmpty) {
+          debugPrint('[Geocoding] Native resolved: $address');
+          return address;
+        }
+      }
+    } catch (e) {
+      debugPrint('[Geocoding] Native geocoder failed: $e');
     }
+
+    // ── Method 2: Google Geocoding REST API ──
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/geocode/json'
+        '?latlng=${latLng.latitude},${latLng.longitude}'
+        '&key=$_gMapsKey',
+      );
+      final resp = await http.get(url);
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        final status = data['status'] as String?;
+        debugPrint('[Geocoding] Google API status: $status');
+        if (status == 'OK') {
+          final results = data['results'] as List?;
+          if (results != null && results.isNotEmpty) {
+            final shortName = _extractShortName(results);
+            if (shortName != null && shortName.isNotEmpty) return shortName;
+            return results[0]['formatted_address'] as String;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[Geocoding] Google API failed: $e');
+    }
+
+    // ── Method 3: OpenStreetMap Nominatim (free, no API key, works everywhere) ──
+    try {
+      final nominatimUrl = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse'
+        '?lat=${latLng.latitude}&lon=${latLng.longitude}'
+        '&format=json&zoom=16&addressdetails=1',
+      );
+      final resp = await http.get(nominatimUrl, headers: {
+        'User-Agent': 'RideMateApp/1.0',
+        'Accept-Language': 'en',
+      });
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        final addr = data['address'] as Map<String, dynamic>?;
+        if (addr != null) {
+          final shortName = _extractNominatimShortName(addr);
+          if (shortName.isNotEmpty) {
+            debugPrint('[Geocoding] Nominatim resolved: $shortName');
+            return shortName;
+          }
+        }
+        // Fallback to display_name
+        final displayName = data['display_name'] as String?;
+        if (displayName != null && displayName.isNotEmpty) {
+          // Take only the first 2-3 parts to keep it short
+          final nameParts = displayName.split(',').map((s) => s.trim()).toList();
+          final short = nameParts.take(2).join(', ');
+          debugPrint('[Geocoding] Nominatim display_name: $short');
+          return short;
+        }
+      }
+    } catch (e) {
+      debugPrint('[Geocoding] Nominatim failed: $e');
+    }
+
+    // ── Last resort: raw coordinates ──
+    debugPrint('[Geocoding] All methods failed, using coordinates');
+    return _coordString(latLng);
+  }
+
+  /// Extracts a short name from Nominatim address components.
+  String _extractNominatimShortName(Map<String, dynamic> addr) {
+    final suburb = addr['suburb'] as String?;
+    final neighbourhood = addr['neighbourhood'] as String?;
+    final city = addr['city'] as String?;
+    final town = addr['town'] as String?;
+    final village = addr['village'] as String?;
+    final road = addr['road'] as String?;
+
+    final area = suburb ?? neighbourhood ?? road ?? '';
+    final place = city ?? town ?? village ?? '';
+
+    if (area.isNotEmpty && place.isNotEmpty && area != place) {
+      return '$area, $place';
+    }
+    if (place.isNotEmpty) return place;
+    if (area.isNotEmpty) return area;
+    return '';
+  }
+
+  /// Builds a short, human-readable address from a [Placemark].
+  String _buildShortAddress(Placemark place) {
+    final parts = <String>[];
+
+    // Prefer subLocality (neighborhood / area)
+    if (place.subLocality != null && place.subLocality!.isNotEmpty) {
+      parts.add(place.subLocality!);
+    } else if (place.thoroughfare != null && place.thoroughfare!.isNotEmpty) {
+      parts.add(place.thoroughfare!);
+    } else if (place.street != null && place.street!.isNotEmpty) {
+      parts.add(place.street!);
+    }
+
+    // Add locality (city)
+    if (place.locality != null &&
+        place.locality!.isNotEmpty &&
+        !parts.contains(place.locality)) {
+      parts.add(place.locality!);
+    }
+
+    // If still empty, try administrative area (province/district)
+    if (parts.isEmpty &&
+        place.administrativeArea != null &&
+        place.administrativeArea!.isNotEmpty) {
+      parts.add(place.administrativeArea!);
+    }
+
+    // If everything is empty, use name + country
+    if (parts.isEmpty) {
+      final name = place.name ?? '';
+      final country = place.country ?? '';
+      if (name.isNotEmpty) return name;
+      if (country.isNotEmpty) return country;
+    }
+
+    return parts.join(', ');
+  }
+
+  /// Extracts a short, human-readable name from Google Geocoding API results.
+  String? _extractShortName(List results) {
+    final components = results[0]['address_components'] as List?;
+    if (components == null) return null;
+
+    String? street;
+    String? sublocality;
+    String? locality;
+    String? adminArea;
+
+    for (final comp in components) {
+      final types = (comp['types'] as List?)?.cast<String>() ?? [];
+      if (types.contains('route')) {
+        street ??= comp['long_name'] as String?;
+      }
+      if (types.contains('sublocality_level_1') || types.contains('sublocality')) {
+        sublocality ??= comp['long_name'] as String?;
+      }
+      if (types.contains('locality')) {
+        locality ??= comp['long_name'] as String?;
+      }
+      if (types.contains('administrative_area_level_2') ||
+          types.contains('administrative_area_level_1')) {
+        adminArea ??= comp['long_name'] as String?;
+      }
+    }
+
+    final parts = <String>[];
+    if (sublocality != null) {
+      parts.add(sublocality);
+    } else if (street != null) {
+      parts.add(street);
+    }
+    if (locality != null && locality != sublocality) {
+      parts.add(locality);
+    } else if (adminArea != null && !parts.contains(adminArea)) {
+      parts.add(adminArea);
+    }
+
+    return parts.isNotEmpty ? parts.join(', ') : null;
   }
 
   String _coordString(LatLng l) =>
@@ -553,7 +724,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
             // ── top card: pickup + drop ──
             ClipRRect(
@@ -636,25 +807,26 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      // Confirm button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton(
+                          onPressed: (_pickupLatLng != null && _dropLatLng != null) ? _onConfirm : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF03AF74),
+                            disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const Text(
+                            'Confirm Ride',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                ),
-              ),
-            ),
-            // ── confirm button ──
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: (_pickupLatLng != null && _dropLatLng != null) ? _onConfirm : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF03AF74),
-                  disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                child: const Text(
-                  'Confirm Ride',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
                 ),
               ),
             ),
