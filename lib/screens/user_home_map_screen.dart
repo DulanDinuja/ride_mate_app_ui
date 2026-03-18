@@ -352,6 +352,10 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   }
 
   Future<void> _onMapTap(LatLng latLng) async {
+    // If a drop location is already set, don't override it on accidental tap.
+    // User must tap the drop field → open search → choose a new destination.
+    if (_dropLatLng != null) return;
+
     final address = await _resolveAddress(latLng);
     if (!mounted) return;
     setState(() {
@@ -375,6 +379,10 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
       _isSearchMode = true;
       _searchController.clear();
       _placePredictions = [];
+      // Clear current drop so user can pick a new destination
+      _dropLatLng = null;
+      _dropAddress = '';
+      _dropController.clear();
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _searchFocusNode.requestFocus();
@@ -409,7 +417,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   }
 
   Future<void> _fetchPlacePredictions(String input) async {
-    // ── Try Google Places Autocomplete first ──
+    // ── Try Google Places Autocomplete first (works on Android/iOS) ──
     try {
       final loc = _pickupLatLng ?? _defaultCenter;
       final url = Uri.parse(
@@ -438,79 +446,80 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
                       'source': 'google',
                     })
                 .toList();
+            _isSearchingPlaces = false;
           });
-          if (mounted) setState(() => _isSearchingPlaces = false);
-          return; // Google succeeded – skip Nominatim
+          return; // Google succeeded — skip fallback
         }
       }
     } catch (e) {
       debugPrint('[Places] Google Autocomplete error: $e');
     }
 
-    // ── Fallback: Nominatim search (free, CORS-safe, works on web) ──
+    // ── Fallback: Photon API (autocomplete-friendly, CORS-safe, works on web) ──
     try {
+      debugPrint('[Places] Trying Photon for "$input"');
+      final loc = _pickupLatLng ?? _defaultCenter;
       final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/search'
+        'https://photon.komoot.io/api/'
         '?q=${Uri.encodeComponent(input)}'
-        '&format=json'
-        '&addressdetails=1'
-        '&countrycodes=lk'
-        '&limit=7',
+        '&limit=10'
+        '&lang=en'
+        '&lat=${loc.latitude}'
+        '&lon=${loc.longitude}',
       );
-      final resp = await http.get(url, headers: {
-        'User-Agent': 'RideMateApp/1.0',
-        'Accept-Language': 'en',
-      });
+      final resp = await http.get(url);
       if (!mounted) return;
       if (resp.statusCode == 200) {
-        final results = json.decode(resp.body) as List;
+        final data = json.decode(resp.body);
+        final features = (data['features'] as List?) ?? [];
+        debugPrint('[Places] Photon returned ${features.length} results');
+
+        // Prefer Sri Lanka results, but show all if none match
+        final sriLankaResults = features.where((f) {
+          final country =
+              (f['properties'] as Map<String, dynamic>?)?['country'] as String?;
+          return country != null &&
+              country.toLowerCase().contains('sri lanka');
+        }).toList();
+
+        final resultsToUse =
+            sriLankaResults.isNotEmpty ? sriLankaResults : features;
+
         setState(() {
-          _placePredictions = results.map<Map<String, dynamic>>((r) {
-            final addr = r['address'] as Map<String, dynamic>? ?? {};
-            final displayName = r['display_name'] as String? ?? '';
-            final mainText = _nominatimMainText(r, addr);
-            final secondary = _nominatimSecondaryText(displayName, mainText);
+          _placePredictions =
+              resultsToUse.take(7).map<Map<String, dynamic>>((f) {
+            final props = f['properties'] as Map<String, dynamic>? ?? {};
+            final coords =
+                (f['geometry']?['coordinates'] as List?) ?? [0.0, 0.0];
+            final mainText = (props['name'] ?? '') as String;
+
+            // Build secondary text: city, state, country
+            final secondaryParts = <String>[];
+            for (final key in ['city', 'county', 'state', 'country']) {
+              final val = props[key] as String?;
+              if (val != null && val.isNotEmpty && val != mainText) {
+                secondaryParts.add(val);
+              }
+            }
+
             return {
               'place_id': '',
-              'description': displayName,
+              'description': '$mainText, ${secondaryParts.join(', ')}',
               'main_text': mainText,
-              'secondary_text': secondary,
-              'source': 'nominatim',
-              'lat': double.tryParse(r['lat']?.toString() ?? '') ?? 0.0,
-              'lon': double.tryParse(r['lon']?.toString() ?? '') ?? 0.0,
+              'secondary_text': secondaryParts.join(', '),
+              'source': 'photon',
+              'lat': (coords[1] as num).toDouble(), // GeoJSON: [lon, lat]
+              'lon': (coords[0] as num).toDouble(),
             };
           }).toList();
         });
       }
     } catch (e) {
-      debugPrint('[Places] Nominatim search error: $e');
+      debugPrint('[Places] Photon search error: $e');
       if (mounted) setState(() => _placePredictions = []);
     } finally {
       if (mounted) setState(() => _isSearchingPlaces = false);
     }
-  }
-
-  /// Extracts a short place name from a Nominatim search result.
-  String _nominatimMainText(Map<String, dynamic> result, Map<String, dynamic> addr) {
-    final name = result['name'] as String?;
-    if (name != null && name.isNotEmpty) return name;
-    final suburb = addr['suburb'] as String?;
-    final city = addr['city'] as String?;
-    final town = addr['town'] as String?;
-    final village = addr['village'] as String?;
-    return suburb ?? city ?? town ?? village ?? '';
-  }
-
-  /// Builds a secondary description from the display_name minus the main text.
-  String _nominatimSecondaryText(String displayName, String mainText) {
-    if (mainText.isEmpty) return displayName;
-    var secondary = displayName;
-    if (secondary.startsWith(mainText)) {
-      secondary = secondary.substring(mainText.length);
-      if (secondary.startsWith(', ')) secondary = secondary.substring(2);
-    }
-    final parts = secondary.split(',').map((s) => s.trim()).take(3).toList();
-    return parts.join(', ');
   }
 
   Future<void> _selectPrediction(Map<String, dynamic> prediction) async {
@@ -524,8 +533,8 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     try {
       LatLng latLng;
 
-      if (source == 'nominatim') {
-        // Nominatim results already include coordinates
+      if (source == 'photon' || source == 'nominatim') {
+        // Photon / Nominatim results already include coordinates
         latLng = LatLng(
           (prediction['lat'] as num).toDouble(),
           (prediction['lon'] as num).toDouble(),
