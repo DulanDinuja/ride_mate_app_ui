@@ -126,11 +126,13 @@ class _RevenueLicenseUploadScreenState extends State<RevenueLicenseUploadScreen>
   Future<void> _submitDriverProfile() async {
     final data = ModalRoute.of(context)!.settings.arguments as DriverRegistrationData;
     data.registrationCertificateBytes = _photos[_RevenueLicenseSide.front];
+    data.revenueLicenseFrontBytes = _photos[_RevenueLicenseSide.front];
+    data.revenueLicenseBackBytes = _photos[_RevenueLicenseSide.back];
 
     setState(() => _isSubmitting = true);
 
     try {
-      // Upload all documents in parallel-ish (sequential for reliability)
+      // Upload all documents
       final driverLicenseFrontId = await FileService.uploadFile(
         bytes: data.driverLicenseFrontBytes!,
         fileName: 'driver_license_front.jpg',
@@ -139,26 +141,56 @@ class _RevenueLicenseUploadScreenState extends State<RevenueLicenseUploadScreen>
         bytes: data.driverLicenseBackBytes!,
         fileName: 'driver_license_back.jpg',
       );
-      final vehicleImageId = await FileService.uploadFile(
-        bytes: data.vehicleImageBytes!,
-        fileName: 'vehicle_image.jpg',
+      final vehicleImageId1 = await FileService.uploadFile(
+        bytes: data.vehicleImageBytes1!,
+        fileName: 'vehicle_image_front.jpg',
       );
-      final insuranceDocId = await FileService.uploadFile(
-        bytes: data.insuranceDocumentBytes!,
-        fileName: 'insurance_document.jpg',
+      final vehicleImageId2 = await FileService.uploadFile(
+        bytes: data.vehicleImageBytes2!,
+        fileName: 'vehicle_image_rear.jpg',
+      );
+      final vehicleImageId3 = await FileService.uploadFile(
+        bytes: data.vehicleImageBytes3!,
+        fileName: 'vehicle_image_left.jpg',
+      );
+      final vehicleImageId4 = await FileService.uploadFile(
+        bytes: data.vehicleImageBytes4!,
+        fileName: 'vehicle_image_right.jpg',
       );
       final registrationCertId = await FileService.uploadFile(
         bytes: data.registrationCertificateBytes!,
         fileName: 'registration_certificate.jpg',
+      );
+      final insuranceDocId1 = await FileService.uploadFile(
+        bytes: data.insuranceDocumentFrontBytes!,
+        fileName: 'insurance_document_front.jpg',
+      );
+      final insuranceDocId2 = await FileService.uploadFile(
+        bytes: data.insuranceDocumentBackBytes!,
+        fileName: 'insurance_document_back.jpg',
+      );
+      final revenueLicenseId1 = await FileService.uploadFile(
+        bytes: data.revenueLicenseFrontBytes!,
+        fileName: 'revenue_license_front.jpg',
+      );
+      final revenueLicenseId2 = await FileService.uploadFile(
+        bytes: data.revenueLicenseBackBytes!,
+        fileName: 'revenue_license_back.jpg',
       );
 
       // Build the request body
       final body = data.toSaveBody(
         driverLicenseFrontDocumentId: driverLicenseFrontId,
         driverLicenseBackDocumentId: driverLicenseBackId,
-        vehicleImageDocumentId: vehicleImageId,
+        vehicleImageDocumentId1: vehicleImageId1,
+        vehicleImageDocumentId2: vehicleImageId2,
+        vehicleImageDocumentId3: vehicleImageId3,
+        vehicleImageDocumentId4: vehicleImageId4,
         registrationCertificateDocumentId: registrationCertId,
-        insuranceDocumentId: insuranceDocId,
+        insuranceDocumentId1: insuranceDocId1,
+        insuranceDocumentId2: insuranceDocId2,
+        revenueLicenseDocumentId1: revenueLicenseId1,
+        revenueLicenseDocumentId2: revenueLicenseId2,
       );
 
       // Save the driver profile

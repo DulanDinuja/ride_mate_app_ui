@@ -181,7 +181,8 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
     final data = DriverRegistrationData()
       ..vehicleTypeId = _selectedVehicleType!.id
       ..vehicleMakeId = _selectedMake!.id
-      ..vehicleModelId = _selectedModel!.id.toString()
+      ..vehicleModelId = _selectedModel!.id
+      ..model = _selectedModel!.name
       ..registrationNumber = _registrationController.text.trim()
       ..year = int.tryParse(_selectedYear)
       ..color = _selectedColour;

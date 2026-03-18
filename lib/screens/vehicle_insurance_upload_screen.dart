@@ -147,7 +147,8 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
     data.insuranceNumber = _insuranceNumberController.text.trim();
     data.insuranceProvider = _insuranceProviderController.text.trim();
     data.insuranceExpiry = _insuranceExpiryController.text.trim();
-    data.insuranceDocumentBytes = _photos[_InsuranceSide.front];
+    data.insuranceDocumentFrontBytes = _photos[_InsuranceSide.front];
+    data.insuranceDocumentBackBytes = _photos[_InsuranceSide.back];
 
     Navigator.of(context).pushNamed(
       AppRoutes.revenueLicenseUpload,

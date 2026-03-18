@@ -6,13 +6,17 @@ class DriverRegistrationData {
   // ─── Vehicle Registration Screen ──────────────────────────────────
   int? vehicleTypeId;
   int? vehicleMakeId;
-  String? vehicleModelId;
+  int? vehicleModelId;
+  String? model;
   String? registrationNumber;
   int? year;
   String? color;
 
   // ─── Vehicle Photos Upload Screen ─────────────────────────────────
-  Uint8List? vehicleImageBytes;
+  Uint8List? vehicleImageBytes1;
+  Uint8List? vehicleImageBytes2;
+  Uint8List? vehicleImageBytes3;
+  Uint8List? vehicleImageBytes4;
 
   // ─── Driving License Upload Screen ────────────────────────────────
   String? driverLicenseNumber;
@@ -24,10 +28,13 @@ class DriverRegistrationData {
   String? insuranceNumber;
   String? insuranceProvider;
   String? insuranceExpiry;
-  Uint8List? insuranceDocumentBytes;
+  Uint8List? insuranceDocumentFrontBytes;
+  Uint8List? insuranceDocumentBackBytes;
 
   // ─── Revenue License Upload Screen ────────────────────────────────
   Uint8List? registrationCertificateBytes;
+  Uint8List? revenueLicenseFrontBytes;
+  Uint8List? revenueLicenseBackBytes;
 
   DriverRegistrationData();
 
@@ -35,9 +42,15 @@ class DriverRegistrationData {
   Map<String, dynamic> toSaveBody({
     required int driverLicenseFrontDocumentId,
     required int driverLicenseBackDocumentId,
-    required int vehicleImageDocumentId,
+    required int vehicleImageDocumentId1,
+    required int vehicleImageDocumentId2,
+    required int vehicleImageDocumentId3,
+    required int vehicleImageDocumentId4,
     required int registrationCertificateDocumentId,
-    required int insuranceDocumentId,
+    required int insuranceDocumentId1,
+    required int insuranceDocumentId2,
+    required int revenueLicenseDocumentId1,
+    required int revenueLicenseDocumentId2,
   }) {
     return {
       'driverLicenseNumber': driverLicenseNumber ?? '',
@@ -47,16 +60,23 @@ class DriverRegistrationData {
       'vehicleDetails': {
         'vehicleTypeId': vehicleTypeId ?? 0,
         'vehicleMakeId': vehicleMakeId ?? 0,
+        'vehicleModelId': vehicleModelId ?? 0,
         'registrationNumber': registrationNumber ?? '',
-        'vehicleModelId': vehicleModelId ?? '',
+        'model': model ?? '',
         'year': year ?? 0,
         'color': color ?? '',
-        'vehicleImageDocumentId': vehicleImageDocumentId,
+        'vehicleImageDocumentId1': vehicleImageDocumentId1,
+        'vehicleImageDocumentId2': vehicleImageDocumentId2,
+        'vehicleImageDocumentId3': vehicleImageDocumentId3,
+        'vehicleImageDocumentId4': vehicleImageDocumentId4,
         'registrationCertificateDocumentId': registrationCertificateDocumentId,
+        'insuranceDocumentId1': insuranceDocumentId1,
+        'insuranceDocumentId2': insuranceDocumentId2,
         'insuranceNumber': insuranceNumber ?? '',
         'insuranceProvider': insuranceProvider ?? '',
         'insuranceExpiry': insuranceExpiry ?? '',
-        'insuranceDocumentId': insuranceDocumentId,
+        'revenueLicenseDocumentId1': revenueLicenseDocumentId1,
+        'revenueLicenseDocumentId2': revenueLicenseDocumentId2,
       },
     };
   }

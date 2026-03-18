@@ -129,8 +129,10 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
 
   DriverRegistrationData _getRegistrationData() {
     final data = ModalRoute.of(context)!.settings.arguments as DriverRegistrationData;
-    // Use the front photo as the vehicle image
-    data.vehicleImageBytes = _photos[_VehiclePhotoSide.front];
+    data.vehicleImageBytes1 = _photos[_VehiclePhotoSide.front];
+    data.vehicleImageBytes2 = _photos[_VehiclePhotoSide.rear];
+    data.vehicleImageBytes3 = _photos[_VehiclePhotoSide.left];
+    data.vehicleImageBytes4 = _photos[_VehiclePhotoSide.right];
     return data;
   }
 
