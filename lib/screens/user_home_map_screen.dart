@@ -987,7 +987,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
           GoogleMap(
             onMapCreated: (c) {
               _mapController = c;
-              // If location was already resolved before map was ready, move now
+              c.setMapStyle(_darkMapStyle).catchError((_) {});
               if (_pickupLatLng != null) {
                 Future.delayed(const Duration(milliseconds: 300), () {
                   if (mounted && _pickupLatLng != null) {
@@ -997,7 +997,6 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
               }
             },
             onTap: _onMapTap,
-            style: _darkMapStyle,
             initialCameraPosition: CameraPosition(
               target: _pickupLatLng ?? _defaultCenter,
               zoom: _pickupLatLng == null ? 11 : 16,

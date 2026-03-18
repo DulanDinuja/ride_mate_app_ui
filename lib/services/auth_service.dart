@@ -116,6 +116,33 @@ class AuthService {
     }
   }
 
+  // ─── Reset Password ──────────────────────────────────────────────
+
+  static Future<ApiResponse> resetPassword({
+    required String email,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await ApiClient.publicPost(
+        '/auth/reset-password',
+        body: jsonEncode({'email': email, 'newPassword': newPassword}),
+      );
+
+      if (response.statusCode == 200) {
+        return ApiResponse.fromJson(jsonDecode(response.body));
+      } else {
+        final error = jsonDecode(response.body);
+        if (error.containsKey('errorMessage') && error['errorMessage'] != null) {
+          throw ApiException(error['errorMessage']);
+        }
+        throw Exception(error['messages'] ?? 'Password reset failed');
+      }
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Network error: $e');
+    }
+  }
+
   // ─── Logout ───────────────────────────────────────────────────────
 
   static Future<void> logout() async {
