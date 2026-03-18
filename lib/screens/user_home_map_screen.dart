@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import '../core/routes/app_routes.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
+import '../services/driver_service.dart';
 import '../services/file_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
@@ -31,6 +32,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   // ── profile ──
   bool _isLoadingProfile = true;
   bool _isUploadingPhoto = false;
+  bool _showDriverProfileCard = false;
   String? _loadError;
   UserProfile? _userProfile;
 
@@ -360,6 +362,11 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
       setState(() {
         _userProfile = profile;
       });
+
+      // Check driver profile if user is willing to drive
+      if (profile.isProfileCompleted && profile.isWillingToDrive) {
+        await _checkDriverProfileStatus(userId);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -370,6 +377,21 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
         setState(() {
           _isLoadingProfile = false;
         });
+      }
+    }
+  }
+
+  Future<void> _checkDriverProfileStatus(String userId) async {
+    try {
+      final driverProfile =
+          await DriverService.getDriverProfileByUserId(userId);
+      if (mounted && !driverProfile.isDriverProfileCompleted) {
+        setState(() => _showDriverProfileCard = true);
+      }
+    } catch (_) {
+      // Driver profile not found (non-200) — show popup
+      if (mounted) {
+        setState(() => _showDriverProfileCard = true);
       }
     }
   }
@@ -710,6 +732,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
             _buildBanner('Getting your current location...', Colors.black87),
           if (!_isLocating && _locationError != null)
             _buildErrorBanner(_locationError!),
+          if (_showDriverProfileCard) _buildCompleteDriverProfileCard(),
         ],
       ),
     );
@@ -908,6 +931,87 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
               child: const Text('Retry', style: TextStyle(color: Colors.white)),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompleteDriverProfileCard() {
+    return Center(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(40),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.8,
+            padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
+            decoration: BoxDecoration(
+              color: const Color(0xFF040F1B).withOpacity(0.7),
+              borderRadius: BorderRadius.circular(40),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Align(
+                  alignment: Alignment.topRight,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _showDriverProfileCard = false),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                      child: const Icon(Icons.close, color: Colors.white70, size: 18),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Complete Driver Profile',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Please complete your driver profile to start accepting rides.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 14, color: Colors.white70),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.8 * 0.6,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() => _showDriverProfileCard = false);
+                      Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF03AF74),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Complete Now',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

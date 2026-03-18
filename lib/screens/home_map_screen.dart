@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../core/routes/app_routes.dart';
+import '../services/driver_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 
@@ -41,6 +42,7 @@ class HomeMapScreenState extends State<HomeMapScreen> {
 ''';
 
   bool _showProfileCard = false;
+  bool _showDriverProfileCard = false;
   bool _isLocating = true;
   String? _locationError;
 
@@ -70,11 +72,26 @@ class HomeMapScreenState extends State<HomeMapScreen> {
       final userId = await TokenService.getUserId();
       if (userId == null) return;
       final profile = await UserService.getUserProfileByUserId(userId);
-      if (mounted && !profile.isProfileCompleted) {
-        setState(() => _showProfileCard = true);
+      if (!profile.isProfileCompleted) {
+        if (mounted) setState(() => _showProfileCard = true);
+        return;
+      }
+      if (profile.isWillingToDrive) {
+        await _checkDriverProfileStatus(userId);
       }
     } catch (_) {
       if (mounted) setState(() => _showProfileCard = true);
+    }
+  }
+
+  Future<void> _checkDriverProfileStatus(String userId) async {
+    try {
+      final driverProfile = await DriverService.getDriverProfileByUserId(userId);
+      if (mounted && !driverProfile.isDriverProfileCompleted) {
+        setState(() => _showDriverProfileCard = true);
+      }
+    } catch (_) {
+      // Driver profile not found or error — do nothing
     }
   }
 
@@ -166,6 +183,7 @@ class HomeMapScreenState extends State<HomeMapScreen> {
           if (_isLocating) _buildStatusBanner('Getting your current location...'),
           if (_locationError != null) _buildErrorBanner(_locationError!),
           if (_showProfileCard) _buildCompleteProfileCard(),
+          if (_showDriverProfileCard) _buildCompleteDriverProfileCard(),
         ],
       ),
     );
@@ -346,5 +364,84 @@ class HomeMapScreenState extends State<HomeMapScreen> {
     );
   }
 
+  Widget _buildCompleteDriverProfileCard() {  
+    return Center(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(40),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.8,
+            padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
+            decoration: BoxDecoration(
+              color: const Color(0xFF040F1B).withOpacity(0.7),
+              borderRadius: BorderRadius.circular(40),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Align(
+                  alignment: Alignment.topRight,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _showDriverProfileCard = false),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                      child: const Icon(Icons.close, color: Colors.white70, size: 18),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Complete Driver Profile',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Please complete your driver profile to start accepting rides.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 14, color: Colors.white70),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.8 * 0.6,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() => _showDriverProfileCard = false);
+                      // TODO: Navigate to driver profile completion screen
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF03AF74),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Complete Now',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
-
