@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/routes/app_routes.dart';
+import '../models/driver_registration_data.dart';
+import '../services/driver_service.dart';
+import '../services/file_service.dart';
 import 'selfie_camera_screen.dart';
 
 class RevenueLicenseUploadScreen extends StatefulWidget {
@@ -22,6 +25,7 @@ class _RevenueLicenseUploadScreenState extends State<RevenueLicenseUploadScreen>
     _RevenueLicenseSide.front: null,
     _RevenueLicenseSide.back: null,
   };
+  bool _isSubmitting = false;
 
   static const Color _screenBackground = Colors.black;
   static const Color _panelBackground = Color(0xFFFFFFF0);
@@ -116,7 +120,60 @@ class _RevenueLicenseUploadScreenState extends State<RevenueLicenseUploadScreen>
       return;
     }
 
-    Navigator.of(context).pushNamed(AppRoutes.rideStart);
+    _submitDriverProfile();
+  }
+
+  Future<void> _submitDriverProfile() async {
+    final data = ModalRoute.of(context)!.settings.arguments as DriverRegistrationData;
+    data.registrationCertificateBytes = _photos[_RevenueLicenseSide.front];
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      // Upload all documents in parallel-ish (sequential for reliability)
+      final driverLicenseFrontId = await FileService.uploadFile(
+        bytes: data.driverLicenseFrontBytes!,
+        fileName: 'driver_license_front.jpg',
+      );
+      final driverLicenseBackId = await FileService.uploadFile(
+        bytes: data.driverLicenseBackBytes!,
+        fileName: 'driver_license_back.jpg',
+      );
+      final vehicleImageId = await FileService.uploadFile(
+        bytes: data.vehicleImageBytes!,
+        fileName: 'vehicle_image.jpg',
+      );
+      final insuranceDocId = await FileService.uploadFile(
+        bytes: data.insuranceDocumentBytes!,
+        fileName: 'insurance_document.jpg',
+      );
+      final registrationCertId = await FileService.uploadFile(
+        bytes: data.registrationCertificateBytes!,
+        fileName: 'registration_certificate.jpg',
+      );
+
+      // Build the request body
+      final body = data.toSaveBody(
+        driverLicenseFrontDocumentId: driverLicenseFrontId,
+        driverLicenseBackDocumentId: driverLicenseBackId,
+        vehicleImageDocumentId: vehicleImageId,
+        registrationCertificateDocumentId: registrationCertId,
+        insuranceDocumentId: insuranceDocId,
+      );
+
+      // Save the driver profile
+      await DriverService.saveDriverProfile(body: body);
+
+      if (!mounted) return;
+      Navigator.of(context).pushNamed(AppRoutes.rideStart);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Registration failed: ${e.toString().replaceFirst('Exception: ', '')}')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -166,7 +223,7 @@ class _RevenueLicenseUploadScreenState extends State<RevenueLicenseUploadScreen>
                     width: double.infinity,
                     height: 58,
                     child: ElevatedButton(
-                      onPressed: _onCompleteRegistrationPressed,
+                      onPressed: _isSubmitting ? null : _onCompleteRegistrationPressed,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _buttonDark,
                         foregroundColor: Colors.white,
@@ -174,13 +231,22 @@ class _RevenueLicenseUploadScreenState extends State<RevenueLicenseUploadScreen>
                           borderRadius: BorderRadius.circular(22),
                         ),
                       ),
-                      child: const Text(
-                        'Complete Registration',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Text(
+                              'Complete Registration',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                     ),
                   ),
                 ],

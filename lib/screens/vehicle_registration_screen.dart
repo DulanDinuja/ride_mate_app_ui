@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../core/routes/app_routes.dart';
+import '../models/driver_registration_data.dart';
 import '../models/vehicle_type.dart';
 import '../models/vehicle_make.dart';
+import '../models/vehicle_model.dart';
 import '../services/vehicle_service.dart';
 
 class VehicleRegistrationScreen extends StatefulWidget {
@@ -33,19 +35,21 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
   // API-loaded data
   List<VehicleType> _vehicleTypes = [];
   List<VehicleMake> _vehicleMakes = [];
+  List<VehicleModel> _vehicleModels = [];
   bool _isLoadingTypes = true;
   bool _isLoadingMakes = true;
+  bool _isLoadingModels = false;
   String? _typesError;
   String? _makesError;
+  String? _modelsError;
 
   VehicleType? _selectedVehicleType;
   VehicleMake? _selectedMake;
+  VehicleModel? _selectedModel;
 
-  final List<String> _models = const ['Yaris', 'Prius', 'Alto', 'WagonR'];
   final List<String> _years = const ['2025', '2024', '2023', '2022'];
   final List<String> _colours = const ['Black', 'White', 'Silver', 'Blue'];
 
-  String _selectedModel = 'Yaris';
   String _selectedYear = '2025';
   String _selectedColour = 'Black';
 
@@ -100,7 +104,10 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
         setState(() {
           _vehicleMakes = makes;
           _isLoadingMakes = false;
-          if (makes.isNotEmpty) _selectedMake = makes.first;
+          if (makes.isNotEmpty) {
+            _selectedMake = makes.first;
+            _loadVehicleModels(makes.first.id);
+          }
         });
       }
     } catch (e) {
@@ -113,6 +120,31 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
     }
   }
 
+  Future<void> _loadVehicleModels(int vehicleMakeId) async {
+    setState(() {
+      _isLoadingModels = true;
+      _modelsError = null;
+      _vehicleModels = [];
+      _selectedModel = null;
+    });
+    try {
+      final models = await VehicleService.getVehicleModelsByMakeId(vehicleMakeId);
+      if (mounted) {
+        setState(() {
+          _vehicleModels = models;
+          _isLoadingModels = false;
+          if (models.isNotEmpty) _selectedModel = models.first;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _modelsError = e.toString().replaceFirst('Exception: ', '');
+          _isLoadingModels = false;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -133,6 +165,12 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
       );
       return;
     }
+    if (_selectedModel == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a vehicle model')),
+      );
+      return;
+    }
     if (_registrationController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter registration number')),
@@ -140,7 +178,18 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
       return;
     }
 
-    Navigator.of(context).pushNamed(AppRoutes.vehiclePhotosUpload);
+    final data = DriverRegistrationData()
+      ..vehicleTypeId = _selectedVehicleType!.id
+      ..vehicleMakeId = _selectedMake!.id
+      ..vehicleModelId = _selectedModel!.id.toString()
+      ..registrationNumber = _registrationController.text.trim()
+      ..year = int.tryParse(_selectedYear)
+      ..color = _selectedColour;
+
+    Navigator.of(context).pushNamed(
+      AppRoutes.vehiclePhotosUpload,
+      arguments: data,
+    );
   }
 
   @override
@@ -196,14 +245,7 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _buildDropdownField(
-                    value: _selectedModel,
-                    items: _models,
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() => _selectedModel = value);
-                    },
-                  ),
+                  _buildModelDropdown(),
                   const SizedBox(height: 26),
                   Row(
                     children: [
@@ -522,6 +564,80 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
       onChanged: (value) {
         if (value == null) return;
         setState(() => _selectedMake = value);
+        _loadVehicleModels(value.id);
+      },
+    );
+  }
+
+  Widget _buildModelDropdown() {
+    if (_isLoadingModels) {
+      return const SizedBox(
+        height: 62,
+        child: Center(child: CircularProgressIndicator(color: _accent)),
+      );
+    }
+    if (_modelsError != null) {
+      return Row(
+        children: [
+          Expanded(
+            child: Text(
+              _modelsError!,
+              style: const TextStyle(color: Colors.red, fontSize: 13),
+            ),
+          ),
+          if (_selectedMake != null)
+            TextButton(
+              onPressed: () => _loadVehicleModels(_selectedMake!.id),
+              child: const Text('Retry', style: TextStyle(color: _accent)),
+            ),
+        ],
+      );
+    }
+    if (_vehicleModels.isEmpty) {
+      return const Text('No vehicle models available.',
+          style: TextStyle(color: _textPrimary));
+    }
+
+    return DropdownButtonFormField<VehicleModel>(
+      value: _selectedModel,
+      icon: const Icon(
+        Icons.keyboard_arrow_down_rounded,
+        color: Color(0xFFB5B6B8),
+        size: 32,
+      ),
+      dropdownColor: Colors.white,
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: _fieldBackground,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: const BorderSide(color: _accent, width: 1.5),
+        ),
+      ),
+      style: const TextStyle(
+        fontSize: 17,
+        color: Color(0xFF8F95A1),
+        fontWeight: FontWeight.w400,
+      ),
+      items: _vehicleModels
+          .map((m) => DropdownMenuItem<VehicleModel>(
+                value: m,
+                child: Text(m.name),
+              ))
+          .toList(),
+      onChanged: (value) {
+        if (value == null) return;
+        setState(() => _selectedModel = value);
       },
     );
   }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/routes/app_routes.dart';
+import '../models/driver_registration_data.dart';
 import 'selfie_camera_screen.dart';
 
 class VehiclePhotosUploadScreen extends StatefulWidget {
@@ -120,7 +121,17 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
       return;
     }
 
-    Navigator.of(context).pushNamed(AppRoutes.drivingLicenseUpload);
+    Navigator.of(context).pushNamed(
+      AppRoutes.drivingLicenseUpload,
+      arguments: _getRegistrationData(),
+    );
+  }
+
+  DriverRegistrationData _getRegistrationData() {
+    final data = ModalRoute.of(context)!.settings.arguments as DriverRegistrationData;
+    // Use the front photo as the vehicle image
+    data.vehicleImageBytes = _photos[_VehiclePhotoSide.front];
+    return data;
   }
 
   @override

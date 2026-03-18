@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/routes/app_routes.dart';
+import '../models/driver_registration_data.dart';
 import 'selfie_camera_screen.dart';
 
 class VehicleInsuranceUploadScreen extends StatefulWidget {
@@ -23,6 +24,10 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
     _InsuranceSide.front: null,
     _InsuranceSide.back: null,
   };
+
+  final TextEditingController _insuranceNumberController = TextEditingController();
+  final TextEditingController _insuranceProviderController = TextEditingController();
+  final TextEditingController _insuranceExpiryController = TextEditingController();
 
   static const Color _screenBackground = Colors.black;
   static const Color _panelBackground = Color(0xFFFFFFF0);
@@ -117,7 +122,45 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
       return;
     }
 
-    Navigator.of(context).pushNamed(AppRoutes.revenueLicenseUpload);
+    if (_insuranceNumberController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter insurance number')),
+      );
+      return;
+    }
+
+    if (_insuranceProviderController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter insurance provider')),
+      );
+      return;
+    }
+
+    if (_insuranceExpiryController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter insurance expiry date')),
+      );
+      return;
+    }
+
+    final data = ModalRoute.of(context)!.settings.arguments as DriverRegistrationData;
+    data.insuranceNumber = _insuranceNumberController.text.trim();
+    data.insuranceProvider = _insuranceProviderController.text.trim();
+    data.insuranceExpiry = _insuranceExpiryController.text.trim();
+    data.insuranceDocumentBytes = _photos[_InsuranceSide.front];
+
+    Navigator.of(context).pushNamed(
+      AppRoutes.revenueLicenseUpload,
+      arguments: data,
+    );
+  }
+
+  @override
+  void dispose() {
+    _insuranceNumberController.dispose();
+    _insuranceProviderController.dispose();
+    _insuranceExpiryController.dispose();
+    super.dispose();
   }
 
   @override
@@ -162,6 +205,114 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
                   _buildPhotoCard(_InsuranceSide.front),
                   const SizedBox(height: 16),
                   _buildPhotoCard(_InsuranceSide.back),
+                  const SizedBox(height: 30),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: const Text(
+                      'Insurance Number',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w500,
+                        color: _textPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _insuranceNumberController,
+                    style: const TextStyle(fontSize: 17, color: _textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. INS-12345',
+                      hintStyle: const TextStyle(color: Color(0xFF9AA0AA)),
+                      filled: true,
+                      fillColor: const Color(0xFFE9E9DC),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: const BorderSide(color: _accent, width: 1.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: const Text(
+                      'Insurance Provider',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w500,
+                        color: _textPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _insuranceProviderController,
+                    style: const TextStyle(fontSize: 17, color: _textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Sri Lanka Insurance',
+                      hintStyle: const TextStyle(color: Color(0xFF9AA0AA)),
+                      filled: true,
+                      fillColor: const Color(0xFFE9E9DC),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: const BorderSide(color: _accent, width: 1.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: const Text(
+                      'Insurance Expiry Date',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w500,
+                        color: _textPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _insuranceExpiryController,
+                    style: const TextStyle(fontSize: 17, color: _textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. 2027-12-31',
+                      hintStyle: const TextStyle(color: Color(0xFF9AA0AA)),
+                      filled: true,
+                      fillColor: const Color(0xFFE9E9DC),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: const BorderSide(color: _accent, width: 1.5),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 44),
                   SizedBox(
                     width: double.infinity,
