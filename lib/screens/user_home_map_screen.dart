@@ -1258,7 +1258,17 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
                 Align(
                   alignment: Alignment.topRight,
                   child: GestureDetector(
-                    onTap: () => setState(() => _showDriverProfileCard = false),
+                    onTap: () async {
+                      setState(() => _showDriverProfileCard = false);
+                      try {
+                        final userId = await TokenService.getUserId();
+                        if (userId != null) {
+                          await UserService.updateWillingToDrive(userId, 'NO');
+                        }
+                      } catch (_) {
+                        // Best-effort — popup is already dismissed
+                      }
+                    },
                     child: Container(
                       width: 32,
                       height: 32,
