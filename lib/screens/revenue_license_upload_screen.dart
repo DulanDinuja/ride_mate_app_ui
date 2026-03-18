@@ -196,7 +196,17 @@ class _RevenueLicenseUploadScreenState extends State<RevenueLicenseUploadScreen>
       await DriverService.saveDriverProfile(body: body);
 
       if (!mounted) return;
-      Navigator.of(context).pushNamed(AppRoutes.rideStart);
+      // Pop all the registration screens back to the home map
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppRoutes.userHomeMap,
+        (route) => false,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Driver profile completed successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

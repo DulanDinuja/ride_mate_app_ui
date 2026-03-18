@@ -33,6 +33,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   // ── profile ──
   bool _isLoadingProfile = true;
   bool _isUploadingPhoto = false;
+  bool _isChangingRole = false;
   bool _showDriverProfileCard = false;
   String? _loadError;
   UserProfile? _userProfile;
@@ -671,6 +672,70 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     }
   }
 
+  Future<void> _onChangeRole() async {
+    final profile = _userProfile;
+    if (profile == null) return;
+
+    final userId = await TokenService.getUserId();
+    if (userId == null) return;
+
+    final isPassenger = profile.role.toUpperCase() == 'PASSENGER';
+    final newRole = isPassenger ? 'DRIVER' : 'PASSENGER';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isPassenger ? 'Become a Driver?' : 'Switch to Passenger?'),
+        content: Text(
+          isPassenger
+              ? 'You will need to complete your driver profile with vehicle details, photos, driving licence, insurance and revenue licence.'
+              : 'Switch your role back to Passenger?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(isPassenger ? 'Continue' : 'Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isChangingRole = true);
+    try {
+      await UserService.updateRole(userId, newRole);
+      await _loadUserProfile();
+      if (!mounted) return;
+
+      if (newRole == 'DRIVER') {
+        // Launch the full driver registration flow
+        Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Role changed to Passenger.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isChangingRole = false);
+    }
+  }
+
   Future<void> _onChangeProfilePhoto() async {
     try {
       final file = await _imagePicker.pickImage(
@@ -825,6 +890,19 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
                 leading: const Icon(Icons.badge_outlined),
                 title: const Text('Role'),
                 subtitle: Text(profile == null ? 'Not available' : _safeValue(profile.role)),
+                trailing: _isChangingRole
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Switch(
+                        value: (profile?.role.toUpperCase() ?? '') == 'DRIVER',
+                        activeColor: const Color(0xFF03AF74),
+                        onChanged: profile == null || _isChangingRole
+                            ? null
+                            : (_) => _onChangeRole(),
+                      ),
               ),
               const Divider(height: 1),
               ListTile(

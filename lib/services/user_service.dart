@@ -86,6 +86,27 @@ class UserService {
     }
   }
 
+  /// PATCH /user-profile/update-role/{userId}
+  static Future<void> updateRole(String userId, String role) async {
+    try {
+      final response = await ApiClient.patch(
+        '/user-profile/update-role/$userId',
+        body: {'role': role},
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) return;
+
+      final error = jsonDecode(response.body);
+      if (error.containsKey('errorMessage') && error['errorMessage'] != null) {
+        throw ApiException(error['errorMessage']);
+      }
+      throw Exception(error['message'] ?? 'Failed to update role');
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Network error: $e');
+    }
+  }
+
   /// PATCH /user-profile/update-willing-to-drive/{userId}
   static Future<void> updateWillingToDrive(String userId, String value) async {
     try {
