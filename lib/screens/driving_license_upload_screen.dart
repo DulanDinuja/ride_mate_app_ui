@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/routes/app_routes.dart';
+import '../models/driver_registration_data.dart';
 import 'selfie_camera_screen.dart';
 
 class DrivingLicenseUploadScreen extends StatefulWidget {
@@ -22,6 +23,9 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
     _LicenseSide.front: null,
     _LicenseSide.back: null,
   };
+
+  final TextEditingController _licenseNumberController = TextEditingController();
+  final TextEditingController _licenseExpiryController = TextEditingController();
 
   static const Color _screenBackground = Colors.black;
   static const Color _panelBackground = Color(0xFFFFFFF0);
@@ -116,7 +120,37 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
       return;
     }
 
-    Navigator.of(context).pushNamed(AppRoutes.vehicleInsuranceUpload);
+    if (_licenseNumberController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter license number')),
+      );
+      return;
+    }
+
+    if (_licenseExpiryController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter license expiry date')),
+      );
+      return;
+    }
+
+    final data = ModalRoute.of(context)!.settings.arguments as DriverRegistrationData;
+    data.driverLicenseNumber = _licenseNumberController.text.trim();
+    data.driverLicenseExpiry = _licenseExpiryController.text.trim();
+    data.driverLicenseFrontBytes = _photos[_LicenseSide.front];
+    data.driverLicenseBackBytes = _photos[_LicenseSide.back];
+
+    Navigator.of(context).pushNamed(
+      AppRoutes.vehicleInsuranceUpload,
+      arguments: data,
+    );
+  }
+
+  @override
+  void dispose() {
+    _licenseNumberController.dispose();
+    _licenseExpiryController.dispose();
+    super.dispose();
   }
 
   @override
@@ -161,6 +195,78 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
                   _buildPhotoCard(_LicenseSide.front),
                   const SizedBox(height: 24),
                   _buildPhotoCard(_LicenseSide.back),
+                  const SizedBox(height: 30),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'License Number',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w500,
+                        color: _textPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _licenseNumberController,
+                    style: const TextStyle(fontSize: 17, color: _textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. B1234567',
+                      hintStyle: const TextStyle(color: Color(0xFF9AA0AA)),
+                      filled: true,
+                      fillColor: const Color(0xFFE9E9DC),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: const BorderSide(color: _accent, width: 1.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'License Expiry Date',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w500,
+                        color: _textPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _licenseExpiryController,
+                    style: const TextStyle(fontSize: 17, color: _textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. 2027-12-31',
+                      hintStyle: const TextStyle(color: Color(0xFF9AA0AA)),
+                      filled: true,
+                      fillColor: const Color(0xFFE9E9DC),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: const BorderSide(color: _accent, width: 1.5),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 44),
                   SizedBox(
                     width: double.infinity,
