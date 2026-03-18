@@ -119,7 +119,6 @@ class _RevenueLicenseUploadScreenState extends State<RevenueLicenseUploadScreen>
       );
       return;
     }
-
     _submitDriverProfile();
   }
 
