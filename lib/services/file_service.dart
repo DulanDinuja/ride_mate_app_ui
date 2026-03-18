@@ -1,17 +1,17 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:http/http.dart' as http;
-
 import '../models/api_exception.dart';
 import 'api_client.dart';
-import 'token_service.dart';
 
 /// Handles file uploads to the ride-mate backend.
 ///
 /// Endpoint: POST /file/upload
 /// Authorization: Bearer token attached automatically.
 /// Body: multipart/form-data with field name `file`.
+///
+/// On a 401 the token is refreshed once and the request retried (handled by
+/// [ApiClient.multipartPost]).
 class FileService {
   static const String _uploadEndpoint = '/file/upload';
 
@@ -27,26 +27,11 @@ class FileService {
     required String fileName,
   }) async {
     try {
-      final uri = Uri.parse('${ApiClient.baseUrl}$_uploadEndpoint');
-      final request = http.MultipartRequest('POST', uri);
-
-      // --- Authorization header (Bearer token) ---
-      final authHeader = await TokenService.getAuthorizationHeader();
-      if (authHeader != null) {
-        request.headers['Authorization'] = authHeader;
-      }
-
-      // --- file field ---
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          bytes,
-          filename: fileName,
-        ),
+      final response = await ApiClient.multipartPost(
+        _uploadEndpoint,
+        fileBytes: bytes,
+        fileName: fileName,
       );
-
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
