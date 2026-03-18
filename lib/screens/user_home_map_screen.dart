@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 
@@ -66,6 +67,15 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   String? _locationError;
   final TextEditingController _dropController = TextEditingController();
 
+  // ── search mode ──
+  bool _isSearchMode = false;
+  bool _isSearchingPlaces = false;
+  Timer? _searchDebounceTimer;
+  List<Map<String, dynamic>> _placePredictions = [];
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  List<Map<String, String>> _recentSearches = [];
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +87,9 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   void dispose() {
     _mapController?.dispose();
     _dropController.dispose();
+    _searchDebounceTimer?.cancel();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -98,19 +111,30 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
       final latLng = LatLng(pos.latitude, pos.longitude);
-      final address = await _resolveAddress(latLng);
+
       if (!mounted) return;
       setState(() {
         _pickupLatLng = latLng;
-        _pickupAddress = address;
+        _pickupAddress = 'Current Location';
       });
-      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 16));
+      // Animate camera — works whether map is already created or not
+      _moveCameraToPickup(latLng);
+
+      final address = await _resolveAddress(latLng);
+      if (!mounted) return;
+      if (address != _coordString(latLng)) {
+        setState(() => _pickupAddress = address);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _locationError = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isLocating = false);
     }
+  }
+
+  void _moveCameraToPickup(LatLng latLng) {
+    _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 16));
   }
 
   static const String _gMapsKey = 'AIzaSyAaIKIFaESxfhuchdlrRRQh7r6y9UhU9Uo';
@@ -342,6 +366,248 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
       content: Text('Ride confirmed! Looking for drivers...'),
       backgroundColor: Color(0xFF03AF74),
     ));
+  }
+
+  // ── search helpers ──────────────────────────────────────────────
+
+  void _openSearchMode() {
+    setState(() {
+      _isSearchMode = true;
+      _searchController.clear();
+      _placePredictions = [];
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchFocusNode.requestFocus();
+    });
+  }
+
+  void _closeSearchMode() {
+    _searchDebounceTimer?.cancel();
+    _searchFocusNode.unfocus();
+    setState(() {
+      _isSearchMode = false;
+      _placePredictions = [];
+      _isSearchingPlaces = false;
+      _searchController.clear();
+    });
+  }
+
+  void _onSearchChanged(String query) {
+    _searchDebounceTimer?.cancel();
+    final trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setState(() {
+        _placePredictions = [];
+        _isSearchingPlaces = false;
+      });
+      return;
+    }
+    setState(() => _isSearchingPlaces = true);
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 400), () {
+      _fetchPlacePredictions(trimmed);
+    });
+  }
+
+  Future<void> _fetchPlacePredictions(String input) async {
+    // ── Try Google Places Autocomplete first ──
+    try {
+      final loc = _pickupLatLng ?? _defaultCenter;
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+        '?input=${Uri.encodeComponent(input)}'
+        '&key=$_gMapsKey'
+        '&components=country:lk'
+        '&location=${loc.latitude},${loc.longitude}'
+        '&radius=50000',
+      );
+      final resp = await http.get(url);
+      if (!mounted) return;
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        if (data['status'] == 'OK') {
+          setState(() {
+            _placePredictions = (data['predictions'] as List)
+                .map<Map<String, dynamic>>((p) => {
+                      'place_id': p['place_id'] ?? '',
+                      'description': p['description'] ?? '',
+                      'main_text': (p['structured_formatting']?['main_text'] ??
+                          p['description'] ??
+                          '') as String,
+                      'secondary_text':
+                          (p['structured_formatting']?['secondary_text'] ?? '') as String,
+                      'source': 'google',
+                    })
+                .toList();
+          });
+          if (mounted) setState(() => _isSearchingPlaces = false);
+          return; // Google succeeded – skip Nominatim
+        }
+      }
+    } catch (e) {
+      debugPrint('[Places] Google Autocomplete error: $e');
+    }
+
+    // ── Fallback: Nominatim search (free, CORS-safe, works on web) ──
+    try {
+      final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/search'
+        '?q=${Uri.encodeComponent(input)}'
+        '&format=json'
+        '&addressdetails=1'
+        '&countrycodes=lk'
+        '&limit=7',
+      );
+      final resp = await http.get(url, headers: {
+        'User-Agent': 'RideMateApp/1.0',
+        'Accept-Language': 'en',
+      });
+      if (!mounted) return;
+      if (resp.statusCode == 200) {
+        final results = json.decode(resp.body) as List;
+        setState(() {
+          _placePredictions = results.map<Map<String, dynamic>>((r) {
+            final addr = r['address'] as Map<String, dynamic>? ?? {};
+            final displayName = r['display_name'] as String? ?? '';
+            final mainText = _nominatimMainText(r, addr);
+            final secondary = _nominatimSecondaryText(displayName, mainText);
+            return {
+              'place_id': '',
+              'description': displayName,
+              'main_text': mainText,
+              'secondary_text': secondary,
+              'source': 'nominatim',
+              'lat': double.tryParse(r['lat']?.toString() ?? '') ?? 0.0,
+              'lon': double.tryParse(r['lon']?.toString() ?? '') ?? 0.0,
+            };
+          }).toList();
+        });
+      }
+    } catch (e) {
+      debugPrint('[Places] Nominatim search error: $e');
+      if (mounted) setState(() => _placePredictions = []);
+    } finally {
+      if (mounted) setState(() => _isSearchingPlaces = false);
+    }
+  }
+
+  /// Extracts a short place name from a Nominatim search result.
+  String _nominatimMainText(Map<String, dynamic> result, Map<String, dynamic> addr) {
+    final name = result['name'] as String?;
+    if (name != null && name.isNotEmpty) return name;
+    final suburb = addr['suburb'] as String?;
+    final city = addr['city'] as String?;
+    final town = addr['town'] as String?;
+    final village = addr['village'] as String?;
+    return suburb ?? city ?? town ?? village ?? '';
+  }
+
+  /// Builds a secondary description from the display_name minus the main text.
+  String _nominatimSecondaryText(String displayName, String mainText) {
+    if (mainText.isEmpty) return displayName;
+    var secondary = displayName;
+    if (secondary.startsWith(mainText)) {
+      secondary = secondary.substring(mainText.length);
+      if (secondary.startsWith(', ')) secondary = secondary.substring(2);
+    }
+    final parts = secondary.split(',').map((s) => s.trim()).take(3).toList();
+    return parts.join(', ');
+  }
+
+  Future<void> _selectPrediction(Map<String, dynamic> prediction) async {
+    final source = prediction['source'] as String? ?? 'google';
+    final mainText = prediction['main_text'] as String;
+    final description = prediction['description'] as String;
+
+    _closeSearchMode();
+    setState(() => _isSearchingDrop = true);
+
+    try {
+      LatLng latLng;
+
+      if (source == 'nominatim') {
+        // Nominatim results already include coordinates
+        latLng = LatLng(
+          (prediction['lat'] as num).toDouble(),
+          (prediction['lon'] as num).toDouble(),
+        );
+      } else {
+        // Google Places: resolve place_id → LatLng via Details API
+        final placeId = prediction['place_id'] as String;
+        final url = Uri.parse(
+          'https://maps.googleapis.com/maps/api/place/details/json'
+          '?place_id=$placeId'
+          '&key=$_gMapsKey'
+          '&fields=geometry',
+        );
+        final resp = await http.get(url);
+        if (!mounted) return;
+        if (resp.statusCode == 200) {
+          final data = json.decode(resp.body);
+          if (data['status'] == 'OK') {
+            final loc = data['result']['geometry']['location'];
+            latLng = LatLng(
+              (loc['lat'] as num).toDouble(),
+              (loc['lng'] as num).toDouble(),
+            );
+          } else {
+            throw Exception('Could not resolve location.');
+          }
+        } else {
+          throw Exception('Could not resolve location.');
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _dropLatLng = latLng;
+        _dropAddress = mainText;
+        _dropController.text = mainText;
+      });
+      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 15));
+
+      // Save to recents (include coordinates for instant re-selection)
+      _recentSearches.removeWhere((r) => r['name'] == mainText);
+      _recentSearches.insert(0, {
+        'name': mainText,
+        'address': description,
+        'place_id': prediction['place_id']?.toString() ?? '',
+        'lat': latLng.latitude.toString(),
+        'lon': latLng.longitude.toString(),
+        'source': source,
+      });
+      if (_recentSearches.length > 5) {
+        _recentSearches = _recentSearches.sublist(0, 5);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e.toString().replaceFirst('Exception: ', '')),
+        backgroundColor: Colors.red.shade700,
+      ));
+    } finally {
+      if (mounted) setState(() => _isSearchingDrop = false);
+    }
+  }
+
+  void _selectRecentSearch(Map<String, String> recent) {
+    final lat = double.tryParse(recent['lat'] ?? '');
+    final lon = double.tryParse(recent['lon'] ?? '');
+
+    if (lat != null && lon != null) {
+      // We have saved coordinates — use them directly
+      _selectPrediction({
+        'place_id': recent['place_id'] ?? '',
+        'main_text': recent['name'] ?? '',
+        'description': recent['address'] ?? '',
+        'source': recent['source'] ?? 'nominatim',
+        'lat': lat,
+        'lon': lon,
+      });
+    } else {
+      // Fallback: use the name as a text search
+      _closeSearchMode();
+      _searchDrop(recent['name'] ?? '');
+    }
   }
 
   Future<void> _loadUserProfile() async {
@@ -712,8 +978,13 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
           GoogleMap(
             onMapCreated: (c) {
               _mapController = c;
+              // If location was already resolved before map was ready, move now
               if (_pickupLatLng != null) {
-                c.animateCamera(CameraUpdate.newLatLngZoom(_pickupLatLng!, 16));
+                Future.delayed(const Duration(milliseconds: 300), () {
+                  if (mounted && _pickupLatLng != null) {
+                    c.animateCamera(CameraUpdate.newLatLngZoom(_pickupLatLng!, 16));
+                  }
+                });
               }
             },
             onTap: _onMapTap,
@@ -722,7 +993,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
               target: _pickupLatLng ?? _defaultCenter,
               zoom: _pickupLatLng == null ? 11 : 16,
             ),
-            myLocationEnabled: _pickupLatLng != null,
+            myLocationEnabled: true,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             markers: markers,
@@ -733,6 +1004,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
           if (!_isLocating && _locationError != null)
             _buildErrorBanner(_locationError!),
           if (_showDriverProfileCard) _buildCompleteDriverProfileCard(),
+          if (_isSearchMode) _buildSearchOverlay(),
         ],
       ),
     );
@@ -797,36 +1069,58 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
                         scheme: scheme,
                       ),
                       const SizedBox(height: 8),
-                      // Drop search field
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(10, 2, 8, 2),
-                        decoration: BoxDecoration(
-                          color: fill,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: border),
-                        ),
-                        child: TextField(
-                          controller: _dropController,
-                          textInputAction: TextInputAction.search,
-                          onSubmitted: _searchDrop,
-                          style: TextStyle(color: scheme.onSurface),
-                          decoration: InputDecoration(
-                            labelText: 'Drop location',
-                            labelStyle: TextStyle(color: scheme.onSurfaceVariant),
-                            hintText: 'Search or tap map',
-                            hintStyle: TextStyle(color: scheme.onSurfaceVariant.withOpacity(0.7)),
-                            border: InputBorder.none,
-                            prefixIcon: Icon(Icons.location_on, color: scheme.error),
-                            suffixIcon: _isSearchingDrop
-                                ? const Padding(
-                                    padding: EdgeInsets.all(12),
-                                    child: SizedBox(width: 16, height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2)),
-                                  )
-                                : IconButton(
-                                    icon: Icon(Icons.search, color: scheme.primary),
-                                    onPressed: () => _searchDrop(_dropController.text),
-                                  ),
+                      // Drop location – tap to open search overlay
+                      GestureDetector(
+                        onTap: _openSearchMode,
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(10, 14, 10, 14),
+                          decoration: BoxDecoration(
+                            color: fill,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: border),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.location_on, color: scheme.error, size: 22),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Drop location',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _dropAddress.isEmpty ? 'Where to?' : _dropAddress,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: _dropAddress.isEmpty
+                                            ? scheme.onSurfaceVariant.withOpacity(0.6)
+                                            : scheme.onSurface,
+                                        fontSize: 13,
+                                        fontWeight: _dropAddress.isEmpty
+                                            ? FontWeight.w400
+                                            : FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (_isSearchingDrop)
+                                const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              else
+                                Icon(Icons.search, color: scheme.primary, size: 22),
+                            ],
                           ),
                         ),
                       ),
@@ -1017,6 +1311,368 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     );
   }
 
+  // ── search overlay ─────────────────────────────────────────────
+
+  Widget _buildSearchOverlay() {
+    return Positioned.fill(
+      child: Material(
+        color: Colors.white,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              // ── Header row ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 6, 16, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                      onPressed: _closeSearchMode,
+                    ),
+                    const Spacer(),
+                    Text(
+                      'Set Destination',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+                    const Spacer(),
+                    const SizedBox(width: 48), // balance the back button
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+              // ── PICKUP + DROP rows with dotted connector ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Left: icons + dotted line
+                      SizedBox(
+                        width: 24,
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 14),
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFF03AF74),
+                              ),
+                            ),
+                            Expanded(
+                              child: SizedBox(
+                                width: 2,
+                                child: CustomPaint(
+                                  painter: _DottedLinePainter(color: Colors.grey.shade400),
+                                ),
+                              ),
+                            ),
+                            Icon(Icons.location_on,
+                                color: Colors.orange.shade700, size: 20),
+                            const SizedBox(height: 14),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Right: PICKUP + DROP fields
+                      Expanded(
+                        child: Column(
+                          children: [
+                            // ── Pickup row ──
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Text(
+                                    'PICKUP',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF03AF74),
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      _pickupAddress,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      // Re-detect current location
+                                      _loadCurrentLocation();
+                                    },
+                                    child: Icon(Icons.cancel,
+                                        color: Colors.grey.shade400, size: 20),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            // ── Drop row (text field) ──
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                    color: const Color(0xFF03AF74).withOpacity(0.5),
+                                    width: 1.5),
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    'DROP',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.orange.shade700,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _searchController,
+                                      focusNode: _searchFocusNode,
+                                      onChanged: _onSearchChanged,
+                                      style: const TextStyle(
+                                          fontSize: 14, color: Colors.black87),
+                                      decoration: InputDecoration(
+                                        hintText: 'Search destination...',
+                                        hintStyle: TextStyle(
+                                            color: Colors.grey.shade400,
+                                            fontSize: 14),
+                                        border: InputBorder.none,
+                                        isDense: true,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                vertical: 10),
+                                      ),
+                                    ),
+                                  ),
+                                  if (_isSearchingPlaces)
+                                    const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    )
+                                  else if (_searchController.text.isNotEmpty)
+                                    GestureDetector(
+                                      onTap: () {
+                                        _searchController.clear();
+                                        _onSearchChanged('');
+                                      },
+                                      child: Icon(Icons.close,
+                                          color: Colors.grey.shade500,
+                                          size: 20),
+                                    )
+                                  else
+                                    Icon(Icons.add,
+                                        color: Colors.grey.shade500, size: 20),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Divider(height: 1, color: Colors.grey.shade200),
+              // ── Results list ──
+              Expanded(child: _buildSearchResults()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    final hasQuery = _searchController.text.trim().length >= 2;
+
+    // Show recent searches when no query
+    if (!hasQuery) {
+      if (_recentSearches.isEmpty) {
+        return Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            children: [
+              Icon(Icons.search, size: 48, color: Colors.grey.shade300),
+              const SizedBox(height: 12),
+              Text(
+                'Search for your destination',
+                style: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Or tap on the map to set a drop point',
+                style: TextStyle(
+                  color: Colors.grey.shade400,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      // Show recent searches
+      return ListView(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Text(
+              'RECENT',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey.shade500,
+                letterSpacing: 1,
+              ),
+            ),
+          ),
+          ..._recentSearches.map((recent) => _buildResultTile(
+                icon: Icons.access_time,
+                iconBg: Colors.orange.shade50,
+                iconColor: Colors.orange.shade700,
+                mainText: recent['name'] ?? '',
+                secondaryText: recent['address'] ?? '',
+                onTap: () => _selectRecentSearch(recent),
+              )),
+        ],
+      );
+    }
+
+    // Loading state
+    if (_isSearchingPlaces && _placePredictions.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // No results
+    if (_placePredictions.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Text(
+            'No results found for "${_searchController.text.trim()}"',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+          ),
+        ),
+      );
+    }
+
+    // Prediction results
+    return ListView.separated(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      itemCount: _placePredictions.length,
+      separatorBuilder: (_, __) =>
+          Divider(height: 1, indent: 72, color: Colors.grey.shade200),
+      itemBuilder: (context, index) {
+        final p = _placePredictions[index];
+        return _buildResultTile(
+          icon: Icons.location_on,
+          iconBg: Colors.orange.shade50,
+          iconColor: Colors.orange.shade700,
+          mainText: p['main_text'] as String? ?? '',
+          secondaryText: p['secondary_text'] as String? ?? '',
+          onTap: () => _selectPrediction(p),
+        );
+      },
+    );
+  }
+
+  Widget _buildResultTile({
+    required IconData icon,
+    required Color iconBg,
+    required Color iconColor,
+    required String mainText,
+    required String secondaryText,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            // Icon
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: iconBg,
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 14),
+            // Text
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    mainText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  if (secondaryText.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      secondaryText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Trailing icon
+            Icon(Icons.person_pin_circle_outlined,
+                color: Colors.grey.shade600, size: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── build ─────────────────────────────────────────────────────────
 
   @override
@@ -1077,3 +1733,30 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   }
 }
 
+// ── Dotted line painter for the PICKUP→DROP connector ──
+
+class _DottedLinePainter extends CustomPainter {
+  _DottedLinePainter({this.color = Colors.grey});
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+
+    const dashHeight = 3.0;
+    const dashSpace = 4.0;
+    double y = 0;
+    final x = size.width / 2;
+
+    while (y < size.height) {
+      canvas.drawLine(Offset(x, y), Offset(x, y + dashHeight), paint);
+      y += dashHeight + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
