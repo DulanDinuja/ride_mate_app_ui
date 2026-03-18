@@ -12,6 +12,7 @@ class UserProfile {
   final String gender;
   final String preferredLanguage;
   final String userProfileCompleted;
+  final String willingToDrive;
   final int? userVerificationImageDocumentId;
   final String? userVerificationImageUrl;
   final String createdDate;
@@ -30,12 +31,14 @@ class UserProfile {
     required this.gender,
     required this.preferredLanguage,
     required this.userProfileCompleted,
+    required this.willingToDrive,
     this.userVerificationImageDocumentId,
     this.userVerificationImageUrl,
     required this.createdDate,
   });
 
   bool get isProfileCompleted => userProfileCompleted == 'YES';
+  bool get isWillingToDrive => willingToDrive == 'YES';
 
   // bool get isProfileCompleted =>
   //     userProfileCompleted == 'YES' ||
@@ -56,6 +59,7 @@ class UserProfile {
       gender: json['gender'] as String,
       preferredLanguage: json['preferredLanguage'] as String,
       userProfileCompleted: json['userProfileCompleted'] as String,
+      willingToDrive: (json['willingToDrive'] as String?) ?? 'NO',
       userVerificationImageDocumentId:
           json['userVerificationImageDocumentId'] as int?,
       userVerificationImageUrl: json['userVerificationImageUrl'] as String?,
