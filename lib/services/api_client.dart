@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:http/http.dart' as http;
+
 import 'token_service.dart';
 
 /// Base HTTP client used by all service classes.
@@ -108,6 +112,36 @@ class ApiClient {
     });
   }
 
+  // ─── Multipart upload (authenticated, 401 auto-retry) ────────────
+
+  /// Sends a multipart POST with one file field.
+  ///
+  /// On a 401 the token is refreshed once and the request is retried,
+  /// exactly like [get]/[post]/[put]/[patch]/[delete].
+  static Future<http.Response> multipartPost(
+    String endpoint, {
+    required Uint8List fileBytes,
+    required String fileName,
+    String fieldName = 'file',
+  }) async {
+    return _withTokenRefresh(() async {
+      final uri = Uri.parse('$baseUrl$endpoint');
+      final request = http.MultipartRequest('POST', uri);
+
+      final authHeader = await TokenService.getAuthorizationHeader();
+      if (authHeader != null) {
+        request.headers['Authorization'] = authHeader;
+      }
+
+      request.files.add(
+        http.MultipartFile.fromBytes(fieldName, fileBytes, filename: fileName),
+      );
+
+      final streamed = await request.send();
+      return http.Response.fromStream(streamed);
+    });
+  }
+
   // ─── 401 auto-retry logic ────────────────────────────────────────
 
   static Future<http.Response> _withTokenRefresh(
@@ -126,10 +160,23 @@ class ApiClient {
     return response;
   }
 
+  /// Guards concurrent refresh attempts so only one network call is made.
+  static Completer<bool>? _refreshCompleter;
+
   static Future<bool> _tryRefreshToken() async {
+    // If a refresh is already in progress, wait for it.
+    if (_refreshCompleter != null) {
+      return _refreshCompleter!.future;
+    }
+
+    _refreshCompleter = Completer<bool>();
+
     try {
       final refreshToken = await TokenService.getRefreshToken();
-      if (refreshToken == null) return false;
+      if (refreshToken == null) {
+        _refreshCompleter!.complete(false);
+        return false;
+      }
 
       final response = await http.post(
         Uri.parse('$baseUrl/auth/refresh-token'),
@@ -146,12 +193,18 @@ class ApiClient {
             refreshToken: data['refreshToken'] as String?,
             tokenType: data['tokenType'] as String?,
           );
+          _refreshCompleter!.complete(true);
           return true;
         }
       }
+
+      _refreshCompleter!.complete(false);
       return false;
     } catch (_) {
+      _refreshCompleter!.complete(false);
       return false;
+    } finally {
+      _refreshCompleter = null;
     }
   }
 }
