@@ -1322,199 +1322,311 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
 
   // ── search overlay ─────────────────────────────────────────────
 
+  // App theme constants for the search overlay
+  static const Color _navyDark = Color(0xFF040F1B);
+  static const Color _primaryGreen = Color(0xFF169F7E);
+  static const Color _accentGreen = Color(0xFF03AF74);
+  static const Color _creamBg = Color(0xFFFFFFF0);
+  static const Color _textPrimary = Color(0xFF040F1B);
+  static const Color _textSecondary = Color(0xFF4A5565);
+  static const Color _inputFill = Color(0xFFF5F5F5);
+
   Widget _buildSearchOverlay() {
     return Positioned.fill(
       child: Material(
-        color: Colors.white,
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              // ── Header row ──
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 6, 16, 0),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.black87),
-                      onPressed: _closeSearchMode,
-                    ),
-                    const Spacer(),
-                    Text(
-                      'Set Destination',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                    const Spacer(),
-                    const SizedBox(width: 48), // balance the back button
-                  ],
+        color: _creamBg,
+        child: Column(
+          children: [
+            // ── Dark header with PICKUP + DROP ──
+            Container(
+              decoration: const BoxDecoration(
+                color: _navyDark,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(28),
+                  bottomRight: Radius.circular(28),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0x40000000),
+                    blurRadius: 16,
+                    offset: Offset(0, 4),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              // ── PICKUP + DROP rows with dotted connector ──
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                child: IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(6, 4, 16, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Left: icons + dotted line
-                      SizedBox(
-                        width: 24,
-                        child: Column(
-                          children: [
-                            const SizedBox(height: 14),
-                            Container(
-                              width: 12,
-                              height: 12,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Color(0xFF03AF74),
+                      // ── Header row ──
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                                color: Colors.white, size: 20),
+                            onPressed: _closeSearchMode,
+                            splashRadius: 22,
+                          ),
+                          const Expanded(
+                            child: Text(
+                              'Set Destination',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.3,
                               ),
                             ),
-                            Expanded(
-                              child: SizedBox(
-                                width: 2,
-                                child: CustomPaint(
-                                  painter: _DottedLinePainter(color: Colors.grey.shade400),
+                          ),
+                          const SizedBox(width: 48),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // ── PICKUP + DROP rows with connector ──
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Left: icons + dotted line
+                              SizedBox(
+                                width: 26,
+                                child: Column(
+                                  children: [
+                                    const SizedBox(height: 16),
+                                    Container(
+                                      width: 14,
+                                      height: 14,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: _accentGreen,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: _accentGreen.withOpacity(0.4),
+                                            blurRadius: 8,
+                                            spreadRadius: 1,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: SizedBox(
+                                        width: 2,
+                                        child: CustomPaint(
+                                          painter: _DottedLinePainter(
+                                            color: Colors.white.withOpacity(0.3),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      width: 14,
+                                      height: 14,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: const Color(0xFFFF6B35),
+                                          width: 2.5,
+                                        ),
+                                      ),
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.circle,
+                                          color: Color(0xFFFF6B35),
+                                          size: 6,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                  ],
                                 ),
                               ),
-                            ),
-                            Icon(Icons.location_on,
-                                color: Colors.orange.shade700, size: 20),
-                            const SizedBox(height: 14),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Right: PICKUP + DROP fields
-                      Expanded(
-                        child: Column(
-                          children: [
-                            // ── Pickup row ──
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Text(
-                                    'PICKUP',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF03AF74),
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      _pickupAddress,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.black87,
+                              const SizedBox(width: 14),
+                              // Right: PICKUP + DROP fields
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    // ── Pickup row ──
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 13),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.08),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                          color: Colors.white.withOpacity(0.1),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: _accentGreen.withOpacity(0.15),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Text(
+                                              'FROM',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w800,
+                                                color: _accentGreen,
+                                                letterSpacing: 1,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              _pickupAddress,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                          GestureDetector(
+                                            onTap: _loadCurrentLocation,
+                                            child: Container(
+                                              padding: const EdgeInsets.all(4),
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: Colors.white.withOpacity(0.08),
+                                              ),
+                                              child: Icon(
+                                                Icons.my_location_rounded,
+                                                color: Colors.white.withOpacity(0.5),
+                                                size: 16,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ),
-                                  GestureDetector(
-                                    onTap: () {
-                                      // Re-detect current location
-                                      _loadCurrentLocation();
-                                    },
-                                    child: Icon(Icons.cancel,
-                                        color: Colors.grey.shade400, size: 20),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            // ── Drop row (text field) ──
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                    color: const Color(0xFF03AF74).withOpacity(0.5),
-                                    width: 1.5),
-                              ),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    'DROP',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.orange.shade700,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _searchController,
-                                      focusNode: _searchFocusNode,
-                                      onChanged: _onSearchChanged,
-                                      style: const TextStyle(
-                                          fontSize: 14, color: Colors.black87),
-                                      decoration: InputDecoration(
-                                        hintText: 'Search destination...',
-                                        hintStyle: TextStyle(
-                                            color: Colors.grey.shade400,
-                                            fontSize: 14),
-                                        border: InputBorder.none,
-                                        isDense: true,
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                                vertical: 10),
+                                    const SizedBox(height: 10),
+                                    // ── Drop row (text field) ──
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                          color: _primaryGreen.withOpacity(0.5),
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFF6B35)
+                                                  .withOpacity(0.15),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Text(
+                                              'TO',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w800,
+                                                color: Color(0xFFFF6B35),
+                                                letterSpacing: 1,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: TextField(
+                                              controller: _searchController,
+                                              focusNode: _searchFocusNode,
+                                              onChanged: _onSearchChanged,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.white,
+                                              ),
+                                              cursorColor: _primaryGreen,
+                                              decoration: InputDecoration(
+                                                hintText: 'Where are you going?',
+                                                hintStyle: TextStyle(
+                                                  color: Colors.white.withOpacity(0.35),
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w400,
+                                                ),
+                                                filled: true,
+                                                fillColor: Colors.transparent,
+                                                border: InputBorder.none,
+                                                enabledBorder: InputBorder.none,
+                                                focusedBorder: InputBorder.none,
+                                                isDense: true,
+                                                contentPadding:
+                                                    const EdgeInsets.symmetric(
+                                                        vertical: 10),
+                                              ),
+                                            ),
+                                          ),
+                                          if (_isSearchingPlaces)
+                                            const SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: _primaryGreen,
+                                              ),
+                                            )
+                                          else if (_searchController.text.isNotEmpty)
+                                            GestureDetector(
+                                              onTap: () {
+                                                _searchController.clear();
+                                                _onSearchChanged('');
+                                              },
+                                              child: Container(
+                                                padding: const EdgeInsets.all(4),
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  color: Colors.white.withOpacity(0.1),
+                                                ),
+                                                child: Icon(
+                                                  Icons.close_rounded,
+                                                  color: Colors.white.withOpacity(0.5),
+                                                  size: 16,
+                                                ),
+                                              ),
+                                            )
+                                          else
+                                            Icon(
+                                              Icons.search_rounded,
+                                              color: Colors.white.withOpacity(0.35),
+                                              size: 20,
+                                            ),
+                                        ],
                                       ),
                                     ),
-                                  ),
-                                  if (_isSearchingPlaces)
-                                    const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2),
-                                    )
-                                  else if (_searchController.text.isNotEmpty)
-                                    GestureDetector(
-                                      onTap: () {
-                                        _searchController.clear();
-                                        _onSearchChanged('');
-                                      },
-                                      child: Icon(Icons.close,
-                                          color: Colors.grey.shade500,
-                                          size: 20),
-                                    )
-                                  else
-                                    Icon(Icons.add,
-                                        color: Colors.grey.shade500, size: 20),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              Divider(height: 1, color: Colors.grey.shade200),
-              // ── Results list ──
-              Expanded(child: _buildSearchResults()),
-            ],
-          ),
+            ),
+            // ── Results list ──
+            Expanded(child: _buildSearchResults()),
+          ],
         ),
       ),
     );
@@ -1527,25 +1639,53 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     if (!hasQuery) {
       if (_recentSearches.isEmpty) {
         return Padding(
-          padding: const EdgeInsets.all(40),
+          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
           child: Column(
             children: [
-              Icon(Icons.search, size: 48, color: Colors.grey.shade300),
-              const SizedBox(height: 12),
-              Text(
-                'Search for your destination',
-                style: TextStyle(
-                  color: Colors.grey.shade500,
-                  fontSize: 15,
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _primaryGreen.withOpacity(0.08),
+                ),
+                child: Icon(
+                  Icons.explore_rounded,
+                  size: 40,
+                  color: _primaryGreen.withOpacity(0.5),
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Or tap on the map to set a drop point',
+              const SizedBox(height: 20),
+              const Text(
+                'Where are you heading?',
                 style: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 13,
+                  color: _textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
                 ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Search for a place or tap the map\nto set your destination',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: _textSecondary,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 28),
+              // Quick suggestion chips
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  _buildSuggestionChip('🏠  Home', Icons.home_rounded),
+                  _buildSuggestionChip('🏢  Work', Icons.work_rounded),
+                  _buildSuggestionChip('🍽️  Restaurant', Icons.restaurant_rounded),
+                  _buildSuggestionChip('🛒  Mall', Icons.shopping_bag_rounded),
+                ],
               ),
             ],
           ),
@@ -1553,26 +1693,45 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
       }
       // Show recent searches
       return ListView(
+        padding: const EdgeInsets.only(top: 8),
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: Text(
-              'RECENT',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: Colors.grey.shade500,
-                letterSpacing: 1,
-              ),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: _primaryGreen.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.history_rounded,
+                    size: 16,
+                    color: _primaryGreen,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Recent Searches',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: _textPrimary,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
             ),
           ),
           ..._recentSearches.map((recent) => _buildResultTile(
-                icon: Icons.access_time,
-                iconBg: Colors.orange.shade50,
-                iconColor: Colors.orange.shade700,
+                icon: Icons.access_time_rounded,
+                iconBg: _primaryGreen.withOpacity(0.08),
+                iconColor: _primaryGreen,
                 mainText: recent['name'] ?? '',
                 secondaryText: recent['address'] ?? '',
                 onTap: () => _selectRecentSearch(recent),
+                isRecent: true,
               )),
         ],
       );
@@ -1580,7 +1739,30 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
 
     // Loading state
     if (_isSearchingPlaces && _placePredictions.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: _primaryGreen,
+                backgroundColor: _primaryGreen.withOpacity(0.1),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Searching places...',
+              style: TextStyle(
+                color: _textSecondary,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     // No results
@@ -1588,32 +1770,129 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(40),
-          child: Text(
-            'No results found for "${_searchController.text.trim()}"',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.red.shade50,
+                ),
+                child: Icon(
+                  Icons.location_off_rounded,
+                  size: 32,
+                  color: Colors.red.shade300,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No results found',
+                style: TextStyle(
+                  color: _textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Try a different search for\n"${_searchController.text.trim()}"',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: _textSecondary,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+            ],
           ),
         ),
       );
     }
 
     // Prediction results
-    return ListView.separated(
+    return ListView.builder(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      itemCount: _placePredictions.length,
-      separatorBuilder: (_, __) =>
-          Divider(height: 1, indent: 72, color: Colors.grey.shade200),
+      padding: const EdgeInsets.only(top: 12, bottom: 20),
+      itemCount: _placePredictions.length + 1, // +1 for header
       itemBuilder: (context, index) {
-        final p = _placePredictions[index];
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF6B35).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.place_rounded,
+                    size: 16,
+                    color: Color(0xFFFF6B35),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '${_placePredictions.length} places found',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: _textPrimary,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        final p = _placePredictions[index - 1];
         return _buildResultTile(
-          icon: Icons.location_on,
-          iconBg: Colors.orange.shade50,
-          iconColor: Colors.orange.shade700,
+          icon: Icons.location_on_rounded,
+          iconBg: const Color(0xFFFF6B35).withOpacity(0.08),
+          iconColor: const Color(0xFFFF6B35),
           mainText: p['main_text'] as String? ?? '',
           secondaryText: p['secondary_text'] as String? ?? '',
           onTap: () => _selectPrediction(p),
         );
       },
+    );
+  }
+
+  Widget _buildSuggestionChip(String label, IconData icon) {
+    return GestureDetector(
+      onTap: () {
+        // Extract just the text part after emoji
+        final query = label.replaceAll(RegExp(r'[^\w\s]'), '').trim();
+        _searchController.text = query;
+        _onSearchChanged(query);
+        _searchFocusNode.requestFocus();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _primaryGreen.withOpacity(0.15)),
+          boxShadow: [
+            BoxShadow(
+              color: _navyDark.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: _textPrimary,
+          ),
+        ),
+      ),
     );
   }
 
@@ -1624,59 +1903,93 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     required String mainText,
     required String secondaryText,
     required VoidCallback onTap,
+    bool isRecent = false,
   }) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        child: Row(
-          children: [
-            // Icon
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: iconBg,
-              ),
-              child: Icon(icon, color: iconColor, size: 20),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          splashColor: _primaryGreen.withOpacity(0.08),
+          highlightColor: _primaryGreen.withOpacity(0.04),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _navyDark.withOpacity(0.04)),
+              boxShadow: [
+                BoxShadow(
+                  color: _navyDark.withOpacity(0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            const SizedBox(width: 14),
-            // Text
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    mainText,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
+            child: Row(
+              children: [
+                // Icon
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  if (secondaryText.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      secondaryText,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
+                  child: Icon(icon, color: iconColor, size: 20),
+                ),
+                const SizedBox(width: 14),
+                // Text
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        mainText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: _textPrimary,
+                        ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
+                      if (secondaryText.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          secondaryText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: _textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Trailing arrow
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _primaryGreen.withOpacity(0.08),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: _primaryGreen,
+                    size: 14,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            // Trailing icon
-            Icon(Icons.person_pin_circle_outlined,
-                color: Colors.grey.shade600, size: 24),
-          ],
+          ),
         ),
       ),
     );
