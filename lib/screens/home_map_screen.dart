@@ -437,6 +437,36 @@ class HomeMapScreenState extends State<HomeMapScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.8 * 0.6,
+                  height: 50,
+                  child: TextButton(
+                    onPressed: () async {
+                      setState(() => _showDriverProfileCard = false);
+                      try {
+                        final userId = await TokenService.getUserId();
+                        if (userId != null) {
+                          await UserService.updateWillingToDrive(userId, 'NO');
+                        }
+                      } catch (_) {
+                        // Best-effort — popup is already dismissed
+                      }
+                    },
+                    style: TextButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    ),
+                    child: const Text(
+                      'Do it later',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
