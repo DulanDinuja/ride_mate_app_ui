@@ -206,9 +206,9 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
                   const SizedBox(height: 16),
                   _buildPhotoCard(_InsuranceSide.back),
                   const SizedBox(height: 30),
-                  Align(
+                  const Align(
                     alignment: Alignment.centerLeft,
-                    child: const Text(
+                    child: Text(
                       'Insurance Number',
                       style: TextStyle(
                         fontSize: 19,
@@ -242,9 +242,9 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Align(
+                  const Align(
                     alignment: Alignment.centerLeft,
-                    child: const Text(
+                    child: Text(
                       'Insurance Provider',
                       style: TextStyle(
                         fontSize: 19,
@@ -278,9 +278,9 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Align(
+                  const Align(
                     alignment: Alignment.centerLeft,
-                    child: const Text(
+                    child: Text(
                       'Insurance Expiry Date',
                       style: TextStyle(
                         fontSize: 19,

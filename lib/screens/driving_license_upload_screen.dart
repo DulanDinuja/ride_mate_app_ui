@@ -196,9 +196,9 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
                   const SizedBox(height: 24),
                   _buildPhotoCard(_LicenseSide.back),
                   const SizedBox(height: 30),
-                  Align(
+                  const Align(
                     alignment: Alignment.centerLeft,
-                    child: const Text(
+                    child: Text(
                       'License Number',
                       style: TextStyle(
                         fontSize: 19,
@@ -232,9 +232,9 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Align(
+                  const Align(
                     alignment: Alignment.centerLeft,
-                    child: const Text(
+                    child: Text(
                       'License Expiry Date',
                       style: TextStyle(
                         fontSize: 19,

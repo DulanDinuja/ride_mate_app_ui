@@ -18,6 +18,7 @@ import '../../screens/vehicle_insurance_upload_screen.dart';
 import '../../screens/revenue_license_upload_screen.dart';
 import '../../screens/ride_start_screen.dart';
 import '../../models/user_verification_args.dart';
+import '../../models/driver_registration_data.dart';
 
 class AppRoutes {
   // Route names
@@ -101,16 +102,44 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const VehicleRegistrationScreen());
 
       case vehiclePhotosUpload:
-        return MaterialPageRoute(builder: (_) => const VehiclePhotosUploadScreen());
+        final data = settings.arguments;
+        if (data is! DriverRegistrationData) {
+          return _errorRoute('Vehicle registration data is missing');
+        }
+        return MaterialPageRoute(
+          builder: (_) => const VehiclePhotosUploadScreen(),
+          settings: settings,
+        );
 
       case drivingLicenseUpload:
-        return MaterialPageRoute(builder: (_) => const DrivingLicenseUploadScreen());
+        final data = settings.arguments;
+        if (data is! DriverRegistrationData) {
+          return _errorRoute('Vehicle registration data is missing');
+        }
+        return MaterialPageRoute(
+          builder: (_) => const DrivingLicenseUploadScreen(),
+          settings: settings,
+        );
 
       case vehicleInsuranceUpload:
-        return MaterialPageRoute(builder: (_) => const VehicleInsuranceUploadScreen());
+        final data = settings.arguments;
+        if (data is! DriverRegistrationData) {
+          return _errorRoute('Vehicle registration data is missing');
+        }
+        return MaterialPageRoute(
+          builder: (_) => const VehicleInsuranceUploadScreen(),
+          settings: settings,
+        );
 
       case revenueLicenseUpload:
-        return MaterialPageRoute(builder: (_) => const RevenueLicenseUploadScreen());
+        final data = settings.arguments;
+        if (data is! DriverRegistrationData) {
+          return _errorRoute('Vehicle registration data is missing');
+        }
+        return MaterialPageRoute(
+          builder: (_) => const RevenueLicenseUploadScreen(),
+          settings: settings,
+        );
 
       case rideStart:
         return MaterialPageRoute(builder: (_) => const RideStartScreen());
