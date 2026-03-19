@@ -11,12 +11,16 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/routes/app_routes.dart';
+import '../models/api_exception.dart';
+import '../models/passenger_ride_confirm_request.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/driver_service.dart';
 import '../services/file_service.dart';
+import '../services/ride_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
+import '../utils/snackbar_helper.dart';
 
 class UserHomeMapScreen extends StatefulWidget {
   const UserHomeMapScreen({super.key});
@@ -74,6 +78,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   double? _routeDistanceKm;
   String? _routeDuration;
   bool _isFetchingRoute = false;
+  bool _isConfirmingRide = false;
 
   // ── search mode ──
   bool _isSearchMode = false;
@@ -372,10 +377,166 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   }
 
   void _onConfirm() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Ride confirmed! Looking for drivers...'),
-      backgroundColor: Color(0xFF03AF74),
-    ));
+    if (_pickupLatLng == null || _dropLatLng == null || _routeDistanceKm == null) return;
+    _showConfirmRideDialog();
+  }
+
+  /// Shows a confirmation dialog before calling the API.
+  void _showConfirmRideDialog() {
+    final distance = _routeDistanceKm!;
+    const double ratePerKm = 30.0; // LKR per km
+    final cost = double.parse((distance * ratePerKm).toStringAsFixed(2));
+    final startCity = _extractCityName(_pickupAddress);
+    final endCity = _extractCityName(_dropAddress);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Confirm Your Ride',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 16),
+              _buildConfirmInfoRow(Icons.my_location, 'From', startCity),
+              const SizedBox(height: 8),
+              _buildConfirmInfoRow(Icons.location_on, 'To', endCity),
+              const SizedBox(height: 8),
+              _buildConfirmInfoRow(Icons.straighten_rounded, 'Distance', '${distance.toStringAsFixed(1)} km'),
+              const SizedBox(height: 8),
+              _buildConfirmInfoRow(Icons.payments_outlined, 'Estimated Cost', 'LKR ${cost.toStringAsFixed(2)}'),
+              if (_routeDuration != null) ...[
+                const SizedBox(height: 8),
+                _buildConfirmInfoRow(Icons.access_time_rounded, 'Duration', _routeDuration!),
+              ],
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: StatefulBuilder(
+                  builder: (context, setSheetState) {
+                    return ElevatedButton(
+                      onPressed: _isConfirmingRide
+                          ? null
+                          : () {
+                              Navigator.pop(ctx);
+                              _confirmPassengerRide(cost, startCity, endCity);
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF03AF74),
+                        disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: _isConfirmingRide
+                          ? const SizedBox(
+                              width: 22, height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text(
+                              'Confirm & Book Ride',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                            ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildConfirmInfoRow(IconData icon, String label, String value) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: const Color(0xFF03AF74)),
+        const SizedBox(width: 10),
+        Text('$label: ', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Extracts a city name from an address string (takes the last meaningful part).
+  String _extractCityName(String address) {
+    if (address.isEmpty) return '';
+    final parts = address.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    // Return the last part as city, or the whole address if no comma
+    return parts.length > 1 ? parts.last : parts.first;
+  }
+
+  /// Calls the passenger ride confirm API.
+  Future<void> _confirmPassengerRide(double cost, String startCity, String endCity) async {
+    if (_isConfirmingRide) return;
+    setState(() => _isConfirmingRide = true);
+
+    try {
+      final userIdStr = await TokenService.getUserId();
+      if (userIdStr == null) {
+        throw Exception('User not logged in. Please login again.');
+      }
+      final userId = int.parse(userIdStr);
+
+      final request = PassengerRideConfirmRequest(
+        rideDetailId: 1, // TODO: Replace with actual ride detail ID from ride search/selection
+        userId: userId,
+        startLocationLongitude: _pickupLatLng!.longitude,
+        endLocationLongitude: _dropLatLng!.longitude,
+        passengerRideDistance: _routeDistanceKm!,
+        passengerCost: cost,
+        startCity: startCity,
+        endCity: endCity,
+      );
+
+      final response = await RideService.confirmPassengerRide(request);
+
+      if (!mounted) return;
+
+      SnackBarHelper.showSuccess(
+        context,
+        response.message ?? 'Ride confirmed successfully! Looking for drivers...',
+      );
+
+      debugPrint('[RideConfirm] Confirmed — ShareRideDetailId: ${response.shareRideDetailId}, '
+          'Status: ${response.status}');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        e.toString().replaceFirst('Exception: ', ''),
+      );
+    } finally {
+      if (mounted) setState(() => _isConfirmingRide = false);
+    }
   }
 
   Future<void> _fetchRoute() async {
@@ -1439,16 +1600,30 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
                         width: double.infinity,
                         height: 52,
                         child: ElevatedButton(
-                          onPressed: (_pickupLatLng != null && _dropLatLng != null) ? _onConfirm : null,
+                          onPressed: (_pickupLatLng != null && _dropLatLng != null && _routeDistanceKm != null && !_isConfirmingRide)
+                              ? _onConfirm
+                              : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF03AF74),
                             disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
-                          child: const Text(
-                            'Confirm Ride',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
-                          ),
+                          child: _isConfirmingRide
+                              ? const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 20, height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text('Confirming...', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+                                  ],
+                                )
+                              : const Text(
+                                  'Confirm Ride',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                                ),
                         ),
                       ),
                     ],

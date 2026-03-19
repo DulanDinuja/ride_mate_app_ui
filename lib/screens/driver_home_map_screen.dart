@@ -13,13 +13,17 @@ import 'package:image_picker/image_picker.dart';
 // ignore_for_file: unused_element
 
 import '../core/routes/app_routes.dart';
+import '../models/api_exception.dart';
 import '../models/driver_profile.dart';
+import '../models/ride_detail_request.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/driver_service.dart';
 import '../services/file_service.dart';
+import '../services/ride_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
+import '../utils/snackbar_helper.dart';
 
 class DriverHomeMapScreen extends StatefulWidget {
   const DriverHomeMapScreen({super.key});
@@ -86,6 +90,7 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
 
   // Driver availability toggle
   bool _isAvailable = false;
+  bool _isStartingRide = false;
 
   // Driver profile (for vehicle type: car / bike)
   DriverProfile? _driverProfile;
@@ -183,17 +188,234 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
   }
 
   void _onStartRide() {
-    if (_destLatLng == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Please set a destination first.'),
-        backgroundColor: Colors.orange,
-      ));
+    if (_destLatLng == null || _currentLatLng == null) {
+      SnackBarHelper.showError(context, 'Please set a destination first.');
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Looking for ride requests...'),
-      backgroundColor: Color(0xFF03AF74),
-    ));
+    if (_driverProfile == null) {
+      SnackBarHelper.showError(context, 'Driver profile not loaded. Please wait.');
+      return;
+    }
+    if (_routeDistanceKm == null) {
+      SnackBarHelper.showError(context, 'Route is still loading. Please wait.');
+      return;
+    }
+    _showStartRideDialog();
+  }
+
+  /// Shows a confirmation bottom sheet, calls calculate-price, then creates the ride.
+  void _showStartRideDialog() {
+    final distance = _routeDistanceKm!;
+    final startCity = _extractCityName(_currentAddress);
+    final destCity = _extractCityName(_destAddress);
+    final tripRoute = '$startCity -> $destCity';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        bool isCalculating = true;
+        double? totalCost;
+        String? calcError;
+
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            // Fetch price on first build
+            if (isCalculating && totalCost == null && calcError == null) {
+              RideService.calculateRidePrice(
+                driverProfileId: _driverProfile!.id,
+                totalDistance: distance,
+              ).then((priceResp) {
+                setSheetState(() {
+                  totalCost = priceResp.totalRidePrice ?? 0;
+                  isCalculating = false;
+                });
+              }).catchError((e) {
+                setSheetState(() {
+                  calcError = e is ApiException
+                      ? e.message
+                      : e.toString().replaceFirst('Exception: ', '');
+                  isCalculating = false;
+                });
+              });
+            }
+
+            return Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40, height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const Text(
+                    'Start Your Ride',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildStartRideInfoRow(Icons.my_location, 'From', startCity),
+                  const SizedBox(height: 8),
+                  _buildStartRideInfoRow(Icons.location_on, 'To', destCity),
+                  const SizedBox(height: 8),
+                  _buildStartRideInfoRow(Icons.straighten_rounded, 'Distance', '${distance.toStringAsFixed(1)} km'),
+                  const SizedBox(height: 8),
+                  _buildStartRideInfoRow(Icons.event_seat_rounded, 'Seats', '$_availableSeats'),
+                  if (_routeDuration != null) ...[
+                    const SizedBox(height: 8),
+                    _buildStartRideInfoRow(Icons.access_time_rounded, 'Duration', _routeDuration!),
+                  ],
+                  const SizedBox(height: 8),
+                  // Price row (loading / error / value)
+                  if (isCalculating)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                          SizedBox(width: 10),
+                          Text('Calculating ride price...', style: TextStyle(fontSize: 13)),
+                        ],
+                      ),
+                    )
+                  else if (calcError != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, size: 18, color: Colors.red),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(calcError!, style: const TextStyle(fontSize: 13, color: Colors.red))),
+                        ],
+                      ),
+                    )
+                  else
+                    _buildStartRideInfoRow(
+                      Icons.payments_outlined,
+                      'Total Cost',
+                      'LKR ${totalCost?.toStringAsFixed(2) ?? '0.00'}',
+                    ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: (isCalculating || calcError != null)
+                          ? null
+                          : () {
+                              Navigator.pop(ctx);
+                              _createRideDetail(
+                                totalCost: totalCost!,
+                                startCity: startCity,
+                                tripRoute: tripRoute,
+                              );
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF03AF74),
+                        disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text(
+                        'Confirm & Start Ride',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildStartRideInfoRow(IconData icon, String label, String value) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: const Color(0xFF03AF74)),
+        const SizedBox(width: 10),
+        Text('$label: ', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Extracts a city name from an address string (takes the last meaningful part).
+  String _extractCityName(String address) {
+    if (address.isEmpty) return '';
+    final parts = address.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    return parts.length > 1 ? parts.last : parts.first;
+  }
+
+  /// Formats a DateTime to the backend-expected format: "yyyy-MM-dd HH:mm:ss"
+  String _formatDateTime(DateTime dt) {
+    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:${dt.second.toString().padLeft(2, '0')}';
+  }
+
+  /// Calls POST /ride-details/addRide to create the ride.
+  Future<void> _createRideDetail({
+    required double totalCost,
+    required String startCity,
+    required String tripRoute,
+  }) async {
+    if (_isStartingRide) return;
+    setState(() => _isStartingRide = true);
+
+    try {
+      final request = RideDetailRequest(
+        driverProfileId: _driverProfile!.id,
+        startLocationLongitude: _currentLatLng!.longitude,
+        endLocationLongitude: _destLatLng!.longitude,
+        startLocationLatitude: _currentLatLng!.latitude,
+        endLocationLatitude: _destLatLng!.latitude,
+        startCity: startCity,
+        availableSeats: _availableSeats,
+        startTime: _formatDateTime(DateTime.now()),
+        totalRideDistance: _routeDistanceKm!,
+        tripRoute: tripRoute,
+        status: 'ACTIVE',
+        totalRideCost: totalCost,
+      );
+
+      final response = await RideService.createRideDetail(request);
+
+      if (!mounted) return;
+
+      final rideId = response['id'];
+      final message = response['messages'] ?? 'Ride created successfully!';
+
+      SnackBarHelper.showSuccess(context, message.toString());
+      debugPrint('[StartRide] Ride created — ID: $rideId');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        e.toString().replaceFirst('Exception: ', ''),
+      );
+    } finally {
+      if (mounted) setState(() => _isStartingRide = false);
+    }
   }
 
   // ── search helpers ──
@@ -1214,16 +1436,30 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
                         width: double.infinity,
                         height: 52,
                         child: ElevatedButton(
-                          onPressed: (_isAvailable && _destLatLng != null) ? _onStartRide : null,
+                          onPressed: (_isAvailable && _destLatLng != null && !_isStartingRide)
+                              ? _onStartRide
+                              : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF03AF74),
                             disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
-                          child: const Text(
-                            'Start Ride',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
-                          ),
+                          child: _isStartingRide
+                              ? const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 20, height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text('Starting Ride...', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+                                  ],
+                                )
+                              : const Text(
+                                  'Start Ride',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                                ),
                         ),
                       ),
                       if (!_isAvailable)
