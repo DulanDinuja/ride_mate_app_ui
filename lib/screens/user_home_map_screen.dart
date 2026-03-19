@@ -11,6 +11,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/routes/app_routes.dart';
+import '../models/driver_profile.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/driver_service.dart';
@@ -38,6 +39,14 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   bool _showDriverProfileCard = false;
   String? _loadError;
   UserProfile? _userProfile;
+
+  // ── driver-specific ──
+  bool _isAvailable = false;
+  DriverProfile? _driverProfile;
+  int _availableSeats = 1;
+  final TextEditingController _noteController = TextEditingController();
+
+  bool get _isDriver => _userProfile?.role.toUpperCase() == 'DRIVER';
 
   // ── map / ride ──
   static const LatLng _defaultCenter = LatLng(6.9271, 79.8612);
@@ -95,6 +104,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   void dispose() {
     _mapController?.dispose();
     _dropController.dispose();
+    _noteController.dispose();
     _searchDebounceTimer?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
@@ -378,12 +388,31 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     ));
   }
 
+  void _onOfferRide() {
+    if (_dropLatLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please set a destination first.'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Ride offered! Waiting for passengers...'),
+      backgroundColor: Color(0xFF03AF74),
+    ));
+  }
+
   Future<void> _fetchRoute() async {
     final origin = _pickupLatLng;
     final destination = _dropLatLng;
     if (origin == null || destination == null) return;
 
     setState(() { _isFetchingRoute = true; _polylines = {}; _routeDistanceKm = null; _routeDuration = null; });
+
+    // Vehicle-type-aware routing for drivers
+    final routeColor = (_isDriver && (_driverProfile?.isTwoWheeler ?? false))
+        ? const Color(0xFF2196F3)
+        : const Color(0xFF03AF74);
 
     // ── 1. OSRM with GeoJSON geometry (no decoding needed) ──
     try {
@@ -430,7 +459,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
               Polyline(
                 polylineId: const PolylineId('route'),
                 points: points,
-                color: const Color(0xFF03AF74),
+                color: routeColor,
                 width: 5,
               ),
             };
@@ -444,11 +473,13 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     }
 
     // ── 2. Google Directions fallback (mobile/non-CORS environments) ──
+    final googleMode = (_isDriver && (_driverProfile?.isTwoWheeler ?? false)) ? 'TWO_WHEELER' : 'driving';
     try {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/directions/json'
         '?origin=${origin.latitude},${origin.longitude}'
         '&destination=${destination.latitude},${destination.longitude}'
+        '&mode=$googleMode'
         '&key=$_gMapsKey',
       );
       final resp = await http.get(url);
@@ -477,7 +508,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
               Polyline(
                 polylineId: const PolylineId('route'),
                 points: points,
-                color: const Color(0xFF03AF74),
+                color: routeColor,
                 width: 5,
               ),
             };
@@ -787,6 +818,14 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
         _userProfile = profile;
       });
 
+      // If user is a driver, fetch the driver profile for vehicle type info
+      if (profile.role.toUpperCase() == 'DRIVER') {
+        try {
+          final driverProfile = await DriverService.getDriverProfileByUserId(userId);
+          if (mounted) setState(() => _driverProfile = driverProfile);
+        } catch (_) {}
+      }
+
       // Check driver profile if user is willing to drive
       if (profile.isProfileCompleted && profile.isWillingToDrive) {
         await _checkDriverProfileStatus(userId);
@@ -864,6 +903,13 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
         // Launch the full driver registration flow
         Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
       } else {
+        // Reset driver-specific state
+        setState(() {
+          _isAvailable = false;
+          _driverProfile = null;
+          _availableSeats = 1;
+          _noteController.clear();
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Role changed to Passenger.'),
@@ -1076,6 +1122,20 @@ Future<void> _onChangeProfilePhoto() async {
                         ),
                         const SizedBox(height: 2),
                         Text(profile.email, style: const TextStyle(color: Colors.black54)),
+                        if (_isDriver) ...[
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF03AF74).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'DRIVER',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF03AF74)),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1335,25 +1395,66 @@ Future<void> _onChangeProfilePhoto() async {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // GPS refresh button
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: GestureDetector(
-                          onTap: _isLocating ? null : _loadCurrentLocation,
-                          child: Container(
-                            width: 38, height: 38,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: const Color(0xFF040F1B).withOpacity(0.9),
+                      // GPS refresh button + driver availability toggle
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: _isLocating ? null : _loadCurrentLocation,
+                            child: Container(
+                              width: 38, height: 38,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF040F1B).withOpacity(0.9),
+                              ),
+                              child: _isLocating
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(9),
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : const Icon(Icons.my_location, color: Colors.white, size: 18),
                             ),
-                            child: _isLocating
-                                ? const Padding(
-                                    padding: EdgeInsets.all(9),
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                  )
-                                : const Icon(Icons.my_location, color: Colors.white, size: 18),
                           ),
-                        ),
+                          if (_isDriver) ...[
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: () => setState(() => _isAvailable = !_isAvailable),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: _isAvailable
+                                      ? const Color(0xFF03AF74).withOpacity(0.15)
+                                      : Colors.grey.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: _isAvailable ? const Color(0xFF03AF74) : Colors.grey.shade400,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 8, height: 8,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: _isAvailable ? const Color(0xFF03AF74) : Colors.grey,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _isAvailable ? 'Online' : 'Offline',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: _isAvailable ? const Color(0xFF03AF74) : Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 10),
                       // Pickup row
@@ -1420,6 +1521,114 @@ Future<void> _onChangeProfilePhoto() async {
                           ),
                         ),
                       ),
+                      // ── Driver-only: available seats ──
+                      if (_isDriver) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                          decoration: BoxDecoration(
+                            color: scheme.surfaceContainerHighest.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: border),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 32, height: 32,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFF03AF74).withOpacity(0.14),
+                                ),
+                                child: const Icon(Icons.event_seat_rounded, color: Color(0xFF03AF74), size: 16),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Available Seats',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: scheme.onSurface),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: _availableSeats > 1 ? () => setState(() => _availableSeats--) : null,
+                                child: Container(
+                                  width: 30, height: 30,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _availableSeats > 1
+                                        ? const Color(0xFF03AF74).withOpacity(0.12)
+                                        : scheme.onSurfaceVariant.withOpacity(0.08),
+                                  ),
+                                  child: Icon(Icons.remove,
+                                    size: 16,
+                                    color: _availableSeats > 1 ? const Color(0xFF03AF74) : scheme.onSurfaceVariant.withOpacity(0.4),
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: Text(
+                                  '$_availableSeats',
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF03AF74)),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: _availableSeats < 6 ? () => setState(() => _availableSeats++) : null,
+                                child: Container(
+                                  width: 30, height: 30,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _availableSeats < 6
+                                        ? const Color(0xFF03AF74).withOpacity(0.12)
+                                        : scheme.onSurfaceVariant.withOpacity(0.08),
+                                  ),
+                                  child: Icon(Icons.add,
+                                    size: 16,
+                                    color: _availableSeats < 6 ? const Color(0xFF03AF74) : scheme.onSurfaceVariant.withOpacity(0.4),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Driver-only: note for passengers
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(10, 4, 10, 4),
+                          decoration: BoxDecoration(
+                            color: scheme.surfaceContainerHighest.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: border),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 32, height: 32,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFF03AF74).withOpacity(0.14),
+                                ),
+                                child: const Icon(Icons.notes_rounded, color: Color(0xFF03AF74), size: 16),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextField(
+                                  controller: _noteController,
+                                  maxLines: 1,
+                                  style: TextStyle(fontSize: 13, color: scheme.onSurface),
+                                  decoration: InputDecoration(
+                                    hintText: 'Add a note for passengers...',
+                                    hintStyle: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant.withOpacity(0.6)),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       // Route info (distance + duration)
                       if (_isFetchingRoute)
@@ -1495,23 +1704,33 @@ Future<void> _onChangeProfilePhoto() async {
                             ],
                           ),
                         ),
-                      // Confirm button
+                      // Action button
                       SizedBox(
                         width: double.infinity,
                         height: 52,
                         child: ElevatedButton(
-                          onPressed: (_pickupLatLng != null && _dropLatLng != null) ? _onConfirm : null,
+                          onPressed: _isDriver
+                              ? ((_isAvailable && _pickupLatLng != null && _dropLatLng != null) ? _onOfferRide : null)
+                              : ((_pickupLatLng != null && _dropLatLng != null) ? _onConfirm : null),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF03AF74),
                             disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
-                          child: const Text(
-                            'Confirm Ride',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                          child: Text(
+                            _isDriver ? 'Offer Ride' : 'Confirm Ride',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
                           ),
                         ),
                       ),
+                      if (_isDriver && !_isAvailable)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            'Go online to start offering rides',
+                            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                          ),
+                        ),
                     ],
                   ),
                 ),
