@@ -11,16 +11,14 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/routes/app_routes.dart';
-import '../models/api_exception.dart';
-import '../models/passenger_ride_confirm_request.dart';
+import '../models/driver_profile.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/driver_service.dart';
 import '../services/file_service.dart';
-import '../services/ride_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
-import '../utils/snackbar_helper.dart';
+import 'driver_home_mixin.dart';
 
 class UserHomeMapScreen extends StatefulWidget {
   const UserHomeMapScreen({super.key});
@@ -29,7 +27,7 @@ class UserHomeMapScreen extends StatefulWidget {
   State<UserHomeMapScreen> createState() => _UserHomeMapScreenState();
 }
 
-class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
+class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMixin {
   final ImagePicker _imagePicker = ImagePicker();
 
   // ── bottom nav ──
@@ -39,9 +37,14 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   bool _isLoadingProfile = true;
   bool _isUploadingPhoto = false;
   bool _isChangingRole = false;
-  bool _showDriverProfileCard = false;
   String? _loadError;
   UserProfile? _userProfile;
+
+  // ── DriverHomeMixin interface ──
+  @override
+  UserProfile? get currentUserProfile => _userProfile;
+  @override
+  LatLng? get currentDropLatLng => _dropLatLng;
 
   // ── map / ride ──
   static const LatLng _defaultCenter = LatLng(6.9271, 79.8612);
@@ -78,7 +81,6 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   double? _routeDistanceKm;
   String? _routeDuration;
   bool _isFetchingRoute = false;
-  bool _isConfirmingRide = false;
 
   // ── search mode ──
   bool _isSearchMode = false;
@@ -100,6 +102,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   void dispose() {
     _mapController?.dispose();
     _dropController.dispose();
+    disposeDriverState();
     _searchDebounceTimer?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
@@ -377,166 +380,10 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   }
 
   void _onConfirm() {
-    if (_pickupLatLng == null || _dropLatLng == null || _routeDistanceKm == null) return;
-    _showConfirmRideDialog();
-  }
-
-  /// Shows a confirmation dialog before calling the API.
-  void _showConfirmRideDialog() {
-    final distance = _routeDistanceKm!;
-    const double ratePerKm = 30.0; // LKR per km
-    final cost = double.parse((distance * ratePerKm).toStringAsFixed(2));
-    final startCity = _extractCityName(_pickupAddress);
-    final endCity = _extractCityName(_dropAddress);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40, height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade400,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const Text(
-                'Confirm Your Ride',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 16),
-              _buildConfirmInfoRow(Icons.my_location, 'From', startCity),
-              const SizedBox(height: 8),
-              _buildConfirmInfoRow(Icons.location_on, 'To', endCity),
-              const SizedBox(height: 8),
-              _buildConfirmInfoRow(Icons.straighten_rounded, 'Distance', '${distance.toStringAsFixed(1)} km'),
-              const SizedBox(height: 8),
-              _buildConfirmInfoRow(Icons.payments_outlined, 'Estimated Cost', 'LKR ${cost.toStringAsFixed(2)}'),
-              if (_routeDuration != null) ...[
-                const SizedBox(height: 8),
-                _buildConfirmInfoRow(Icons.access_time_rounded, 'Duration', _routeDuration!),
-              ],
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: StatefulBuilder(
-                  builder: (context, setSheetState) {
-                    return ElevatedButton(
-                      onPressed: _isConfirmingRide
-                          ? null
-                          : () {
-                              Navigator.pop(ctx);
-                              _confirmPassengerRide(cost, startCity, endCity);
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF03AF74),
-                        disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      child: _isConfirmingRide
-                          ? const SizedBox(
-                              width: 22, height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text(
-                              'Confirm & Book Ride',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
-                            ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildConfirmInfoRow(IconData icon, String label, String value) {
-    final scheme = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: const Color(0xFF03AF74)),
-        const SizedBox(width: 10),
-        Text('$label: ', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Extracts a city name from an address string (takes the last meaningful part).
-  String _extractCityName(String address) {
-    if (address.isEmpty) return '';
-    final parts = address.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-    // Return the last part as city, or the whole address if no comma
-    return parts.length > 1 ? parts.last : parts.first;
-  }
-
-  /// Calls the passenger ride confirm API.
-  Future<void> _confirmPassengerRide(double cost, String startCity, String endCity) async {
-    if (_isConfirmingRide) return;
-    setState(() => _isConfirmingRide = true);
-
-    try {
-      final userIdStr = await TokenService.getUserId();
-      if (userIdStr == null) {
-        throw Exception('User not logged in. Please login again.');
-      }
-      final userId = int.parse(userIdStr);
-
-      final request = PassengerRideConfirmRequest(
-        rideDetailId: 1, // TODO: Replace with actual ride detail ID from ride search/selection
-        userId: userId,
-        startLocationLongitude: _pickupLatLng!.longitude,
-        endLocationLongitude: _dropLatLng!.longitude,
-        passengerRideDistance: _routeDistanceKm!,
-        passengerCost: cost,
-        startCity: startCity,
-        endCity: endCity,
-      );
-
-      final response = await RideService.confirmPassengerRide(request);
-
-      if (!mounted) return;
-
-      SnackBarHelper.showSuccess(
-        context,
-        response.message ?? 'Ride confirmed successfully! Looking for drivers...',
-      );
-
-      debugPrint('[RideConfirm] Confirmed — ShareRideDetailId: ${response.shareRideDetailId}, '
-          'Status: ${response.status}');
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      SnackBarHelper.showError(context, e.message);
-    } catch (e) {
-      if (!mounted) return;
-      SnackBarHelper.showError(
-        context,
-        e.toString().replaceFirst('Exception: ', ''),
-      );
-    } finally {
-      if (mounted) setState(() => _isConfirmingRide = false);
-    }
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Ride confirmed! Looking for drivers...'),
+      backgroundColor: Color(0xFF03AF74),
+    ));
   }
 
   Future<void> _fetchRoute() async {
@@ -545,6 +392,9 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     if (origin == null || destination == null) return;
 
     setState(() { _isFetchingRoute = true; _polylines = {}; _routeDistanceKm = null; _routeDuration = null; });
+
+    // Vehicle-type-aware routing for drivers
+    final routeColor = driverRouteColor;
 
     // ── 1. OSRM with GeoJSON geometry (no decoding needed) ──
     try {
@@ -591,7 +441,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
               Polyline(
                 polylineId: const PolylineId('route'),
                 points: points,
-                color: const Color(0xFF03AF74),
+                color: routeColor,
                 width: 5,
               ),
             };
@@ -605,11 +455,13 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     }
 
     // ── 2. Google Directions fallback (mobile/non-CORS environments) ──
+    final googleMode = driverGoogleMode;
     try {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/directions/json'
         '?origin=${origin.latitude},${origin.longitude}'
         '&destination=${destination.latitude},${destination.longitude}'
+        '&mode=$googleMode'
         '&key=$_gMapsKey',
       );
       final resp = await http.get(url);
@@ -638,7 +490,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
               Polyline(
                 polylineId: const PolylineId('route'),
                 points: points,
-                color: const Color(0xFF03AF74),
+                color: routeColor,
                 width: 5,
               ),
             };
@@ -948,9 +800,14 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
         _userProfile = profile;
       });
 
+      // If user is a driver, fetch the driver profile for vehicle type info
+      if (profile.role.toUpperCase() == 'DRIVER') {
+        await fetchDriverProfile(userId);
+      }
+
       // Check driver profile if user is willing to drive
       if (profile.isProfileCompleted && profile.isWillingToDrive) {
-        await _checkDriverProfileStatus(userId);
+        await checkDriverProfileStatus(userId);
       }
     } catch (e) {
       if (!mounted) return;
@@ -962,21 +819,6 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
         setState(() {
           _isLoadingProfile = false;
         });
-      }
-    }
-  }
-
-  Future<void> _checkDriverProfileStatus(String userId) async {
-    try {
-      final driverProfile =
-          await DriverService.getDriverProfileByUserId(userId);
-      if (mounted && !driverProfile.isDriverProfileCompleted) {
-        setState(() => _showDriverProfileCard = true);
-      }
-    } catch (_) {
-      // Driver profile not found (non-200) — show popup
-      if (mounted) {
-        setState(() => _showDriverProfileCard = true);
       }
     }
   }
@@ -1025,6 +867,8 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
         // Launch the full driver registration flow
         Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
       } else {
+        // Reset driver-specific state
+        resetDriverState();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Role changed to Passenger.'),
@@ -1237,6 +1081,10 @@ Future<void> _onChangeProfilePhoto() async {
                         ),
                         const SizedBox(height: 2),
                         Text(profile.email, style: const TextStyle(color: Colors.black54)),
+                        if (isDriver) ...[
+                          const SizedBox(height: 4),
+                          buildDriverBadge(),
+                        ],
                       ],
                     ),
                   ),
@@ -1460,7 +1308,7 @@ Future<void> _onChangeProfilePhoto() async {
             _buildBanner('Getting your current location...', Colors.black87),
           if (!_isLocating && _locationError != null)
             _buildErrorBanner(_locationError!),
-          if (_showDriverProfileCard) _buildCompleteDriverProfileCard(),
+          if (showDriverProfileCard) buildCompleteDriverProfileCard(),
           if (_isSearchMode) _buildSearchOverlay(),
         ],
       ),
@@ -1496,25 +1344,30 @@ Future<void> _onChangeProfilePhoto() async {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // GPS refresh button
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: GestureDetector(
-                          onTap: _isLocating ? null : _loadCurrentLocation,
-                          child: Container(
-                            width: 38, height: 38,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: const Color(0xFF040F1B).withOpacity(0.9),
+                      // GPS refresh button + driver availability toggle
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: _isLocating ? null : _loadCurrentLocation,
+                            child: Container(
+                              width: 38, height: 38,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF040F1B).withOpacity(0.9),
+                              ),
+                              child: _isLocating
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(9),
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : const Icon(Icons.my_location, color: Colors.white, size: 18),
                             ),
-                            child: _isLocating
-                                ? const Padding(
-                                    padding: EdgeInsets.all(9),
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                  )
-                                : const Icon(Icons.my_location, color: Colors.white, size: 18),
                           ),
-                        ),
+                          if (isDriver) ...[
+                            const Spacer(),
+                            buildAvailabilityToggle(),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 10),
                       // Pickup row
@@ -1581,6 +1434,13 @@ Future<void> _onChangeProfilePhoto() async {
                           ),
                         ),
                       ),
+                      // ── Driver-only: available seats ──
+                      if (isDriver) ...[
+                        const SizedBox(height: 8),
+                        buildSeatsSelector(scheme, border),
+                        const SizedBox(height: 8),
+                        buildNoteField(scheme, border),
+                      ],
                       const SizedBox(height: 12),
                       // Route info (distance + duration)
                       if (_isFetchingRoute)
@@ -1656,37 +1516,27 @@ Future<void> _onChangeProfilePhoto() async {
                             ],
                           ),
                         ),
-                      // Confirm button
+                      // Action button
                       SizedBox(
                         width: double.infinity,
                         height: 52,
                         child: ElevatedButton(
-                          onPressed: (_pickupLatLng != null && _dropLatLng != null && _routeDistanceKm != null && !_isConfirmingRide)
-                              ? _onConfirm
-                              : null,
+                          onPressed: isDriver
+                              ? ((isDriverAvailable && _pickupLatLng != null && _dropLatLng != null) ? onOfferRide : null)
+                              : ((_pickupLatLng != null && _dropLatLng != null) ? _onConfirm : null),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF03AF74),
                             disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
-                          child: _isConfirmingRide
-                              ? const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    SizedBox(
-                                      width: 20, height: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                    ),
-                                    SizedBox(width: 10),
-                                    Text('Confirming...', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
-                                  ],
-                                )
-                              : const Text(
-                                  'Confirm Ride',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
-                                ),
+                          child: Text(
+                            isDriver ? 'Offer Ride' : 'Confirm Ride',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                          ),
                         ),
                       ),
+                      if (isDriver && !isDriverAvailable)
+                        buildOfflineHint(scheme),
                     ],
                   ),
                 ),
@@ -1770,97 +1620,6 @@ Future<void> _onChangeProfilePhoto() async {
               child: const Text('Retry', style: TextStyle(color: Colors.white)),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCompleteDriverProfileCard() {
-    return Center(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(40),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            width: MediaQuery.of(context).size.width * 0.8,
-            padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
-            decoration: BoxDecoration(
-              color: const Color(0xFF040F1B).withOpacity(0.7),
-              borderRadius: BorderRadius.circular(40),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Align(
-                  alignment: Alignment.topRight,
-                  child: GestureDetector(
-                    onTap: () async {
-                      setState(() => _showDriverProfileCard = false);
-                      try {
-                        final userId = await TokenService.getUserId();
-                        if (userId != null) {
-                          await UserService.updateWillingToDrive(userId, 'NO');
-                        }
-                      } catch (_) {
-                        // Best-effort — popup is already dismissed
-                      }
-                    },
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.1),
-                      ),
-                      child: const Icon(Icons.close, color: Colors.white70, size: 18),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Complete Driver Profile',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Please complete your driver profile to start accepting rides.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontFamily: 'Poppins', fontSize: 14, color: Colors.white70),
-                ),
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: MediaQuery.of(context).size.width * 0.8 * 0.6,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() => _showDriverProfileCard = false);
-                      Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF03AF74),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                      elevation: 0,
-                    ),
-                    child: const Text(
-                      'Complete Now',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );

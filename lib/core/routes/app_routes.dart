@@ -17,7 +17,6 @@ import '../../screens/driving_license_upload_screen.dart';
 import '../../screens/vehicle_insurance_upload_screen.dart';
 import '../../screens/revenue_license_upload_screen.dart';
 import '../../screens/ride_start_screen.dart';
-import '../../screens/driver_home_map_screen.dart';
 import '../../screens/navigation_screen.dart';
 import '../../models/user_verification_args.dart';
 import '../../models/driver_registration_data.dart';
@@ -150,7 +149,7 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const RideStartScreen());
 
       case driverHomeMap:
-        return MaterialPageRoute(builder: (_) => const DriverHomeMapScreen());
+        return MaterialPageRoute(builder: (_) => const UserHomeMapScreen());
 
       case driverNavigation:
       case navigation:
