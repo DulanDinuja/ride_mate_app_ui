@@ -17,6 +17,7 @@ import '../../screens/driving_license_upload_screen.dart';
 import '../../screens/vehicle_insurance_upload_screen.dart';
 import '../../screens/revenue_license_upload_screen.dart';
 import '../../screens/ride_start_screen.dart';
+import '../../screens/driver_home_map_screen.dart';
 import '../../models/user_verification_args.dart';
 import '../../models/driver_registration_data.dart';
 
@@ -40,6 +41,7 @@ class AppRoutes {
   static const String vehicleInsuranceUpload = '/vehicle-insurance-upload';
   static const String revenueLicenseUpload = '/revenue-license-upload';
   static const String rideStart = '/ride-start';
+  static const String driverHomeMap = '/driver-home-map';
 
   // Generate routes
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -143,6 +145,9 @@ class AppRoutes {
 
       case rideStart:
         return MaterialPageRoute(builder: (_) => const RideStartScreen());
+
+      case driverHomeMap:
+        return MaterialPageRoute(builder: (_) => const DriverHomeMapScreen());
 
       default:
         return _errorRoute('Route not found: ${settings.name}');

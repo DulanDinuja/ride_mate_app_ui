@@ -46,7 +46,12 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen>
         final profile = await UserService.getUserProfileByUserId(userId);
         if (!mounted) return;
         if (profile.isProfileCompleted) {
-          Navigator.pushReplacementNamed(context, AppRoutes.userHomeMap);
+          final role = profile.role.toUpperCase();
+          if (role == 'DRIVER') {
+            Navigator.pushReplacementNamed(context, AppRoutes.driverHomeMap);
+          } else {
+            Navigator.pushReplacementNamed(context, AppRoutes.userHomeMap);
+          }
         } else {
           Navigator.pushReplacementNamed(context, AppRoutes.homeMap);
         }

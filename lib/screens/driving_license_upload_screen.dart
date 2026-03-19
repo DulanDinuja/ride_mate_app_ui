@@ -25,7 +25,7 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
   };
 
   final TextEditingController _licenseNumberController = TextEditingController();
-  final TextEditingController _licenseExpiryController = TextEditingController();
+  DateTime? _licenseExpiryDate;
 
   static const Color _screenBackground = Colors.black;
   static const Color _panelBackground = Color(0xFFFFFFF0);
@@ -35,6 +35,22 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
   static const Color _cardMuted = Color(0xFFD8DACE);
   static const Color _accent = Color(0xFF10B47A);
   static const Color _buttonDark = Color(0xFF001A3A);
+
+  Future<void> _pickLicenseExpiry() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _licenseExpiryDate ?? DateTime.now().add(const Duration(days: 365)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(primary: _accent),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _licenseExpiryDate = picked);
+  }
 
   Future<void> _selectPhoto(_LicenseSide side) async {
     final source = await showModalBottomSheet<ImageSource>(
@@ -127,16 +143,16 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
       return;
     }
 
-    if (_licenseExpiryController.text.trim().isEmpty) {
+    if (_licenseExpiryDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter license expiry date')),
+        const SnackBar(content: Text('Please select license expiry date')),
       );
       return;
     }
 
     final data = ModalRoute.of(context)!.settings.arguments as DriverRegistrationData;
     data.driverLicenseNumber = _licenseNumberController.text.trim();
-    data.driverLicenseExpiry = _licenseExpiryController.text.trim();
+    data.driverLicenseExpiry = '${_licenseExpiryDate!.year}-${_licenseExpiryDate!.month.toString().padLeft(2, '0')}-${_licenseExpiryDate!.day.toString().padLeft(2, '0')}';
     data.driverLicenseFrontBytes = _photos[_LicenseSide.front];
     data.driverLicenseBackBytes = _photos[_LicenseSide.back];
 
@@ -149,7 +165,6 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
   @override
   void dispose() {
     _licenseNumberController.dispose();
-    _licenseExpiryController.dispose();
     super.dispose();
   }
 
@@ -244,26 +259,29 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: _licenseExpiryController,
-                    style: const TextStyle(fontSize: 17, color: _textPrimary),
-                    decoration: InputDecoration(
-                      hintText: 'e.g. 2027-12-31',
-                      hintStyle: const TextStyle(color: Color(0xFF9AA0AA)),
-                      filled: true,
-                      fillColor: const Color(0xFFE9E9DC),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-                      border: OutlineInputBorder(
+                  GestureDetector(
+                    onTap: _pickLicenseExpiry,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE9E9DC),
                         borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: _accent, width: 1.5),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _licenseExpiryDate == null
+                                ? 'Select expiry date'
+                                : '${_licenseExpiryDate!.year}-${_licenseExpiryDate!.month.toString().padLeft(2, '0')}-${_licenseExpiryDate!.day.toString().padLeft(2, '0')}',
+                            style: TextStyle(
+                              fontSize: 17,
+                              color: _licenseExpiryDate == null ? const Color(0xFF9AA0AA) : _textPrimary,
+                            ),
+                          ),
+                          const Icon(Icons.calendar_today_rounded, color: Color(0xFFB5B6B8), size: 20),
+                        ],
                       ),
                     ),
                   ),

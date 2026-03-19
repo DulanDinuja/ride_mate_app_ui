@@ -27,7 +27,7 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
 
   final TextEditingController _insuranceNumberController = TextEditingController();
   final TextEditingController _insuranceProviderController = TextEditingController();
-  final TextEditingController _insuranceExpiryController = TextEditingController();
+  DateTime? _insuranceExpiryDate;
 
   static const Color _screenBackground = Colors.black;
   static const Color _panelBackground = Color(0xFFFFFFF0);
@@ -37,6 +37,22 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
   static const Color _cardMuted = Color(0xFFD8DACE);
   static const Color _accent = Color(0xFF10B47A);
   static const Color _buttonDark = Color(0xFF001A3A);
+
+  Future<void> _pickInsuranceExpiry() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _insuranceExpiryDate ?? DateTime.now().add(const Duration(days: 365)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(primary: _accent),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _insuranceExpiryDate = picked);
+  }
 
   Future<void> _selectPhoto(_InsuranceSide side) async {
     final source = await showModalBottomSheet<ImageSource>(
@@ -136,9 +152,9 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
       return;
     }
 
-    if (_insuranceExpiryController.text.trim().isEmpty) {
+    if (_insuranceExpiryDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter insurance expiry date')),
+        const SnackBar(content: Text('Please select insurance expiry date')),
       );
       return;
     }
@@ -146,7 +162,7 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
     final data = ModalRoute.of(context)!.settings.arguments as DriverRegistrationData;
     data.insuranceNumber = _insuranceNumberController.text.trim();
     data.insuranceProvider = _insuranceProviderController.text.trim();
-    data.insuranceExpiry = _insuranceExpiryController.text.trim();
+    data.insuranceExpiry = '${_insuranceExpiryDate!.year}-${_insuranceExpiryDate!.month.toString().padLeft(2, '0')}-${_insuranceExpiryDate!.day.toString().padLeft(2, '0')}';
     data.insuranceDocumentFrontBytes = _photos[_InsuranceSide.front];
     data.insuranceDocumentBackBytes = _photos[_InsuranceSide.back];
 
@@ -160,7 +176,6 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
   void dispose() {
     _insuranceNumberController.dispose();
     _insuranceProviderController.dispose();
-    _insuranceExpiryController.dispose();
     super.dispose();
   }
 
@@ -291,26 +306,29 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: _insuranceExpiryController,
-                    style: const TextStyle(fontSize: 17, color: _textPrimary),
-                    decoration: InputDecoration(
-                      hintText: 'e.g. 2027-12-31',
-                      hintStyle: const TextStyle(color: Color(0xFF9AA0AA)),
-                      filled: true,
-                      fillColor: const Color(0xFFE9E9DC),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-                      border: OutlineInputBorder(
+                  GestureDetector(
+                    onTap: _pickInsuranceExpiry,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE9E9DC),
                         borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: _accent, width: 1.5),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _insuranceExpiryDate == null
+                                ? 'Select expiry date'
+                                : '${_insuranceExpiryDate!.year}-${_insuranceExpiryDate!.month.toString().padLeft(2, '0')}-${_insuranceExpiryDate!.day.toString().padLeft(2, '0')}',
+                            style: TextStyle(
+                              fontSize: 17,
+                              color: _insuranceExpiryDate == null ? const Color(0xFF9AA0AA) : _textPrimary,
+                            ),
+                          ),
+                          const Icon(Icons.calendar_today_rounded, color: Color(0xFFB5B6B8), size: 20),
+                        ],
                       ),
                     ),
                   ),

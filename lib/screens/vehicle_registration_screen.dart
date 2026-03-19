@@ -47,10 +47,9 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
   VehicleMake? _selectedMake;
   VehicleModel? _selectedModel;
 
-  final List<String> _years = const ['2025', '2024', '2023', '2022'];
   final List<String> _colours = const ['Black', 'White', 'Silver', 'Blue'];
 
-  String _selectedYear = '2025';
+  int _selectedYear = DateTime.now().year;
   String _selectedColour = 'Black';
 
   static const Color _screenBackground = Colors.black;
@@ -61,6 +60,34 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
   static const Color _accent = Color(0xFF10B47A);
   static const Color _muted = Color(0xFFB5B6B8);
   static const Color _buttonDark = Color(0xFF061324);
+
+  Future<void> _pickYear() async {
+    int tempYear = _selectedYear;
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: _panelBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Select Year', style: TextStyle(color: _textDark, fontWeight: FontWeight.w600)),
+        content: SizedBox(
+          width: 200,
+          height: 200,
+          child: StatefulBuilder(
+            builder: (context, setDialogState) => YearPicker(
+              firstDate: DateTime(1990),
+              lastDate: DateTime.now(),
+              selectedDate: DateTime(tempYear),
+              onChanged: (date) {
+                setDialogState(() => tempYear = date.year);
+                setState(() => _selectedYear = date.year);
+                Navigator.of(context).pop();
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -184,7 +211,7 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
       ..vehicleModelId = _selectedModel!.id
       ..model = _selectedModel!.name
       ..registrationNumber = _registrationController.text.trim()
-      ..year = int.tryParse(_selectedYear)
+      ..year = _selectedYear
       ..color = _selectedColour;
 
     Navigator.of(context).pushNamed(
@@ -263,13 +290,25 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            _buildDropdownField(
-                              value: _selectedYear,
-                              items: _years,
-                              onChanged: (value) {
-                                if (value == null) return;
-                                setState(() => _selectedYear = value);
-                              },
+                            GestureDetector(
+                              onTap: _pickYear,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                                decoration: BoxDecoration(
+                                  color: _fieldBackground,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      '$_selectedYear',
+                                      style: const TextStyle(fontSize: 17, color: Color(0xFF8F95A1)),
+                                    ),
+                                    const Icon(Icons.calendar_today_rounded, color: Color(0xFFB5B6B8), size: 20),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         ),
