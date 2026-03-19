@@ -1,11 +1,13 @@
 /// Request model for confirming a passenger ride.
+/// Matches backend PassengerRideConfirmRequestResource exactly.
 class PassengerRideConfirmRequest {
   final int rideDetailId;
   final int userId;
   final double startLocationLongitude;
+  final double startLocationLatitude;
   final double endLocationLongitude;
+  final double endLocationLatitude;
   final double passengerRideDistance;
-  final double passengerCost;
   final String? startCity;
   final String? endCity;
 
@@ -13,9 +15,10 @@ class PassengerRideConfirmRequest {
     required this.rideDetailId,
     required this.userId,
     required this.startLocationLongitude,
+    required this.startLocationLatitude,
     required this.endLocationLongitude,
+    required this.endLocationLatitude,
     required this.passengerRideDistance,
-    required this.passengerCost,
     this.startCity,
     this.endCity,
   });
@@ -25,9 +28,10 @@ class PassengerRideConfirmRequest {
       'rideDetailId': rideDetailId,
       'userId': userId,
       'startLocationLongitude': startLocationLongitude,
+      'startLocationLatitude': startLocationLatitude,
       'endLocationLongitude': endLocationLongitude,
+      'endLocationLatitude': endLocationLatitude,
       'passengerRideDistance': passengerRideDistance,
-      'passengerCost': passengerCost,
       'startCity': startCity,
       'endCity': endCity,
     };

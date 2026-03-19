@@ -11,13 +11,17 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/routes/app_routes.dart';
+import '../models/cost_split_response.dart';
 import '../models/driver_profile.dart';
+import '../models/passenger_ride_confirm_request.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/driver_service.dart';
 import '../services/file_service.dart';
+import '../services/ride_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
+import 'cost_split_screen.dart';
 import 'driver_home_mixin.dart';
 
 class UserHomeMapScreen extends StatefulWidget {
@@ -45,6 +49,19 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   UserProfile? get currentUserProfile => _userProfile;
   @override
   LatLng? get currentDropLatLng => _dropLatLng;
+  @override
+  LatLng? get currentPickupLatLng => _pickupLatLng;
+  @override
+  String get currentPickupAddress => _pickupAddress;
+  @override
+  String get currentDropAddress => _dropAddress;
+  @override
+  double? get currentRouteDistanceKm => _routeDistanceKm;
+  @override
+  List<LatLng> get currentRoutePoints {
+    if (_polylines.isEmpty) return [];
+    return _polylines.first.points;
+  }
 
   // ── map / ride ──
   static const LatLng _defaultCenter = LatLng(6.9271, 79.8612);
@@ -84,6 +101,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
 
   // ── search mode ──
   bool _isSearchMode = false;
+  bool _isPickupSearchMode = false;
   bool _isSearchingPlaces = false;
   Timer? _searchDebounceTimer;
   List<Map<String, dynamic>> _placePredictions = [];
@@ -368,6 +386,18 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   }
 
   Future<void> _onMapTap(LatLng latLng) async {
+    // If pickup is missing (location failed), let user set it by tapping the map
+    if (_pickupLatLng == null) {
+      final address = await _resolveAddress(latLng);
+      if (!mounted) return;
+      setState(() {
+        _pickupLatLng = latLng;
+        _pickupAddress = address;
+        _locationError = null;
+      });
+      _moveCameraToPickup(latLng);
+      return;
+    }
     if (_dropLatLng != null) return;
     final address = await _resolveAddress(latLng);
     if (!mounted) return;
@@ -380,10 +410,22 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   }
 
   void _onConfirm() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Ride confirmed! Looking for drivers...'),
-      backgroundColor: Color(0xFF03AF74),
-    ));
+    if (_pickupLatLng == null || _dropLatLng == null || _routeDistanceKm == null) return;
+
+    // Show a bottom sheet confirming the ride before calling the API
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _PassengerConfirmSheet(
+        pickupAddress: _pickupAddress,
+        dropAddress: _dropAddress,
+        distanceKm: _routeDistanceKm!,
+        pickupLatLng: _pickupLatLng!,
+        dropLatLng: _dropLatLng!,
+        userProfile: _userProfile,
+      ),
+    );
   }
 
   Future<void> _fetchRoute() async {
@@ -533,17 +575,20 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
 
   // ── search helpers ──────────────────────────────────────────────
 
-  void _openSearchMode() {
+  void _openSearchMode({bool forPickup = false}) {
     setState(() {
       _isSearchMode = true;
+      _isPickupSearchMode = forPickup;
       _searchController.clear();
       _placePredictions = [];
-      _dropLatLng = null;
-      _dropAddress = '';
-      _dropController.clear();
-      _polylines = {};
-      _routeDistanceKm = null;
-      _routeDuration = null;
+      if (!forPickup) {
+        _dropLatLng = null;
+        _dropAddress = '';
+        _dropController.clear();
+        _polylines = {};
+        _routeDistanceKm = null;
+        _routeDuration = null;
+      }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _searchFocusNode.requestFocus();
@@ -555,6 +600,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
     _searchFocusNode.unfocus();
     setState(() {
       _isSearchMode = false;
+      _isPickupSearchMode = false;
       _placePredictions = [];
       _isSearchingPlaces = false;
       _searchController.clear();
@@ -688,8 +734,9 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
     final mainText = prediction['main_text'] as String;
     final description = prediction['description'] as String;
 
+    final isPickup = _isPickupSearchMode;
     _closeSearchMode();
-    setState(() => _isSearchingDrop = true);
+    setState(() => _isSearchingDrop = !isPickup);
 
     try {
       LatLng latLng;
@@ -728,13 +775,24 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
       }
 
       if (!mounted) return;
-      setState(() {
-        _dropLatLng = latLng;
-        _dropAddress = mainText;
-        _dropController.text = mainText;
-      });
-      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 15));
-      _fetchRoute();
+
+      if (isPickup) {
+        setState(() {
+          _pickupLatLng = latLng;
+          _pickupAddress = mainText;
+          _locationError = null;
+        });
+        _moveCameraToPickup(latLng);
+        if (_dropLatLng != null) _fetchRoute();
+      } else {
+        setState(() {
+          _dropLatLng = latLng;
+          _dropAddress = mainText;
+          _dropController.text = mainText;
+        });
+        _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 15));
+        _fetchRoute();
+      }
 
       // Save to recents (include coordinates for instant re-selection)
       _recentSearches.removeWhere((r) => r['name'] == mainText);
@@ -1237,10 +1295,134 @@ Future<void> _onChangeProfilePhoto() async {
   }
 
   Widget _buildActiveRidesTab() {
-    return const Center(
-      child: Text(
-        'No active rides right now',
-        style: TextStyle(fontSize: 16, color: Colors.black54),
+    // If the driver has an active ride, show quick actions
+    if (isDriver && activeRideDetailId != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF03AF74).withOpacity(0.12),
+                ),
+                child: const Icon(
+                  Icons.directions_car_filled,
+                  size: 40,
+                  color: Color(0xFF03AF74),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'You have an active ride!',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF040F1B),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Ride #$activeRideDetailId is in progress.\nPassengers can join along your route.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.black54,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.activeRide,
+                      arguments: {
+                        'rideDetailId': activeRideDetailId!,
+                        'pickupAddress': _pickupAddress,
+                        'dropAddress': _dropAddress,
+                        'totalDistance': _routeDistanceKm ?? 0.0,
+                        'totalCost': ridePrice?.totalRidePrice ?? 0.0,
+                      },
+                    );
+                  },
+                  icon: const Icon(Icons.analytics_outlined),
+                  label: const Text(
+                    'View Ride & Cost Split',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF040F1B),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.costSplit,
+                      arguments: {
+                        'rideDetailId': activeRideDetailId!,
+                        'isDriver': true,
+                      },
+                    );
+                  },
+                  icon: const Icon(Icons.pie_chart_outline),
+                  label: const Text(
+                    'View Full Breakdown',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF03AF74),
+                    side: const BorderSide(color: Color(0xFF03AF74)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.local_taxi_outlined,
+                size: 64, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            const Text(
+              'No active rides right now',
+              style: TextStyle(fontSize: 16, color: Colors.black54),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isDriver
+                  ? 'Go to Home tab and offer a ride to get started!'
+                  : 'Browse available rides on the Home tab.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: Colors.black38),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1370,13 +1552,19 @@ Future<void> _onChangeProfilePhoto() async {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      // Pickup row
-                      _buildLocationRow(
-                        icon: Icons.my_location,
-                        iconColor: const Color(0xFF03AF74),
-                        label: 'Pickup',
-                        value: _pickupAddress,
-                        scheme: scheme,
+                      // Pickup row – tappable to search when location failed
+                      GestureDetector(
+                        onTap: (_locationError != null || _pickupLatLng == null && !_isLocating)
+                            ? () => _openSearchMode(forPickup: true)
+                            : null,
+                        child: _buildLocationRow(
+                          icon: Icons.my_location,
+                          iconColor: const Color(0xFF03AF74),
+                          label: 'Pickup',
+                          value: _pickupAddress,
+                          scheme: scheme,
+                          showSearchHint: _locationError != null || (_pickupLatLng == null && !_isLocating),
+                        ),
                       ),
                       const SizedBox(height: 8),
                       // Drop location – tap to open search overlay
@@ -1521,18 +1709,29 @@ Future<void> _onChangeProfilePhoto() async {
                         width: double.infinity,
                         height: 52,
                         child: ElevatedButton(
-                          onPressed: isDriver
-                              ? ((isDriverAvailable && _pickupLatLng != null && _dropLatLng != null) ? onOfferRide : null)
-                              : ((_pickupLatLng != null && _dropLatLng != null) ? _onConfirm : null),
+                          onPressed: isOfferingRide
+                              ? null
+                              : isDriver
+                                  ? ((isDriverAvailable && _pickupLatLng != null && _dropLatLng != null) ? onOfferRide : null)
+                                  : ((_pickupLatLng != null && _dropLatLng != null) ? _onConfirm : null),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF03AF74),
                             disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
-                          child: Text(
-                            isDriver ? 'Offer Ride' : 'Confirm Ride',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
-                          ),
+                          child: isOfferingRide
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  isDriver ? 'Offer Ride' : 'Confirm Ride',
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                                ),
                         ),
                       ),
                       if (isDriver && !isDriverAvailable)
@@ -1554,6 +1753,7 @@ Future<void> _onChangeProfilePhoto() async {
     required String label,
     required String value,
     required ColorScheme scheme,
+    bool showSearchHint = false,
   }) {
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
@@ -1579,14 +1779,21 @@ Future<void> _onChangeProfilePhoto() async {
               children: [
                 Text(label, style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
                 const SizedBox(height: 2),
-                Text(value,
+                Text(
+                  showSearchHint ? 'Tap to search pickup location' : value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: scheme.onSurface),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: showSearchHint ? FontWeight.w400 : FontWeight.w600,
+                    color: showSearchHint ? scheme.onSurfaceVariant.withOpacity(0.6) : scheme.onSurface,
+                  ),
                 ),
               ],
             ),
           ),
+          if (showSearchHint)
+            Icon(Icons.search, color: scheme.primary, size: 20),
         ],
       ),
     );
@@ -1611,13 +1818,37 @@ Future<void> _onChangeProfilePhoto() async {
         margin: const EdgeInsets.only(bottom: 80),
         padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
         decoration: BoxDecoration(color: Colors.red.shade700, borderRadius: BorderRadius.circular(12)),
-        child: Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Flexible(child: Text(message, style: const TextStyle(color: Colors.white))),
-            TextButton(
-              onPressed: _loadCurrentLocation,
-              child: const Text('Retry', style: TextStyle(color: Colors.white)),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(child: Text(message, style: const TextStyle(color: Colors.white))),
+                TextButton(
+                  onPressed: _loadCurrentLocation,
+                  child: const Text('Retry', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: () => _openSearchMode(forPickup: true),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.search, color: Colors.white, size: 16),
+                    SizedBox(width: 6),
+                    Text('Select pickup manually', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -1674,11 +1905,11 @@ Future<void> _onChangeProfilePhoto() async {
                             onPressed: _closeSearchMode,
                             splashRadius: 22,
                           ),
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              'Set Destination',
+                              _isPickupSearchMode ? 'Set Pickup Location' : 'Set Destination',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
@@ -1756,69 +1987,195 @@ Future<void> _onChangeProfilePhoto() async {
                                 child: Column(
                                   children: [
                                     // ── Pickup row ──
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 14, vertical: 13),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.08),
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: Colors.white.withOpacity(0.1),
+                                    _isPickupSearchMode
+                                      ? Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 14, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.12),
+                                            borderRadius: BorderRadius.circular(14),
+                                            border: Border.all(
+                                              color: _accentGreen.withOpacity(0.5),
+                                              width: 1.5,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                    horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: _accentGreen.withOpacity(0.15),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Text(
+                                                  'FROM',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: _accentGreen,
+                                                    letterSpacing: 1,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: TextField(
+                                                  controller: _searchController,
+                                                  focusNode: _searchFocusNode,
+                                                  onChanged: _onSearchChanged,
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Colors.white,
+                                                  ),
+                                                  cursorColor: _accentGreen,
+                                                  decoration: InputDecoration(
+                                                    hintText: 'Search pickup location...',
+                                                    hintStyle: TextStyle(
+                                                      color: Colors.white.withOpacity(0.35),
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.w400,
+                                                    ),
+                                                    filled: true,
+                                                    fillColor: Colors.transparent,
+                                                    border: InputBorder.none,
+                                                    enabledBorder: InputBorder.none,
+                                                    focusedBorder: InputBorder.none,
+                                                    isDense: true,
+                                                    contentPadding:
+                                                        const EdgeInsets.symmetric(vertical: 10),
+                                                  ),
+                                                ),
+                                              ),
+                                              GestureDetector(
+                                                onTap: _loadCurrentLocation,
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(4),
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: Colors.white.withOpacity(0.08),
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.my_location_rounded,
+                                                    color: Colors.white.withOpacity(0.5),
+                                                    size: 16,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 14, vertical: 13),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.08),
+                                            borderRadius: BorderRadius.circular(14),
+                                            border: Border.all(
+                                              color: Colors.white.withOpacity(0.1),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                    horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: _accentGreen.withOpacity(0.15),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Text(
+                                                  'FROM',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: _accentGreen,
+                                                    letterSpacing: 1,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Text(
+                                                  _pickupAddress,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                              GestureDetector(
+                                                onTap: _loadCurrentLocation,
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(4),
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: Colors.white.withOpacity(0.08),
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.my_location_rounded,
+                                                    color: Colors.white.withOpacity(0.5),
+                                                    size: 16,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 8, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: _accentGreen.withOpacity(0.15),
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: const Text(
-                                              'FROM',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w800,
-                                                color: _accentGreen,
-                                                letterSpacing: 1,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Text(
-                                              _pickupAddress,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w500,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ),
-                                          GestureDetector(
-                                            onTap: _loadCurrentLocation,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(4),
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                color: Colors.white.withOpacity(0.08),
-                                              ),
-                                              child: Icon(
-                                                Icons.my_location_rounded,
-                                                color: Colors.white.withOpacity(0.5),
-                                                size: 16,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
                                     const SizedBox(height: 10),
-                                    // ── Drop row (text field) ──
-                                    Container(
+                                    // ── Drop row ──
+                                    _isPickupSearchMode
+                                      ? Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 14, vertical: 13),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.08),
+                                            borderRadius: BorderRadius.circular(14),
+                                            border: Border.all(
+                                              color: Colors.white.withOpacity(0.1),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                    horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFF6B35)
+                                                      .withOpacity(0.15),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Text(
+                                                  'TO',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: Color(0xFFFF6B35),
+                                                    letterSpacing: 1,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Text(
+                                                  _dropAddress.isEmpty ? 'Set after pickup' : _dropAddress,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w400,
+                                                    color: Colors.white.withOpacity(_dropAddress.isEmpty ? 0.35 : 1.0),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : Container(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 14, vertical: 4),
                                       decoration: BoxDecoration(
@@ -2356,6 +2713,353 @@ Future<void> _onChangeProfilePhoto() async {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Passenger Confirm Bottom Sheet ──
+
+/// Bottom sheet that allows a passenger to confirm joining a ride.
+/// Shows their route, distance, and calls the confirm API which returns
+/// the cost-split breakdown.
+class _PassengerConfirmSheet extends StatefulWidget {
+  final String pickupAddress;
+  final String dropAddress;
+  final double distanceKm;
+  final LatLng pickupLatLng;
+  final LatLng dropLatLng;
+  final UserProfile? userProfile;
+
+  const _PassengerConfirmSheet({
+    required this.pickupAddress,
+    required this.dropAddress,
+    required this.distanceKm,
+    required this.pickupLatLng,
+    required this.dropLatLng,
+    this.userProfile,
+  });
+
+  @override
+  State<_PassengerConfirmSheet> createState() => _PassengerConfirmSheetState();
+}
+
+class _PassengerConfirmSheetState extends State<_PassengerConfirmSheet> {
+  static const Color _accent = Color(0xFF03AF74);
+  static const Color _navy = Color(0xFF040F1B);
+
+  bool _isConfirming = false;
+  String? _error;
+
+  // TODO: In a real flow, the passenger selects a ride from available rides.
+  // This rideDetailId would come from the ride search results.
+  final TextEditingController _rideIdController = TextEditingController();
+
+  Future<void> _confirmRide() async {
+    final rideIdText = _rideIdController.text.trim();
+    if (rideIdText.isEmpty) {
+      setState(() => _error = 'Please enter the Ride ID to join.');
+      return;
+    }
+    final rideDetailId = int.tryParse(rideIdText);
+    if (rideDetailId == null) {
+      setState(() => _error = 'Invalid Ride ID.');
+      return;
+    }
+
+    final userId = widget.userProfile?.userId;
+    if (userId == null) {
+      setState(() => _error = 'User not logged in.');
+      return;
+    }
+
+    setState(() {
+      _isConfirming = true;
+      _error = null;
+    });
+
+    try {
+      final request = PassengerRideConfirmRequest(
+        rideDetailId: rideDetailId,
+        userId: userId,
+        startLocationLatitude: widget.pickupLatLng.latitude,
+        startLocationLongitude: widget.pickupLatLng.longitude,
+        endLocationLatitude: widget.dropLatLng.latitude,
+        endLocationLongitude: widget.dropLatLng.longitude,
+        passengerRideDistance: widget.distanceKm,
+        startCity: widget.pickupAddress,
+        endCity: widget.dropAddress,
+      );
+
+      final costSplit = await RideService.confirmPassengerRide(request);
+
+      if (!mounted) return;
+
+      // Show success and navigate to cost split view
+      Navigator.pop(context);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CostSplitScreen(
+            rideDetailId: rideDetailId,
+            initialData: costSplit,
+            isDriver: false,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(
+          () => _error = e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _isConfirming = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _rideIdController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFFFF0),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Title
+              const Text(
+                'Join This Ride',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: _navy,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Route info
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _accent.withOpacity(0.15)),
+                ),
+                child: Column(
+                  children: [
+                    _buildRouteRow(
+                      Icons.radio_button_checked,
+                      _accent,
+                      'FROM',
+                      widget.pickupAddress,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 10),
+                      child: Container(
+                        width: 2,
+                        height: 20,
+                        color: _accent.withOpacity(0.2),
+                      ),
+                    ),
+                    _buildRouteRow(
+                      Icons.location_on,
+                      Colors.red.shade400,
+                      'TO',
+                      widget.dropAddress,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _accent.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.straighten,
+                                  size: 14, color: _accent),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${widget.distanceKm.toStringAsFixed(1)} km',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: _accent,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Ride ID input
+              TextField(
+                controller: _rideIdController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Ride ID',
+                  hintText: 'Enter the ride ID to join',
+                  prefixIcon:
+                      const Icon(Icons.tag, color: _accent),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                        color: _accent.withOpacity(0.3)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                        color: _accent.withOpacity(0.2)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide:
+                        const BorderSide(color: _accent, width: 2),
+                  ),
+                ),
+              ),
+
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline,
+                          size: 18, color: Colors.red.shade700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.red.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+
+              // Confirm button
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _isConfirming ? null : _confirmRide,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _accent,
+                    disabledBackgroundColor: _accent.withOpacity(0.4),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: _isConfirming
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Confirm & Join Ride',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Cost will be split proportionally among all riders',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRouteRow(
+      IconData icon, Color iconColor, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: iconColor),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black38,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF040F1B),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

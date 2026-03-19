@@ -1,4 +1,5 @@
 /// Request model for creating a ride detail (driver starts a ride).
+/// Matches backend RideDetailRequestResource.
 class RideDetailRequest {
   final int driverProfileId;
   final double startLocationLongitude;
@@ -12,6 +13,7 @@ class RideDetailRequest {
   final String? tripRoute;
   final String status;
   final double totalRideCost;
+  final double? perKmRate;
 
   RideDetailRequest({
     required this.driverProfileId,
@@ -26,6 +28,7 @@ class RideDetailRequest {
     this.tripRoute,
     required this.status,
     required this.totalRideCost,
+    this.perKmRate,
   });
 
   Map<String, dynamic> toJson() {
@@ -42,6 +45,7 @@ class RideDetailRequest {
       'tripRoute': tripRoute,
       'status': status,
       'totalRideCost': totalRideCost,
+      if (perKmRate != null) 'perKmRate': perKmRate,
     };
   }
 }

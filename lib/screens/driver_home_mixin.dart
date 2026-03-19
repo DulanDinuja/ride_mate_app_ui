@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -5,8 +6,11 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../core/routes/app_routes.dart';
 import '../models/driver_profile.dart';
+import '../models/ride_detail_request.dart';
+import '../models/ride_price_calculation_response.dart';
 import '../models/user_profile.dart';
 import '../services/driver_service.dart';
+import '../services/ride_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import 'user_home_map_screen.dart';
@@ -19,6 +23,11 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
   // ── interface: host must provide ──────────────────────────────────
   UserProfile? get currentUserProfile;
   LatLng? get currentDropLatLng;
+  LatLng? get currentPickupLatLng;
+  String get currentPickupAddress;
+  String get currentDropAddress;
+  double? get currentRouteDistanceKm;
+  List<LatLng> get currentRoutePoints;
 
   // ── driver state ─────────────────────────────────────────────────
   bool isDriverAvailable = false;
@@ -26,6 +35,9 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
   int driverAvailableSeats = 1;
   final TextEditingController driverNoteController = TextEditingController();
   bool showDriverProfileCard = false;
+  bool isOfferingRide = false;
+  RidePriceCalculationResponse? ridePrice;
+  int? activeRideDetailId;
 
   /// Whether the current user has the DRIVER role.
   bool get isDriver => currentUserProfile?.role.toUpperCase() == 'DRIVER';
@@ -70,18 +82,105 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
   }
 
   /// Offer-ride action for drivers.
-  void onOfferRide() {
-    if (currentDropLatLng == null) {
+  /// 1. Calculate price from backend
+  /// 2. Create ride detail
+  /// 3. Navigate to active ride screen
+  Future<void> onOfferRide() async {
+    if (currentDropLatLng == null || currentPickupLatLng == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Please set a destination first.'),
         backgroundColor: Colors.orange,
       ));
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Ride offered! Waiting for passengers...'),
-      backgroundColor: Color(0xFF03AF74),
-    ));
+
+    if (driverProfile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Driver profile not loaded. Please try again.'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+
+    final distance = currentRouteDistanceKm;
+    if (distance == null || distance <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please wait for route to be calculated.'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+
+    setState(() => isOfferingRide = true);
+
+    try {
+      // Step 1: Calculate price
+      final priceResponse = await RideService.calculateRidePrice(
+        driverProfileId: driverProfile!.id,
+        totalDistance: distance,
+      );
+
+      if (!mounted) return;
+      setState(() => ridePrice = priceResponse);
+
+      // Step 2: Create ride detail
+      // Encode the route polyline as a JSON array of [lat, lng] pairs
+      String? tripRoute;
+      final routePoints = currentRoutePoints;
+      if (routePoints.isNotEmpty) {
+        tripRoute = json.encode(
+          routePoints.map((p) => [p.latitude, p.longitude]).toList(),
+        );
+      }
+
+      final request = RideDetailRequest(
+        driverProfileId: driverProfile!.id,
+        startLocationLatitude: currentPickupLatLng!.latitude,
+        startLocationLongitude: currentPickupLatLng!.longitude,
+        endLocationLatitude: currentDropLatLng!.latitude,
+        endLocationLongitude: currentDropLatLng!.longitude,
+        startCity: currentPickupAddress,
+        availableSeats: driverAvailableSeats,
+        startTime: DateTime.now().toIso8601String(),
+        totalRideDistance: distance,
+        tripRoute: tripRoute,
+        status: 'ACTIVE',
+        totalRideCost: priceResponse.totalRidePrice ?? 0,
+        perKmRate: priceResponse.perKmRate,
+      );
+
+      final result = await RideService.createRideDetail(request);
+      final rideId = result['id'] as int?;
+
+      if (!mounted) return;
+
+      if (rideId == null) {
+        throw Exception('Ride created but no ID returned');
+      }
+
+      setState(() => activeRideDetailId = rideId);
+
+      // Step 3: Navigate to active ride screen
+      Navigator.pushNamed(
+        context,
+        AppRoutes.activeRide,
+        arguments: {
+          'rideDetailId': rideId,
+          'pickupAddress': currentPickupAddress,
+          'dropAddress': currentDropAddress,
+          'totalDistance': distance,
+          'totalCost': priceResponse.totalRidePrice ?? 0,
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e.toString().replaceFirst('Exception: ', '')),
+        backgroundColor: Colors.red.shade700,
+      ));
+    } finally {
+      if (mounted) setState(() => isOfferingRide = false);
+    }
   }
 
   // ── routing helpers ──────────────────────────────────────────────
