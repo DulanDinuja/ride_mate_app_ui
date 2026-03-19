@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
@@ -12,8 +13,10 @@ import 'package:image_picker/image_picker.dart';
 // ignore_for_file: unused_element
 
 import '../core/routes/app_routes.dart';
+import '../models/driver_profile.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
+import '../services/driver_service.dart';
 import '../services/file_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
@@ -83,6 +86,9 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
 
   // Driver availability toggle
   bool _isAvailable = false;
+
+  // Driver profile (for vehicle type: car / bike)
+  DriverProfile? _driverProfile;
 
   // Available seats & note
   int _availableSeats = 1;
@@ -369,11 +375,76 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
     final destination = _destLatLng;
     if (origin == null || destination == null) return;
     setState(() { _isFetchingRoute = true; _polylines = {}; _routeDistanceKm = null; _routeDuration = null; });
+
+    // Vehicle-type-aware routing
+    final isBike = _driverProfile?.isTwoWheeler ?? false;
+    // OSRM public demo only supports "driving" profile reliably.
+    // For bikes we still route with "driving" but change the polyline colour.
+    final routeColor = isBike ? const Color(0xFF2196F3) : const Color(0xFF03AF74);
+    // Google Directions travel mode
+    final googleMode = isBike ? 'TWO_WHEELER' : 'driving';
+
+    // ── 1. OSRM with GeoJSON geometry (no decoding needed) ──
+    try {
+      final url = Uri.parse(
+        'https://router.project-osrm.org/route/v1/driving'
+        '/${origin.longitude},${origin.latitude}'
+        ';${destination.longitude},${destination.latitude}'
+        '?overview=full&geometries=geojson&steps=false',
+      );
+      final resp = await http.get(url, headers: {'User-Agent': 'RideMateApp/1.0'});
+      if (!mounted) return;
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        if (data['code'] == 'Ok') {
+          final route = data['routes'][0];
+          final distanceM = (route['distance'] as num).toDouble();
+          final durationSec = (route['duration'] as num).toDouble();
+
+          // Parse GeoJSON coordinates → List<LatLng>
+          final geometry = route['geometry'] as Map<String, dynamic>;
+          final coordinates = geometry['coordinates'] as List;
+          final points = coordinates.map<LatLng>((coord) {
+            return LatLng(
+              (coord[1] as num).toDouble(), // latitude
+              (coord[0] as num).toDouble(), // longitude (GeoJSON = [lng, lat])
+            );
+          }).toList();
+
+          debugPrint('[Route] OSRM GeoJSON decoded ${points.length} points');
+          if (points.isNotEmpty) {
+            debugPrint('[Route] First: ${points.first}, Last: ${points.last}');
+          }
+
+          final bounds = _boundsFromLatLngs([origin, destination, ...points]);
+          _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+          final mins = (durationSec / 60).round();
+          final durationText = mins >= 60 ? '${mins ~/ 60}h ${mins % 60}m' : '${mins}m';
+          if (mounted) setState(() {
+            _routeDistanceKm = distanceM / 1000;
+            _routeDuration = durationText;
+            _polylines = {
+              Polyline(
+                polylineId: const PolylineId('route'),
+                points: points,
+                color: routeColor,
+                width: 5,
+              ),
+            };
+            _isFetchingRoute = false;
+          });
+          return;
+        }
+      }
+    } catch (e) { debugPrint('[Route] OSRM error: $e'); }
+
+    // ── 2. Google Directions fallback (mobile/non-CORS environments) ──
     try {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/directions/json'
         '?origin=${origin.latitude},${origin.longitude}'
         '&destination=${destination.latitude},${destination.longitude}'
+        '&mode=$googleMode'
         '&key=$_gMapsKey',
       );
       final resp = await http.get(url);
@@ -385,58 +456,47 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
           final leg = route['legs'][0];
           final distanceM = (leg['distance']['value'] as num).toDouble();
           final durationText = leg['duration']['text'] as String;
-          final points = _decodePolyline(route['overview_polyline']['points'] as String);
+          final encodedPolyline = route['overview_polyline']['points'] as String;
+          final points = _decodePolyline(encodedPolyline);
+
+          debugPrint('[Route] Google decoded ${points.length} points');
+          if (points.isNotEmpty) {
+            debugPrint('[Route] First: ${points.first}, Last: ${points.last}');
+          }
+
           final bounds = _boundsFromLatLngs([origin, destination, ...points]);
           _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
-          setState(() {
+          if (mounted) setState(() {
             _routeDistanceKm = distanceM / 1000;
             _routeDuration = durationText;
             _polylines = {
               Polyline(
                 polylineId: const PolylineId('route'),
                 points: points,
-                color: const Color(0xFF03AF74),
+                color: routeColor,
                 width: 5,
               ),
             };
+            _isFetchingRoute = false;
           });
           return;
         }
       }
-    } catch (e) { debugPrint('[Route] $e'); }
-    if (mounted) {
-      final distM = Geolocator.distanceBetween(
-        origin.latitude, origin.longitude, destination.latitude, destination.longitude,
-      );
-      setState(() {
-        _routeDistanceKm = distM / 1000;
-        _polylines = {
-          Polyline(
-            polylineId: const PolylineId('route'),
-            points: [origin, destination],
-            color: const Color(0xFF03AF74),
-            width: 4,
-            patterns: [PatternItem.dash(20), PatternItem.gap(10)],
-          ),
-        };
-      });
-    }
+    } catch (e) { debugPrint('[Route] Google Directions error: $e'); }
+
     if (mounted) setState(() => _isFetchingRoute = false);
   }
 
+  /// Decode Google encoded polyline using flutter_polyline_points package.
   List<LatLng> _decodePolyline(String encoded) {
-    final points = <LatLng>[];
-    int index = 0, lat = 0, lng = 0;
-    while (index < encoded.length) {
-      int shift = 0, result = 0, b;
-      do { b = encoded.codeUnitAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-      lat += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
-      shift = 0; result = 0;
-      do { b = encoded.codeUnitAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-      lng += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
-      points.add(LatLng(lat / 1e5, lng / 1e5));
+    final decoded = PolylinePoints.decodePolyline(encoded);
+    debugPrint('[Polyline] Decoded ${decoded.length} points from encoded string');
+    if (decoded.length >= 3) {
+      debugPrint('[Polyline] First 3 points: ${decoded.take(3).map((p) => '(${p.latitude}, ${p.longitude})').toList()}');
     }
-    return points;
+    return decoded
+        .map((point) => LatLng(point.latitude, point.longitude))
+        .toList();
   }
 
   LatLngBounds _boundsFromLatLngs(List<LatLng> points) {
@@ -460,6 +520,15 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
       if (userId == null) throw Exception('Missing user id. Please login again.');
       final profile = await UserService.getUserProfileByUserId(userId);
       if (mounted) setState(() => _userProfile = profile);
+
+      // Also fetch driver profile to detect vehicle type (car / bike)
+      try {
+        final driverProfile = await DriverService.getDriverProfileByUserId(userId);
+        if (mounted) setState(() => _driverProfile = driverProfile);
+        debugPrint('[Driver] Vehicle type: ${driverProfile.vehicleTypeCode ?? 'unknown'}');
+      } catch (e) {
+        debugPrint('[Driver] Could not fetch driver profile: $e');
+      }
     } catch (e) {
       if (mounted) setState(() => _loadError = e.toString().replaceFirst('Exception: ', ''));
     } finally {

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
@@ -384,6 +385,65 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
 
     setState(() { _isFetchingRoute = true; _polylines = {}; _routeDistanceKm = null; _routeDuration = null; });
 
+    // ── 1. OSRM with GeoJSON geometry (no decoding needed) ──
+    try {
+      final url = Uri.parse(
+        'https://router.project-osrm.org/route/v1/driving'
+        '/${origin.longitude},${origin.latitude}'
+        ';${destination.longitude},${destination.latitude}'
+        '?overview=full&geometries=geojson&steps=false',
+      );
+      final resp = await http.get(url, headers: {'User-Agent': 'RideMateApp/1.0'});
+      if (!mounted) return;
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        if (data['code'] == 'Ok') {
+          final route = data['routes'][0];
+          final distanceM = (route['distance'] as num).toDouble();
+          final durationSec = (route['duration'] as num).toDouble();
+
+          // Parse GeoJSON coordinates → List<LatLng>
+          final geometry = route['geometry'] as Map<String, dynamic>;
+          final coordinates = geometry['coordinates'] as List;
+          final points = coordinates.map<LatLng>((coord) {
+            return LatLng(
+              (coord[1] as num).toDouble(), // latitude
+              (coord[0] as num).toDouble(), // longitude (GeoJSON = [lng, lat])
+            );
+          }).toList();
+
+          debugPrint('[Route] OSRM GeoJSON decoded ${points.length} points');
+          if (points.isNotEmpty) {
+            debugPrint('[Route] First: ${points.first}, Last: ${points.last}');
+          }
+
+          final bounds = _boundsFromLatLngs([origin, destination, ...points]);
+          _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+          final mins = (durationSec / 60).round();
+          final durationText = mins >= 60
+              ? '${mins ~/ 60}h ${mins % 60}m'
+              : '${mins}m';
+          if (mounted) setState(() {
+            _routeDistanceKm = distanceM / 1000;
+            _routeDuration = durationText;
+            _polylines = {
+              Polyline(
+                polylineId: const PolylineId('route'),
+                points: points,
+                color: const Color(0xFF03AF74),
+                width: 5,
+              ),
+            };
+            _isFetchingRoute = false;
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('[Route] OSRM error: $e');
+    }
+
+    // ── 2. Google Directions fallback (mobile/non-CORS environments) ──
     try {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/directions/json'
@@ -400,13 +460,17 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
           final leg = route['legs'][0];
           final distanceM = (leg['distance']['value'] as num).toDouble();
           final durationText = leg['duration']['text'] as String;
-          final points = _decodePolyline(route['overview_polyline']['points'] as String);
+          final encodedPolyline = route['overview_polyline']['points'] as String;
+          final points = _decodePolyline(encodedPolyline);
 
-          // Fit camera to show full route
+          debugPrint('[Route] Google decoded ${points.length} points');
+          if (points.isNotEmpty) {
+            debugPrint('[Route] First: ${points.first}, Last: ${points.last}');
+          }
+
           final bounds = _boundsFromLatLngs([origin, destination, ...points]);
           _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
-
-          setState(() {
+          if (mounted) setState(() {
             _routeDistanceKm = distanceM / 1000;
             _routeDuration = durationText;
             _polylines = {
@@ -415,62 +479,31 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
                 points: points,
                 color: const Color(0xFF03AF74),
                 width: 5,
-                patterns: [],
               ),
             };
+            _isFetchingRoute = false;
           });
           return;
         }
       }
     } catch (e) {
-      debugPrint('[Route] Directions API error: $e');
+      debugPrint('[Route] Google Directions error: $e');
     }
 
-    // Fallback: straight-line distance
-    if (mounted) {
-      final distM = Geolocator.distanceBetween(
-        origin.latitude, origin.longitude,
-        destination.latitude, destination.longitude,
-      );
-      setState(() {
-        _routeDistanceKm = distM / 1000;
-        _polylines = {
-          Polyline(
-            polylineId: const PolylineId('route'),
-            points: [origin, destination],
-            color: const Color(0xFF03AF74),
-            width: 4,
-            patterns: [PatternItem.dash(20), PatternItem.gap(10)],
-          ),
-        };
-      });
-    }
 
     if (mounted) setState(() => _isFetchingRoute = false);
   }
 
+  /// Decode Google encoded polyline using flutter_polyline_points package.
   List<LatLng> _decodePolyline(String encoded) {
-    final points = <LatLng>[];
-    int index = 0;
-    int lat = 0, lng = 0;
-    while (index < encoded.length) {
-      int shift = 0, result = 0, b;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      lat += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
-      shift = 0; result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      lng += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
-      points.add(LatLng(lat / 1e5, lng / 1e5));
+    final decoded = PolylinePoints.decodePolyline(encoded);
+    debugPrint('[Polyline] Decoded ${decoded.length} points from encoded string');
+    if (decoded.length >= 3) {
+      debugPrint('[Polyline] First 3 points: ${decoded.take(3).map((p) => '(${p.latitude}, ${p.longitude})').toList()}');
     }
-    return points;
+    return decoded
+        .map((point) => LatLng(point.latitude, point.longitude))
+        .toList();
   }
 
   LatLngBounds _boundsFromLatLngs(List<LatLng> points) {
