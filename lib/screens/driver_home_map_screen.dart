@@ -9,6 +9,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
+// ignore_for_file: unused_element
+
 import '../core/routes/app_routes.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
@@ -59,8 +61,32 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
   bool _isLocating = true;
   String? _locationError;
 
+  // ── route ──
+  Set<Polyline> _polylines = {};
+  double? _routeDistanceKm;
+  String? _routeDuration;
+  bool _isFetchingRoute = false;
+
+  // ── destination ──
+  LatLng? _destLatLng;
+  String _destAddress = '';
+  bool _isSearchingDest = false;
+
+  // ── search overlay ──
+  bool _isSearchMode = false;
+  bool _isSearchingPlaces = false;
+  Timer? _searchDebounceTimer;
+  List<Map<String, dynamic>> _placePredictions = [];
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  List<Map<String, String>> _recentSearches = [];
+
   // Driver availability toggle
   bool _isAvailable = false;
+
+  // Available seats & note
+  int _availableSeats = 1;
+  final TextEditingController _noteController = TextEditingController();
 
   @override
   void initState() {
@@ -72,6 +98,10 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
   @override
   void dispose() {
     _mapController?.dispose();
+    _searchDebounceTimer?.cancel();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -147,10 +177,278 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
   }
 
   void _onStartRide() {
+    if (_destLatLng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please set a destination first.'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
       content: Text('Looking for ride requests...'),
       backgroundColor: Color(0xFF03AF74),
     ));
+  }
+
+  // ── search helpers ──
+
+  void _openSearchMode() {
+    setState(() {
+      _isSearchMode = true;
+      _searchController.clear();
+      _placePredictions = [];
+      _destLatLng = null;
+      _destAddress = '';
+      _polylines = {};
+      _routeDistanceKm = null;
+      _routeDuration = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _searchFocusNode.requestFocus());
+  }
+
+  void _closeSearchMode() {
+    _searchDebounceTimer?.cancel();
+    _searchFocusNode.unfocus();
+    setState(() {
+      _isSearchMode = false;
+      _placePredictions = [];
+      _isSearchingPlaces = false;
+      _searchController.clear();
+    });
+  }
+
+  void _onSearchChanged(String query) {
+    _searchDebounceTimer?.cancel();
+    final trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setState(() { _placePredictions = []; _isSearchingPlaces = false; });
+      return;
+    }
+    setState(() => _isSearchingPlaces = true);
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 400), () => _fetchPlacePredictions(trimmed));
+  }
+
+  Future<void> _fetchPlacePredictions(String input) async {
+    try {
+      final loc = _currentLatLng ?? _defaultCenter;
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+        '?input=${Uri.encodeComponent(input)}'
+        '&key=$_gMapsKey'
+        '&components=country:lk'
+        '&location=${loc.latitude},${loc.longitude}'
+        '&radius=50000',
+      );
+      final resp = await http.get(url);
+      if (!mounted) return;
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        if (data['status'] == 'OK') {
+          setState(() {
+            _placePredictions = (data['predictions'] as List).map<Map<String, dynamic>>((p) => {
+              'place_id': p['place_id'] ?? '',
+              'description': p['description'] ?? '',
+              'main_text': (p['structured_formatting']?['main_text'] ?? p['description'] ?? '') as String,
+              'secondary_text': (p['structured_formatting']?['secondary_text'] ?? '') as String,
+              'source': 'google',
+            }).toList();
+            _isSearchingPlaces = false;
+          });
+          return;
+        }
+      }
+    } catch (e) { debugPrint('[Places] Google error: $e'); }
+
+    try {
+      final loc = _currentLatLng ?? _defaultCenter;
+      final url = Uri.parse(
+        'https://photon.komoot.io/api/?q=${Uri.encodeComponent(input)}&limit=10&lang=en'
+        '&lat=${loc.latitude}&lon=${loc.longitude}',
+      );
+      final resp = await http.get(url);
+      if (!mounted) return;
+      if (resp.statusCode == 200) {
+        final features = (json.decode(resp.body)['features'] as List?) ?? [];
+        final lk = features.where((f) =>
+          ((f['properties'] as Map?)?['country'] as String? ?? '').toLowerCase().contains('sri lanka')
+        ).toList();
+        final results = lk.isNotEmpty ? lk : features;
+        setState(() {
+          _placePredictions = results.take(7).map<Map<String, dynamic>>((f) {
+            final props = f['properties'] as Map<String, dynamic>? ?? {};
+            final coords = (f['geometry']?['coordinates'] as List?) ?? [0.0, 0.0];
+            final mainText = (props['name'] ?? '') as String;
+            final secondary = <String>[];
+            for (final k in ['city', 'county', 'state', 'country']) {
+              final v = props[k] as String?;
+              if (v != null && v.isNotEmpty && v != mainText) secondary.add(v);
+            }
+            return {
+              'place_id': '', 'description': '$mainText, ${secondary.join(', ')}',
+              'main_text': mainText, 'secondary_text': secondary.join(', '),
+              'source': 'photon',
+              'lat': (coords[1] as num).toDouble(),
+              'lon': (coords[0] as num).toDouble(),
+            };
+          }).toList();
+        });
+      }
+    } catch (e) {
+      debugPrint('[Places] Photon error: $e');
+      if (mounted) setState(() => _placePredictions = []);
+    } finally {
+      if (mounted) setState(() => _isSearchingPlaces = false);
+    }
+  }
+
+  Future<void> _selectPrediction(Map<String, dynamic> prediction) async {
+    final source = prediction['source'] as String? ?? 'google';
+    final mainText = prediction['main_text'] as String;
+    final description = prediction['description'] as String;
+    _closeSearchMode();
+    setState(() => _isSearchingDest = true);
+    try {
+      LatLng latLng;
+      if (source == 'photon' || source == 'nominatim') {
+        latLng = LatLng((prediction['lat'] as num).toDouble(), (prediction['lon'] as num).toDouble());
+      } else {
+        final url = Uri.parse(
+          'https://maps.googleapis.com/maps/api/place/details/json'
+          '?place_id=${prediction['place_id']}&key=$_gMapsKey&fields=geometry',
+        );
+        final resp = await http.get(url);
+        if (!mounted) return;
+        if (resp.statusCode == 200) {
+          final data = json.decode(resp.body);
+          if (data['status'] == 'OK') {
+            final loc = data['result']['geometry']['location'];
+            latLng = LatLng((loc['lat'] as num).toDouble(), (loc['lng'] as num).toDouble());
+          } else { throw Exception('Could not resolve location.'); }
+        } else { throw Exception('Could not resolve location.'); }
+      }
+      if (!mounted) return;
+      setState(() { _destLatLng = latLng; _destAddress = mainText; });
+      _fetchRoute();
+      _recentSearches.removeWhere((r) => r['name'] == mainText);
+      _recentSearches.insert(0, {
+        'name': mainText, 'address': description,
+        'place_id': prediction['place_id']?.toString() ?? '',
+        'lat': latLng.latitude.toString(), 'lon': latLng.longitude.toString(),
+        'source': source,
+      });
+      if (_recentSearches.length > 5) _recentSearches = _recentSearches.sublist(0, 5);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e.toString().replaceFirst('Exception: ', '')),
+        backgroundColor: Colors.red.shade700,
+      ));
+    } finally {
+      if (mounted) setState(() => _isSearchingDest = false);
+    }
+  }
+
+  void _selectRecentSearch(Map<String, String> recent) {
+    final lat = double.tryParse(recent['lat'] ?? '');
+    final lon = double.tryParse(recent['lon'] ?? '');
+    if (lat != null && lon != null) {
+      _selectPrediction({
+        'place_id': recent['place_id'] ?? '',
+        'main_text': recent['name'] ?? '',
+        'description': recent['address'] ?? '',
+        'source': recent['source'] ?? 'nominatim',
+        'lat': lat, 'lon': lon,
+      });
+    } else {
+      _closeSearchMode();
+    }
+  }
+
+  Future<void> _fetchRoute() async {
+    final origin = _currentLatLng;
+    final destination = _destLatLng;
+    if (origin == null || destination == null) return;
+    setState(() { _isFetchingRoute = true; _polylines = {}; _routeDistanceKm = null; _routeDuration = null; });
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/directions/json'
+        '?origin=${origin.latitude},${origin.longitude}'
+        '&destination=${destination.latitude},${destination.longitude}'
+        '&key=$_gMapsKey',
+      );
+      final resp = await http.get(url);
+      if (!mounted) return;
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        if (data['status'] == 'OK') {
+          final route = data['routes'][0];
+          final leg = route['legs'][0];
+          final distanceM = (leg['distance']['value'] as num).toDouble();
+          final durationText = leg['duration']['text'] as String;
+          final points = _decodePolyline(route['overview_polyline']['points'] as String);
+          final bounds = _boundsFromLatLngs([origin, destination, ...points]);
+          _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+          setState(() {
+            _routeDistanceKm = distanceM / 1000;
+            _routeDuration = durationText;
+            _polylines = {
+              Polyline(
+                polylineId: const PolylineId('route'),
+                points: points,
+                color: const Color(0xFF03AF74),
+                width: 5,
+              ),
+            };
+          });
+          return;
+        }
+      }
+    } catch (e) { debugPrint('[Route] $e'); }
+    if (mounted) {
+      final distM = Geolocator.distanceBetween(
+        origin.latitude, origin.longitude, destination.latitude, destination.longitude,
+      );
+      setState(() {
+        _routeDistanceKm = distM / 1000;
+        _polylines = {
+          Polyline(
+            polylineId: const PolylineId('route'),
+            points: [origin, destination],
+            color: const Color(0xFF03AF74),
+            width: 4,
+            patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+          ),
+        };
+      });
+    }
+    if (mounted) setState(() => _isFetchingRoute = false);
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    final points = <LatLng>[];
+    int index = 0, lat = 0, lng = 0;
+    while (index < encoded.length) {
+      int shift = 0, result = 0, b;
+      do { b = encoded.codeUnitAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      lat += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      shift = 0; result = 0;
+      do { b = encoded.codeUnitAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      lng += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      points.add(LatLng(lat / 1e5, lng / 1e5));
+    }
+    return points;
+  }
+
+  LatLngBounds _boundsFromLatLngs(List<LatLng> points) {
+    double minLat = points.first.latitude, maxLat = points.first.latitude;
+    double minLng = points.first.longitude, maxLng = points.first.longitude;
+    for (final p in points) {
+      if (p.latitude < minLat) minLat = p.latitude;
+      if (p.latitude > maxLat) maxLat = p.latitude;
+      if (p.longitude < minLng) minLng = p.longitude;
+      if (p.longitude > maxLng) maxLng = p.longitude;
+    }
+    return LatLngBounds(southwest: LatLng(minLat, minLng), northeast: LatLng(maxLat, maxLng));
   }
 
   // ── profile ──────────────────────────────────────────────────────
@@ -443,8 +741,14 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
         Marker(
           markerId: const MarkerId('current'),
           position: _currentLatLng!,
-          infoWindow: const InfoWindow(title: 'Your Location'),
+          infoWindow: const InfoWindow(title: 'Start Location'),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        ),
+      if (_destLatLng != null)
+        Marker(
+          markerId: const MarkerId('dest'),
+          position: _destLatLng!,
+          infoWindow: const InfoWindow(title: 'End Location'),
         ),
     };
 
@@ -471,12 +775,14 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             markers: markers,
+            polylines: _polylines,
           ),
           _buildDriverPanel(),
           if (_isLocating)
             _buildBanner('Getting your current location...', Colors.black87),
           if (!_isLocating && _locationError != null)
             _buildErrorBanner(_locationError!),
+          if (_isSearchMode) _buildSearchOverlay(),
         ],
       ),
     );
@@ -570,7 +876,7 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      // Current location row
+                      // Start location row
                       Container(
                         padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                         decoration: BoxDecoration(
@@ -593,7 +899,7 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Your Location', style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+                                  Text('Start Location', style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
                                   const SizedBox(height: 2),
                                   Text(
                                     _currentAddress,
@@ -607,13 +913,239 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
                           ],
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      // End location – tap to open search
+                      GestureDetector(
+                        onTap: _openSearchMode,
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(10, 14, 10, 14),
+                          decoration: BoxDecoration(
+                            color: scheme.surfaceContainerHighest.withOpacity(0.75),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: border),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.location_on, color: scheme.error, size: 22),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('End Location', style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _destAddress.isEmpty ? 'Where to?' : _destAddress,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: _destAddress.isEmpty
+                                            ? scheme.onSurfaceVariant.withOpacity(0.6)
+                                            : scheme.onSurface,
+                                        fontSize: 13,
+                                        fontWeight: _destAddress.isEmpty ? FontWeight.w400 : FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (_isSearchingDest)
+                                const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                              else
+                                Icon(Icons.search, color: scheme.primary, size: 22),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Available seats row
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerHighest.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: border),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 32, height: 32,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF03AF74).withOpacity(0.14),
+                              ),
+                              child: const Icon(Icons.event_seat_rounded, color: Color(0xFF03AF74), size: 16),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Available Seats',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: scheme.onSurface),
+                              ),
+                            ),
+                            // Decrement
+                            GestureDetector(
+                              onTap: _availableSeats > 1 ? () => setState(() => _availableSeats--) : null,
+                              child: Container(
+                                width: 30, height: 30,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _availableSeats > 1
+                                      ? const Color(0xFF03AF74).withOpacity(0.12)
+                                      : scheme.onSurfaceVariant.withOpacity(0.08),
+                                ),
+                                child: Icon(Icons.remove,
+                                  size: 16,
+                                  color: _availableSeats > 1 ? const Color(0xFF03AF74) : scheme.onSurfaceVariant.withOpacity(0.4),
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(
+                                '$_availableSeats',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF03AF74)),
+                              ),
+                            ),
+                            // Increment
+                            GestureDetector(
+                              onTap: _availableSeats < 6 ? () => setState(() => _availableSeats++) : null,
+                              child: Container(
+                                width: 30, height: 30,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _availableSeats < 6
+                                      ? const Color(0xFF03AF74).withOpacity(0.12)
+                                      : scheme.onSurfaceVariant.withOpacity(0.08),
+                                ),
+                                child: Icon(Icons.add,
+                                  size: 16,
+                                  color: _availableSeats < 6 ? const Color(0xFF03AF74) : scheme.onSurfaceVariant.withOpacity(0.4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Note field
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(10, 4, 10, 4),
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerHighest.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: border),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 32, height: 32,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF03AF74).withOpacity(0.14),
+                              ),
+                              child: const Icon(Icons.notes_rounded, color: Color(0xFF03AF74), size: 16),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextField(
+                                controller: _noteController,
+                                maxLines: 1,
+                                style: TextStyle(fontSize: 13, color: scheme.onSurface),
+                                decoration: InputDecoration(
+                                  hintText: 'Add a note for passengers...',
+                                  hintStyle: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant.withOpacity(0.6)),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 12),
+                      // Route info
+                      if (_isFetchingRoute)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                              SizedBox(width: 8),
+                              Text('Calculating route...', style: TextStyle(fontSize: 12)),
+                            ],
+                          ),
+                        )
+                      else if (_routeDistanceKm != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF03AF74).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFF03AF74).withOpacity(0.25)),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.straighten_rounded, size: 16, color: Color(0xFF03AF74)),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '${_routeDistanceKm!.toStringAsFixed(1)} km',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF03AF74),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              if (_routeDuration != null) ...[
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF040F1B).withOpacity(0.06),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: const Color(0xFF040F1B).withOpacity(0.1)),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.access_time_rounded, size: 16, color: Color(0xFF040F1B)),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _routeDuration!,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF040F1B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                       // Start Ride button
                       SizedBox(
                         width: double.infinity,
                         height: 52,
                         child: ElevatedButton(
-                          onPressed: _isAvailable ? _onStartRide : null,
+                          onPressed: (_isAvailable && _destLatLng != null) ? _onStartRide : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF03AF74),
                             disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
@@ -677,6 +1209,371 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
     );
   }
 
+  // ── search overlay ─────────────────────────────────────────────
+
+  static const Color _navyDark = Color(0xFF040F1B);
+  static const Color _primaryGreen = Color(0xFF169F7E);
+  static const Color _accentGreen = Color(0xFF03AF74);
+  static const Color _creamBg = Color(0xFFFFFFF0);
+  static const Color _textPrimary = Color(0xFF040F1B);
+  static const Color _textSecondary = Color(0xFF4A5565);
+
+  Widget _buildSearchOverlay() {
+    return Positioned.fill(
+      child: Material(
+        color: _creamBg,
+        child: Column(
+          children: [
+            Container(
+              decoration: const BoxDecoration(
+                color: _navyDark,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(28),
+                  bottomRight: Radius.circular(28),
+                ),
+                boxShadow: [BoxShadow(color: Color(0x40000000), blurRadius: 16, offset: Offset(0, 4))],
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(6, 4, 16, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                            onPressed: _closeSearchMode,
+                            splashRadius: 22,
+                          ),
+                          const Expanded(
+                            child: Text('Set Destination', textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.3)),
+                          ),
+                          const SizedBox(width: 48),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              SizedBox(
+                                width: 26,
+                                child: Column(
+                                  children: [
+                                    const SizedBox(height: 16),
+                                    Container(
+                                      width: 14, height: 14,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle, color: _accentGreen,
+                                        boxShadow: [BoxShadow(color: _accentGreen.withOpacity(0.4), blurRadius: 8, spreadRadius: 1)],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: SizedBox(
+                                        width: 2,
+                                        child: CustomPaint(painter: _DottedLinePainter(color: Colors.white.withOpacity(0.3))),
+                                      ),
+                                    ),
+                                    Container(
+                                      width: 14, height: 14,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: const Color(0xFFFF6B35), width: 2.5),
+                                      ),
+                                      child: const Center(child: Icon(Icons.circle, color: Color(0xFFFF6B35), size: 6)),
+                                    ),
+                                    const SizedBox(height: 16),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    // Start location (read-only)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.08),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: _accentGreen.withOpacity(0.15),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Text('FROM', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: _accentGreen, letterSpacing: 1)),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(_currentAddress, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    // End location (search field)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(color: _primaryGreen.withOpacity(0.5), width: 1.5),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFF6B35).withOpacity(0.15),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Text('TO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFFFF6B35), letterSpacing: 1)),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: TextField(
+                                              controller: _searchController,
+                                              focusNode: _searchFocusNode,
+                                              onChanged: _onSearchChanged,
+                                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white),
+                                              cursorColor: _primaryGreen,
+                                              decoration: InputDecoration(
+                                                hintText: 'Where are you going?',
+                                                hintStyle: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 14, fontWeight: FontWeight.w400),
+                                                filled: true, fillColor: Colors.transparent,
+                                                border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
+                                                isDense: true, contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                                              ),
+                                            ),
+                                          ),
+                                          if (_isSearchingPlaces)
+                                            const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: _primaryGreen))
+                                          else if (_searchController.text.isNotEmpty)
+                                            GestureDetector(
+                                              onTap: () { _searchController.clear(); _onSearchChanged(''); },
+                                              child: Container(
+                                                padding: const EdgeInsets.all(4),
+                                                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.1)),
+                                                child: Icon(Icons.close_rounded, color: Colors.white.withOpacity(0.5), size: 16),
+                                              ),
+                                            )
+                                          else
+                                            Icon(Icons.search_rounded, color: Colors.white.withOpacity(0.35), size: 20),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Expanded(child: _buildSearchResults()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    final hasQuery = _searchController.text.trim().length >= 2;
+
+    if (!hasQuery) {
+      if (_recentSearches.isEmpty) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
+          child: Column(
+            children: [
+              Container(
+                width: 80, height: 80,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: _primaryGreen.withOpacity(0.08)),
+                child: Icon(Icons.explore_rounded, size: 40, color: _primaryGreen.withOpacity(0.5)),
+              ),
+              const SizedBox(height: 20),
+              const Text('Where are you heading?', style: TextStyle(color: _textPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              const Text('Search for a destination', textAlign: TextAlign.center,
+                style: TextStyle(color: _textSecondary, fontSize: 14, height: 1.5)),
+            ],
+          ),
+        );
+      }
+      return ListView(
+        padding: const EdgeInsets.only(top: 8),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: _primaryGreen.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.history_rounded, size: 16, color: _primaryGreen),
+                ),
+                const SizedBox(width: 10),
+                const Text('Recent Searches', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _textPrimary, letterSpacing: 0.3)),
+              ],
+            ),
+          ),
+          ..._recentSearches.map((r) => _buildResultTile(
+            icon: Icons.access_time_rounded,
+            iconBg: _primaryGreen.withOpacity(0.08),
+            iconColor: _primaryGreen,
+            mainText: r['name'] ?? '',
+            secondaryText: r['address'] ?? '',
+            onTap: () => _selectRecentSearch(r),
+          )),
+        ],
+      );
+    }
+
+    if (_isSearchingPlaces && _placePredictions.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(width: 40, height: 40,
+              child: CircularProgressIndicator(strokeWidth: 3, color: _primaryGreen, backgroundColor: _primaryGreen.withOpacity(0.1))),
+            const SizedBox(height: 16),
+            const Text('Searching places...', style: TextStyle(color: _textSecondary, fontSize: 14)),
+          ],
+        ),
+      );
+    }
+
+    if (_placePredictions.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64, height: 64,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.red.shade50),
+                child: Icon(Icons.location_off_rounded, size: 32, color: Colors.red.shade300),
+              ),
+              const SizedBox(height: 16),
+              const Text('No results found', style: TextStyle(color: _textPrimary, fontSize: 16, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.only(top: 12, bottom: 20),
+      itemCount: _placePredictions.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: const Color(0xFFFF6B35).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.place_rounded, size: 16, color: Color(0xFFFF6B35)),
+                ),
+                const SizedBox(width: 10),
+                Text('${_placePredictions.length} places found',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _textPrimary, letterSpacing: 0.3)),
+              ],
+            ),
+          );
+        }
+        final p = _placePredictions[index - 1];
+        return _buildResultTile(
+          icon: Icons.location_on_rounded,
+          iconBg: const Color(0xFFFF6B35).withOpacity(0.08),
+          iconColor: const Color(0xFFFF6B35),
+          mainText: p['main_text'] as String? ?? '',
+          secondaryText: p['secondary_text'] as String? ?? '',
+          onTap: () => _selectPrediction(p),
+        );
+      },
+    );
+  }
+
+  Widget _buildResultTile({
+    required IconData icon,
+    required Color iconBg,
+    required Color iconColor,
+    required String mainText,
+    required String secondaryText,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          splashColor: _primaryGreen.withOpacity(0.08),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _navyDark.withOpacity(0.04)),
+              boxShadow: [BoxShadow(color: _navyDark.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
+                  child: Icon(icon, color: iconColor, size: 20),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(mainText, maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _textPrimary)),
+                      if (secondaryText.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(secondaryText, maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12, color: _textSecondary)),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: _primaryGreen.withOpacity(0.08)),
+                  child: const Icon(Icons.arrow_forward_ios_rounded, color: _primaryGreen, size: 14),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── build ─────────────────────────────────────────────────────────
 
   @override
@@ -714,4 +1611,24 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
       ),
     );
   }
+}
+
+class _DottedLinePainter extends CustomPainter {
+  _DottedLinePainter({this.color = Colors.grey});
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color..strokeWidth = 1.5..strokeCap = StrokeCap.round;
+    const dashHeight = 3.0, dashSpace = 4.0;
+    double y = 0;
+    final x = size.width / 2;
+    while (y < size.height) {
+      canvas.drawLine(Offset(x, y), Offset(x, y + dashHeight), paint);
+      y += dashHeight + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

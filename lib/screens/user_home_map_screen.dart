@@ -68,6 +68,12 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   String? _locationError;
   final TextEditingController _dropController = TextEditingController();
 
+  // ── route ──
+  Set<Polyline> _polylines = {};
+  double? _routeDistanceKm;
+  String? _routeDuration;
+  bool _isFetchingRoute = false;
+
   // ── search mode ──
   bool _isSearchMode = false;
   bool _isSearchingPlaces = false;
@@ -353,10 +359,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   }
 
   Future<void> _onMapTap(LatLng latLng) async {
-    // If a drop location is already set, don't override it on accidental tap.
-    // User must tap the drop field → open search → choose a new destination.
     if (_dropLatLng != null) return;
-
     final address = await _resolveAddress(latLng);
     if (!mounted) return;
     setState(() {
@@ -364,6 +367,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
       _dropAddress = address;
       _dropController.text = address;
     });
+    _fetchRoute();
   }
 
   void _onConfirm() {
@@ -373,6 +377,114 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     ));
   }
 
+  Future<void> _fetchRoute() async {
+    final origin = _pickupLatLng;
+    final destination = _dropLatLng;
+    if (origin == null || destination == null) return;
+
+    setState(() { _isFetchingRoute = true; _polylines = {}; _routeDistanceKm = null; _routeDuration = null; });
+
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/directions/json'
+        '?origin=${origin.latitude},${origin.longitude}'
+        '&destination=${destination.latitude},${destination.longitude}'
+        '&key=$_gMapsKey',
+      );
+      final resp = await http.get(url);
+      if (!mounted) return;
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        if (data['status'] == 'OK') {
+          final route = data['routes'][0];
+          final leg = route['legs'][0];
+          final distanceM = (leg['distance']['value'] as num).toDouble();
+          final durationText = leg['duration']['text'] as String;
+          final points = _decodePolyline(route['overview_polyline']['points'] as String);
+
+          // Fit camera to show full route
+          final bounds = _boundsFromLatLngs([origin, destination, ...points]);
+          _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+
+          setState(() {
+            _routeDistanceKm = distanceM / 1000;
+            _routeDuration = durationText;
+            _polylines = {
+              Polyline(
+                polylineId: const PolylineId('route'),
+                points: points,
+                color: const Color(0xFF03AF74),
+                width: 5,
+                patterns: [],
+              ),
+            };
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('[Route] Directions API error: $e');
+    }
+
+    // Fallback: straight-line distance
+    if (mounted) {
+      final distM = Geolocator.distanceBetween(
+        origin.latitude, origin.longitude,
+        destination.latitude, destination.longitude,
+      );
+      setState(() {
+        _routeDistanceKm = distM / 1000;
+        _polylines = {
+          Polyline(
+            polylineId: const PolylineId('route'),
+            points: [origin, destination],
+            color: const Color(0xFF03AF74),
+            width: 4,
+            patterns: [PatternItem.dash(20), PatternItem.gap(10)],
+          ),
+        };
+      });
+    }
+
+    if (mounted) setState(() => _isFetchingRoute = false);
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    final points = <LatLng>[];
+    int index = 0;
+    int lat = 0, lng = 0;
+    while (index < encoded.length) {
+      int shift = 0, result = 0, b;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      lat += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      shift = 0; result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      lng += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      points.add(LatLng(lat / 1e5, lng / 1e5));
+    }
+    return points;
+  }
+
+  LatLngBounds _boundsFromLatLngs(List<LatLng> points) {
+    double minLat = points.first.latitude, maxLat = points.first.latitude;
+    double minLng = points.first.longitude, maxLng = points.first.longitude;
+    for (final p in points) {
+      if (p.latitude < minLat) minLat = p.latitude;
+      if (p.latitude > maxLat) maxLat = p.latitude;
+      if (p.longitude < minLng) minLng = p.longitude;
+      if (p.longitude > maxLng) maxLng = p.longitude;
+    }
+    return LatLngBounds(southwest: LatLng(minLat, minLng), northeast: LatLng(maxLat, maxLng));
+  }
+
   // ── search helpers ──────────────────────────────────────────────
 
   void _openSearchMode() {
@@ -380,10 +492,12 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
       _isSearchMode = true;
       _searchController.clear();
       _placePredictions = [];
-      // Clear current drop so user can pick a new destination
       _dropLatLng = null;
       _dropAddress = '';
       _dropController.clear();
+      _polylines = {};
+      _routeDistanceKm = null;
+      _routeDuration = null;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _searchFocusNode.requestFocus();
@@ -574,6 +688,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
         _dropController.text = mainText;
       });
       _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 15));
+      _fetchRoute();
 
       // Save to recents (include coordinates for instant re-selection)
       _recentSearches.removeWhere((r) => r['name'] == mainText);
@@ -1083,6 +1198,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             markers: markers,
+            polylines: _polylines,
           ),
           _buildRidePanel(),
           if (_isLocating)
@@ -1211,6 +1327,80 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
+                      // Route info (distance + duration)
+                      if (_isFetchingRoute)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                              SizedBox(width: 8),
+                              Text('Calculating route...', style: TextStyle(fontSize: 12)),
+                            ],
+                          ),
+                        )
+                      else if (_routeDistanceKm != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF03AF74).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFF03AF74).withOpacity(0.25)),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.straighten_rounded, size: 16, color: Color(0xFF03AF74)),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '${_routeDistanceKm!.toStringAsFixed(1)} km',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF03AF74),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              if (_routeDuration != null) ...[
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF040F1B).withOpacity(0.06),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: const Color(0xFF040F1B).withOpacity(0.1)),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.access_time_rounded, size: 16, color: Color(0xFF040F1B)),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _routeDuration!,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF040F1B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                       // Confirm button
                       SizedBox(
                         width: double.infinity,
