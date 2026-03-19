@@ -14,6 +14,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../core/routes/app_routes.dart';
 import '../models/api_exception.dart';
+import 'navigation_screen.dart';
 import '../models/driver_profile.dart';
 import '../models/ride_detail_request.dart';
 import '../models/user_profile.dart';
@@ -399,11 +400,29 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
 
       if (!mounted) return;
 
-      final rideId = response['id'];
+      final rideId = response['id'] as int? ?? 0;
       final message = response['messages'] ?? 'Ride created successfully!';
 
       SnackBarHelper.showSuccess(context, message.toString());
       debugPrint('[StartRide] Ride created — ID: $rideId');
+
+      if (!mounted) return;
+      Navigator.pushNamed(
+        context,
+        AppRoutes.navigation,
+        arguments: NavigationArgs(
+          origin: _currentLatLng!,
+          destination: _destLatLng!,
+          originAddress: _currentAddress,
+          destAddress: _destAddress,
+          polylinePoints: _polylines.isNotEmpty
+              ? _polylines.first.points
+              : [_currentLatLng!, _destLatLng!],
+          distanceKm: _routeDistanceKm!,
+          duration: _routeDuration ?? '',
+          rideId: rideId,
+        ),
+      );
     } on ApiException catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(context, e.message);
@@ -598,13 +617,8 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
     if (origin == null || destination == null) return;
     setState(() { _isFetchingRoute = true; _polylines = {}; _routeDistanceKm = null; _routeDuration = null; });
 
-    // Vehicle-type-aware routing
-    final isBike = _driverProfile?.isTwoWheeler ?? false;
-    // OSRM public demo only supports "driving" profile reliably.
-    // For bikes we still route with "driving" but change the polyline colour.
-    final routeColor = isBike ? const Color(0xFF2196F3) : const Color(0xFF03AF74);
-    // Google Directions travel mode
-    final googleMode = isBike ? 'TWO_WHEELER' : 'driving';
+    const routeColor = Color(0xFF03AF74);
+    const googleMode = 'driving';
 
     // ── 1. OSRM with GeoJSON geometry (no decoding needed) ──
     try {
@@ -686,7 +700,7 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
             debugPrint('[Route] First: ${points.first}, Last: ${points.last}');
           }
 
-          final bounds = _boundsFromLatLngs([origin, destination, ...points]);
+            final bounds = _boundsFromLatLngs([origin, destination, ...points]);
           _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
           if (mounted) setState(() {
             _routeDistanceKm = distanceM / 1000;
@@ -747,7 +761,7 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
       try {
         final driverProfile = await DriverService.getDriverProfileByUserId(userId);
         if (mounted) setState(() => _driverProfile = driverProfile);
-        debugPrint('[Driver] Vehicle type: ${driverProfile.vehicleTypeCode ?? 'unknown'}');
+        debugPrint('[Driver] Driver profile loaded (id: ${driverProfile.id})');
       } catch (e) {
         debugPrint('[Driver] Could not fetch driver profile: $e');
       }
