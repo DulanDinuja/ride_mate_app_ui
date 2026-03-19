@@ -13,7 +13,11 @@ class DriverProfile {
 
   bool get isDriverProfileCompleted => driverProfileCompleted == 'YES';
 
-  bool get isTwoWheeler => vehicleTypeCode?.toUpperCase() == 'BIKE';
+  /// Returns true when the driver's vehicle is a two-wheeler (e.g. bike/scooter).
+  bool get isTwoWheeler {
+    final code = vehicleTypeCode?.toUpperCase();
+    return code == 'BIKE' || code == 'SCOOTER' || code == 'TWO_WHEELER';
+  }
 
   factory DriverProfile.fromJson(Map<String, dynamic> json) {
     return DriverProfile(
