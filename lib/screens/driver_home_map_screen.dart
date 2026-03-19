@@ -577,15 +577,27 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
       setState(() => _isUploadingPhoto = true);
       final bytes = await file.readAsBytes();
       final fileName = file.name.isNotEmpty ? file.name : file.path.split('/').last;
-      await FileService.uploadFile(bytes: bytes, fileName: fileName);
+      final documentId = await FileService.uploadFile(bytes: bytes, fileName: fileName);
+
       if (!mounted) return;
+
+      // Link the uploaded photo to the user profile
+      final userId = _userProfile?.userId.toString() ?? await TokenService.getUserId();
+      if (userId == null) throw Exception('User not logged in');
+      await UserService.updateProfilePhoto(userId, documentId);
+
+      // Reload profile so the new photo is reflected in the UI
+      final updatedProfile = await UserService.getUserProfileByUserId(userId);
+      if (!mounted) return;
+      setState(() => _userProfile = updatedProfile);
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile photo updated.'), backgroundColor: Colors.green),
+        SnackBar(content: const Text('Profile photo updated successfully.'), backgroundColor: Colors.green.shade700),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Photo upload failed: ${e.toString().replaceFirst('Exception: ', '')}'), backgroundColor: Colors.red.shade700),
+        SnackBar(content: Text('Photo update failed: ${e.toString().replaceFirst('Exception: ', '')}'), backgroundColor: Colors.red.shade700),
       );
     } finally {
       if (mounted) setState(() => _isUploadingPhoto = false);
@@ -643,10 +655,13 @@ class _DriverHomeMapScreenState extends State<DriverHomeMapScreen> {
                   CircleAvatar(
                     radius: 30,
                     backgroundColor: const Color(0xFF03AF74),
-                    backgroundImage: (profile.userVerificationImageUrl ?? '').isNotEmpty
-                        ? NetworkImage(profile.userVerificationImageUrl!)
-                        : null,
-                    child: (profile.userVerificationImageUrl ?? '').isNotEmpty
+                    backgroundImage: (profile.profileImageUrl ?? '').isNotEmpty
+                        ? NetworkImage(profile.profileImageUrl!)
+                        : (profile.userVerificationImageUrl ?? '').isNotEmpty
+                            ? NetworkImage(profile.userVerificationImageUrl!)
+                            : null,
+                    child: (profile.profileImageUrl ?? '').isNotEmpty ||
+                            (profile.userVerificationImageUrl ?? '').isNotEmpty
                         ? null
                         : const Icon(Icons.person, color: Colors.white),
                   ),

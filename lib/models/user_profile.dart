@@ -15,6 +15,8 @@ class UserProfile {
   final String willingToDrive;
   final int? userVerificationImageDocumentId;
   final String? userVerificationImageUrl;
+  final int? profileImageDocumentId;
+  final String? profileImageUrl;
   final String createdDate;
 
   const UserProfile({
@@ -34,6 +36,8 @@ class UserProfile {
     required this.willingToDrive,
     this.userVerificationImageDocumentId,
     this.userVerificationImageUrl,
+    this.profileImageDocumentId,
+    this.profileImageUrl,
     required this.createdDate,
   });
 
@@ -63,6 +67,8 @@ class UserProfile {
       userVerificationImageDocumentId:
           json['userVerificationImageDocumentId'] as int?,
       userVerificationImageUrl: json['userVerificationImageUrl'] as String?,
+      profileImageDocumentId: json['profileImageDocumentId'] as int?,
+      profileImageUrl: json['profileImageUrl'] as String?,
       createdDate: json['createdDate'] as String,
     );
   }

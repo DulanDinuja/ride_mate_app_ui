@@ -884,42 +884,100 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     }
   }
 
-  Future<void> _onChangeProfilePhoto() async {
+Future<void> _onChangeProfilePhoto() async {
+  try {
+    // STEP 1: Pick image
+    final file = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+
+    if (file == null) {
+      debugPrint('[Photo] No file selected');
+      return;
+    }
+
+    if (!mounted) return;
+
+    setState(() => _isUploadingPhoto = true);
+
+    // STEP 2: Read file
+    final bytes = await file.readAsBytes();
+    final fileName =
+        file.name.isNotEmpty ? file.name : file.path.split('/').last;
+
+    debugPrint('[Photo] Uploading file: $fileName (${bytes.length} bytes)');
+
+    // STEP 3: Upload file
+    final documentId = await FileService.uploadFile(
+      bytes: bytes,
+      fileName: fileName,
+    );
+
+    debugPrint('[Photo] File uploaded, documentId=$documentId');
+
+    // ✅ Validate documentId
+    if (documentId == null || documentId.toString().isEmpty) {
+      throw Exception('Upload failed: documentId is null or empty');
+    }
+
+    if (!mounted) return;
+
+    // STEP 4: Get userId
+    String? userId =
+        _userProfile?.userId?.toString() ?? await TokenService.getUserId();
+
+    debugPrint('[Photo] userId=$userId');
+
+    if (userId == null || userId.isEmpty) {
+      throw Exception('User not logged in');
+    }
+
+    // STEP 5: Call updateProfilePhoto
     try {
-      final file = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 80,
-      );
+      debugPrint('[Photo] Calling updateProfilePhoto...');
+      await UserService.updateProfilePhoto(userId, documentId);
+      debugPrint('[Photo] updateProfilePhoto SUCCESS');
+    } catch (updateError) {
+      debugPrint('[Photo] updateProfilePhoto ERROR: $updateError');
+      rethrow;
+    }
 
-      if (file == null || !mounted) return;
+    // STEP 6: Reload profile
+    debugPrint('[Photo] Reloading user profile...');
+    final updatedProfile =
+        await UserService.getUserProfileByUserId(userId);
 
-      setState(() => _isUploadingPhoto = true);
+    if (!mounted) return;
 
-      final bytes = await file.readAsBytes();
-      final fileName = file.name.isNotEmpty ? file.name : file.path.split('/').last;
-      final documentId = await FileService.uploadFile(bytes: bytes, fileName: fileName);
+    setState(() => _userProfile = updatedProfile);
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Profile photo uploaded successfully (id: $documentId).'),
-          backgroundColor: Colors.green.shade700,
+    // SUCCESS UI
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Profile photo updated successfully.'),
+        backgroundColor: Colors.green.shade700,
+      ),
+    );
+  } catch (e) {
+    debugPrint('[Photo] ERROR: $e');
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Photo update failed: ${e.toString().replaceFirst('Exception: ', '')}',
         ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Photo upload failed: ${e.toString().replaceFirst('Exception: ', '')}'),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isUploadingPhoto = false);
-      }
+        backgroundColor: Colors.red.shade700,
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() => _isUploadingPhoto = false);
     }
   }
+}
 
   Future<void> _onLogout() async {
     await AuthService.logout();
@@ -997,10 +1055,13 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
                   CircleAvatar(
                     radius: 30,
                     backgroundColor: const Color(0xFF03AF74),
-                    backgroundImage: (profile.userVerificationImageUrl ?? '').isNotEmpty
-                        ? NetworkImage(profile.userVerificationImageUrl!)
-                        : null,
-                    child: (profile.userVerificationImageUrl ?? '').isNotEmpty
+                    backgroundImage: (profile.profileImageUrl ?? '').isNotEmpty
+                        ? NetworkImage(profile.profileImageUrl!)
+                        : (profile.userVerificationImageUrl ?? '').isNotEmpty
+                            ? NetworkImage(profile.userVerificationImageUrl!)
+                            : null,
+                    child: (profile.profileImageUrl ?? '').isNotEmpty ||
+                            (profile.userVerificationImageUrl ?? '').isNotEmpty
                         ? null
                         : const Icon(Icons.person, color: Colors.white),
                   ),

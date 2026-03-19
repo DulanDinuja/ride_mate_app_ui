@@ -107,6 +107,27 @@ class UserService {
     }
   }
 
+  /// PUT /user-profile/update-profile-photo/{userId}
+  static Future<void> updateProfilePhoto(String userId, int profileImageDocumentId) async {
+    try {
+      final response = await ApiClient.put(
+        '/user-profile/update-profile-photo/$userId',
+        body: {'profileImageDocumentId': profileImageDocumentId},
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) return;
+
+      final error = jsonDecode(response.body);
+      if (error.containsKey('errorMessage') && error['errorMessage'] != null) {
+        throw ApiException(error['errorMessage']);
+      }
+      throw Exception(error['message'] ?? 'Failed to update profile photo');
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Network error: $e');
+    }
+  }
+
   /// PATCH /user-profile/update-willing-to-drive/{userId}
   static Future<void> updateWillingToDrive(String userId, String value) async {
     try {
