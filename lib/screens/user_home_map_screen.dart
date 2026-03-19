@@ -18,6 +18,7 @@ import '../services/driver_service.dart';
 import '../services/file_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
+import 'driver_home_mixin.dart';
 
 class UserHomeMapScreen extends StatefulWidget {
   const UserHomeMapScreen({super.key});
@@ -26,7 +27,7 @@ class UserHomeMapScreen extends StatefulWidget {
   State<UserHomeMapScreen> createState() => _UserHomeMapScreenState();
 }
 
-class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
+class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMixin {
   final ImagePicker _imagePicker = ImagePicker();
 
   // ── bottom nav ──
@@ -36,17 +37,14 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   bool _isLoadingProfile = true;
   bool _isUploadingPhoto = false;
   bool _isChangingRole = false;
-  bool _showDriverProfileCard = false;
   String? _loadError;
   UserProfile? _userProfile;
 
-  // ── driver-specific ──
-  bool _isAvailable = false;
-  DriverProfile? _driverProfile;
-  int _availableSeats = 1;
-  final TextEditingController _noteController = TextEditingController();
-
-  bool get _isDriver => _userProfile?.role.toUpperCase() == 'DRIVER';
+  // ── DriverHomeMixin interface ──
+  @override
+  UserProfile? get currentUserProfile => _userProfile;
+  @override
+  LatLng? get currentDropLatLng => _dropLatLng;
 
   // ── map / ride ──
   static const LatLng _defaultCenter = LatLng(6.9271, 79.8612);
@@ -104,7 +102,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
   void dispose() {
     _mapController?.dispose();
     _dropController.dispose();
-    _noteController.dispose();
+    disposeDriverState();
     _searchDebounceTimer?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
@@ -388,20 +386,6 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     ));
   }
 
-  void _onOfferRide() {
-    if (_dropLatLng == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Please set a destination first.'),
-        backgroundColor: Colors.orange,
-      ));
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Ride offered! Waiting for passengers...'),
-      backgroundColor: Color(0xFF03AF74),
-    ));
-  }
-
   Future<void> _fetchRoute() async {
     final origin = _pickupLatLng;
     final destination = _dropLatLng;
@@ -410,9 +394,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     setState(() { _isFetchingRoute = true; _polylines = {}; _routeDistanceKm = null; _routeDuration = null; });
 
     // Vehicle-type-aware routing for drivers
-    final routeColor = (_isDriver && (_driverProfile?.isTwoWheeler ?? false))
-        ? const Color(0xFF2196F3)
-        : const Color(0xFF03AF74);
+    final routeColor = driverRouteColor;
 
     // ── 1. OSRM with GeoJSON geometry (no decoding needed) ──
     try {
@@ -473,7 +455,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
     }
 
     // ── 2. Google Directions fallback (mobile/non-CORS environments) ──
-    final googleMode = (_isDriver && (_driverProfile?.isTwoWheeler ?? false)) ? 'TWO_WHEELER' : 'driving';
+    final googleMode = driverGoogleMode;
     try {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/directions/json'
@@ -820,15 +802,12 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
 
       // If user is a driver, fetch the driver profile for vehicle type info
       if (profile.role.toUpperCase() == 'DRIVER') {
-        try {
-          final driverProfile = await DriverService.getDriverProfileByUserId(userId);
-          if (mounted) setState(() => _driverProfile = driverProfile);
-        } catch (_) {}
+        await fetchDriverProfile(userId);
       }
 
       // Check driver profile if user is willing to drive
       if (profile.isProfileCompleted && profile.isWillingToDrive) {
-        await _checkDriverProfileStatus(userId);
+        await checkDriverProfileStatus(userId);
       }
     } catch (e) {
       if (!mounted) return;
@@ -840,21 +819,6 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
         setState(() {
           _isLoadingProfile = false;
         });
-      }
-    }
-  }
-
-  Future<void> _checkDriverProfileStatus(String userId) async {
-    try {
-      final driverProfile =
-          await DriverService.getDriverProfileByUserId(userId);
-      if (mounted && !driverProfile.isDriverProfileCompleted) {
-        setState(() => _showDriverProfileCard = true);
-      }
-    } catch (_) {
-      // Driver profile not found (non-200) — show popup
-      if (mounted) {
-        setState(() => _showDriverProfileCard = true);
       }
     }
   }
@@ -904,12 +868,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
         Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
       } else {
         // Reset driver-specific state
-        setState(() {
-          _isAvailable = false;
-          _driverProfile = null;
-          _availableSeats = 1;
-          _noteController.clear();
-        });
+        resetDriverState();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Role changed to Passenger.'),
@@ -1122,19 +1081,9 @@ Future<void> _onChangeProfilePhoto() async {
                         ),
                         const SizedBox(height: 2),
                         Text(profile.email, style: const TextStyle(color: Colors.black54)),
-                        if (_isDriver) ...[
+                        if (isDriver) ...[
                           const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF03AF74).withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'DRIVER',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF03AF74)),
-                            ),
-                          ),
+                          buildDriverBadge(),
                         ],
                       ],
                     ),
@@ -1359,7 +1308,7 @@ Future<void> _onChangeProfilePhoto() async {
             _buildBanner('Getting your current location...', Colors.black87),
           if (!_isLocating && _locationError != null)
             _buildErrorBanner(_locationError!),
-          if (_showDriverProfileCard) _buildCompleteDriverProfileCard(),
+          if (showDriverProfileCard) buildCompleteDriverProfileCard(),
           if (_isSearchMode) _buildSearchOverlay(),
         ],
       ),
@@ -1414,45 +1363,9 @@ Future<void> _onChangeProfilePhoto() async {
                                   : const Icon(Icons.my_location, color: Colors.white, size: 18),
                             ),
                           ),
-                          if (_isDriver) ...[
+                          if (isDriver) ...[
                             const Spacer(),
-                            GestureDetector(
-                              onTap: () => setState(() => _isAvailable = !_isAvailable),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                                decoration: BoxDecoration(
-                                  color: _isAvailable
-                                      ? const Color(0xFF03AF74).withOpacity(0.15)
-                                      : Colors.grey.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: _isAvailable ? const Color(0xFF03AF74) : Colors.grey.shade400,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 8, height: 8,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: _isAvailable ? const Color(0xFF03AF74) : Colors.grey,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      _isAvailable ? 'Online' : 'Offline',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: _isAvailable ? const Color(0xFF03AF74) : Colors.grey.shade600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                            buildAvailabilityToggle(),
                           ],
                         ],
                       ),
@@ -1522,112 +1435,11 @@ Future<void> _onChangeProfilePhoto() async {
                         ),
                       ),
                       // ── Driver-only: available seats ──
-                      if (_isDriver) ...[
+                      if (isDriver) ...[
                         const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-                          decoration: BoxDecoration(
-                            color: scheme.surfaceContainerHighest.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: border),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 32, height: 32,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: const Color(0xFF03AF74).withOpacity(0.14),
-                                ),
-                                child: const Icon(Icons.event_seat_rounded, color: Color(0xFF03AF74), size: 16),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Available Seats',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: scheme.onSurface),
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: _availableSeats > 1 ? () => setState(() => _availableSeats--) : null,
-                                child: Container(
-                                  width: 30, height: 30,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: _availableSeats > 1
-                                        ? const Color(0xFF03AF74).withOpacity(0.12)
-                                        : scheme.onSurfaceVariant.withOpacity(0.08),
-                                  ),
-                                  child: Icon(Icons.remove,
-                                    size: 16,
-                                    color: _availableSeats > 1 ? const Color(0xFF03AF74) : scheme.onSurfaceVariant.withOpacity(0.4),
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: Text(
-                                  '$_availableSeats',
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF03AF74)),
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: _availableSeats < 6 ? () => setState(() => _availableSeats++) : null,
-                                child: Container(
-                                  width: 30, height: 30,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: _availableSeats < 6
-                                        ? const Color(0xFF03AF74).withOpacity(0.12)
-                                        : scheme.onSurfaceVariant.withOpacity(0.08),
-                                  ),
-                                  child: Icon(Icons.add,
-                                    size: 16,
-                                    color: _availableSeats < 6 ? const Color(0xFF03AF74) : scheme.onSurfaceVariant.withOpacity(0.4),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        buildSeatsSelector(scheme, border),
                         const SizedBox(height: 8),
-                        // Driver-only: note for passengers
-                        Container(
-                          padding: const EdgeInsets.fromLTRB(10, 4, 10, 4),
-                          decoration: BoxDecoration(
-                            color: scheme.surfaceContainerHighest.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: border),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 32, height: 32,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: const Color(0xFF03AF74).withOpacity(0.14),
-                                ),
-                                child: const Icon(Icons.notes_rounded, color: Color(0xFF03AF74), size: 16),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: TextField(
-                                  controller: _noteController,
-                                  maxLines: 1,
-                                  style: TextStyle(fontSize: 13, color: scheme.onSurface),
-                                  decoration: InputDecoration(
-                                    hintText: 'Add a note for passengers...',
-                                    hintStyle: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant.withOpacity(0.6)),
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        buildNoteField(scheme, border),
                       ],
                       const SizedBox(height: 12),
                       // Route info (distance + duration)
@@ -1709,8 +1521,8 @@ Future<void> _onChangeProfilePhoto() async {
                         width: double.infinity,
                         height: 52,
                         child: ElevatedButton(
-                          onPressed: _isDriver
-                              ? ((_isAvailable && _pickupLatLng != null && _dropLatLng != null) ? _onOfferRide : null)
+                          onPressed: isDriver
+                              ? ((isDriverAvailable && _pickupLatLng != null && _dropLatLng != null) ? onOfferRide : null)
                               : ((_pickupLatLng != null && _dropLatLng != null) ? _onConfirm : null),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF03AF74),
@@ -1718,19 +1530,13 @@ Future<void> _onChangeProfilePhoto() async {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
                           child: Text(
-                            _isDriver ? 'Offer Ride' : 'Confirm Ride',
+                            isDriver ? 'Offer Ride' : 'Confirm Ride',
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
                           ),
                         ),
                       ),
-                      if (_isDriver && !_isAvailable)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(
-                            'Go online to start offering rides',
-                            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-                          ),
-                        ),
+                      if (isDriver && !isDriverAvailable)
+                        buildOfflineHint(scheme),
                     ],
                   ),
                 ),
@@ -1814,97 +1620,6 @@ Future<void> _onChangeProfilePhoto() async {
               child: const Text('Retry', style: TextStyle(color: Colors.white)),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCompleteDriverProfileCard() {
-    return Center(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(40),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            width: MediaQuery.of(context).size.width * 0.8,
-            padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
-            decoration: BoxDecoration(
-              color: const Color(0xFF040F1B).withOpacity(0.7),
-              borderRadius: BorderRadius.circular(40),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Align(
-                  alignment: Alignment.topRight,
-                  child: GestureDetector(
-                    onTap: () async {
-                      setState(() => _showDriverProfileCard = false);
-                      try {
-                        final userId = await TokenService.getUserId();
-                        if (userId != null) {
-                          await UserService.updateWillingToDrive(userId, 'NO');
-                        }
-                      } catch (_) {
-                        // Best-effort — popup is already dismissed
-                      }
-                    },
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.1),
-                      ),
-                      child: const Icon(Icons.close, color: Colors.white70, size: 18),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Complete Driver Profile',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Please complete your driver profile to start accepting rides.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontFamily: 'Poppins', fontSize: 14, color: Colors.white70),
-                ),
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: MediaQuery.of(context).size.width * 0.8 * 0.6,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() => _showDriverProfileCard = false);
-                      Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF03AF74),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                      elevation: 0,
-                    ),
-                    child: const Text(
-                      'Complete Now',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );
