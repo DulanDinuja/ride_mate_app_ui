@@ -9,7 +9,7 @@ class RideDetailRequest {
   final int availableSeats;
   final String startTime;
   final double totalRideDistance;
-  final String? tripRoute;
+  final String tripRoute;
   final String status;
   final double totalRideCost;
 
@@ -23,7 +23,7 @@ class RideDetailRequest {
     required this.availableSeats,
     required this.startTime,
     required this.totalRideDistance,
-    this.tripRoute,
+    required this.tripRoute,
     required this.status,
     required this.totalRideCost,
   });

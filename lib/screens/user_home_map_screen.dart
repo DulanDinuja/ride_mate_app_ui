@@ -44,7 +44,20 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   @override
   UserProfile? get currentUserProfile => _userProfile;
   @override
+  LatLng? get currentPickupLatLng => _pickupLatLng;
+  @override
   LatLng? get currentDropLatLng => _dropLatLng;
+  @override
+  String get currentPickupAddress => _pickupAddress;
+  @override
+  String get currentDropAddress => _dropAddress;
+  @override
+  double? get currentRouteDistanceKm => _routeDistanceKm;
+  @override
+  String? get currentRouteDuration => _routeDuration;
+  @override
+  List<LatLng> get currentPolylinePoints =>
+      _polylines.isNotEmpty ? _polylines.first.points : [];
 
   // ── map / ride ──
   static const LatLng _defaultCenter = LatLng(6.9271, 79.8612);
@@ -1522,17 +1535,23 @@ Future<void> _onChangeProfilePhoto() async {
                         height: 52,
                         child: ElevatedButton(
                           onPressed: isDriver
-                              ? ((isDriverAvailable && _pickupLatLng != null && _dropLatLng != null) ? onOfferRide : null)
+                              ? ((isDriverAvailable && _pickupLatLng != null && _dropLatLng != null && !isOfferingRide) ? onOfferRide : null)
                               : ((_pickupLatLng != null && _dropLatLng != null) ? _onConfirm : null),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF03AF74),
                             disabledBackgroundColor: const Color(0xFF03AF74).withOpacity(0.4),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
-                          child: Text(
-                            isDriver ? 'Offer Ride' : 'Confirm Ride',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
-                          ),
+                          child: isOfferingRide
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                                )
+                              : Text(
+                                  isDriver ? 'Offer Ride' : 'Confirm Ride',
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                                ),
                         ),
                       ),
                       if (isDriver && !isDriverAvailable)

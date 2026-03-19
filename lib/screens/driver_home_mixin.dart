@@ -5,23 +5,33 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../core/routes/app_routes.dart';
 import '../models/driver_profile.dart';
+import '../models/ride_detail_request.dart';
 import '../models/user_profile.dart';
 import '../services/driver_service.dart';
+import '../services/ride_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
+import 'navigation_screen.dart';
 import 'user_home_map_screen.dart';
 
 /// Mixin that encapsulates all driver-specific state, logic, and widgets
-/// for [UserHomeMapScreen]. The host State must implement the two abstract
-/// getters so the mixin can read shared state without reaching into private
-/// fields.
+/// for [UserHomeMapScreen]. The host State must implement the abstract
+/// getters so the mixin can read shared state without reaching into private fields.
 mixin DriverHomeMixin on State<UserHomeMapScreen> {
   // ── interface: host must provide ──────────────────────────────────
   UserProfile? get currentUserProfile;
+  LatLng? get currentPickupLatLng;
   LatLng? get currentDropLatLng;
+  String get currentPickupAddress;
+  String get currentDropAddress;
+  double? get currentRouteDistanceKm;
+  String? get currentRouteDuration;
+  List<LatLng> get currentPolylinePoints;
 
   // ── driver state ─────────────────────────────────────────────────
   bool isDriverAvailable = false;
+  bool _isOfferingRide = false;
+  bool get isOfferingRide => _isOfferingRide;
   DriverProfile? driverProfile;
   int driverAvailableSeats = 1;
   final TextEditingController driverNoteController = TextEditingController();
@@ -32,12 +42,10 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
 
   // ── lifecycle helpers ────────────────────────────────────────────
 
-  /// Call from the host's [dispose].
   void disposeDriverState() {
     driverNoteController.dispose();
   }
 
-  /// Reset driver state when switching back to passenger.
   void resetDriverState() {
     setState(() {
       isDriverAvailable = false;
@@ -49,7 +57,6 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
 
   // ── driver data helpers ──────────────────────────────────────────
 
-  /// Fetch the driver profile (vehicle type, etc.).
   Future<void> fetchDriverProfile(String userId) async {
     try {
       final profile = await DriverService.getDriverProfileByUserId(userId);
@@ -57,7 +64,6 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
     } catch (_) {}
   }
 
-  /// Show the "Complete Driver Profile" card if the profile is incomplete.
   Future<void> checkDriverProfileStatus(String userId) async {
     try {
       final dp = await DriverService.getDriverProfileByUserId(userId);
@@ -69,30 +75,108 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
     }
   }
 
-  /// Offer-ride action for drivers.
-  void onOfferRide() {
-    if (currentDropLatLng == null) {
+  /// Offer-ride: calculate price → create ride → navigate to NavigationScreen.
+  Future<void> onOfferRide() async {
+    final pickup = currentPickupLatLng;
+    final drop = currentDropLatLng;
+    final dp = driverProfile;
+    final distanceKm = currentRouteDistanceKm;
+    final duration = currentRouteDuration;
+
+    if (pickup == null || drop == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Please set a destination first.'),
+        content: Text('Please set pickup and destination first.'),
         backgroundColor: Colors.orange,
       ));
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Ride offered! Waiting for passengers...'),
-      backgroundColor: Color(0xFF03AF74),
-    ));
+    if (dp == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Driver profile not loaded. Please try again.'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+    if (distanceKm == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Route not calculated yet. Please wait.'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+
+    setState(() => _isOfferingRide = true);
+    try {
+      // 1. Calculate price
+      final priceResp = await RideService.calculateRidePrice(
+        driverProfileId: dp.id,
+        totalDistance: distanceKm,
+      );
+
+      // 2. Create ride detail
+      final note = driverNoteController.text.trim();
+      final tripRoute = note.isNotEmpty
+          ? note
+          : '$currentPickupAddress -> $currentDropAddress';
+
+      // Backend expects millisecond-precision ISO-8601 (no microseconds)
+      final now = DateTime.now();
+      final startTime =
+          '${now.toIso8601String().split('.').first}.${now.millisecond.toString().padLeft(3, '0')}';
+
+      final request = RideDetailRequest(
+        driverProfileId: dp.id,
+        startLocationLatitude: pickup.latitude,
+        startLocationLongitude: pickup.longitude,
+        endLocationLatitude: drop.latitude,
+        endLocationLongitude: drop.longitude,
+        startCity: currentPickupAddress,
+        availableSeats: driverAvailableSeats,
+        startTime: startTime,
+        totalRideDistance: distanceKm,
+        tripRoute: tripRoute,
+        status: 'ACTIVE',
+        totalRideCost: priceResp.totalRidePrice ?? 0.0,
+      );
+
+      final result = await RideService.createRideDetail(request);
+      final rideId = result['id'] as int;
+
+      if (!mounted) return;
+
+      // 3. Navigate to NavigationScreen
+      Navigator.pushNamed(
+        context,
+        AppRoutes.navigation,
+        arguments: NavigationArgs(
+          origin: pickup,
+          destination: drop,
+          originAddress: currentPickupAddress,
+          destAddress: currentDropAddress,
+          polylinePoints: currentPolylinePoints,
+          distanceKm: distanceKm,
+          duration: duration ?? '',
+          rideId: rideId,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e.toString().replaceFirst('Exception: ', '')),
+        backgroundColor: Colors.red.shade700,
+      ));
+    } finally {
+      if (mounted) setState(() => _isOfferingRide = false);
+    }
   }
 
   // ── routing helpers ──────────────────────────────────────────────
 
-  /// Route polyline colour based on vehicle type.
   Color get driverRouteColor =>
       (isDriver && (driverProfile?.isTwoWheeler ?? false))
           ? const Color(0xFF2196F3)
           : const Color(0xFF03AF74);
 
-  /// Google Directions travel mode based on vehicle type.
   String get driverGoogleMode =>
       (isDriver && (driverProfile?.isTwoWheeler ?? false))
           ? 'TWO_WHEELER'
