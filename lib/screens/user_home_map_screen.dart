@@ -507,24 +507,36 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> {
         rideDetailId: 1, // TODO: Replace with actual ride detail ID from ride search/selection
         userId: userId,
         startLocationLongitude: _pickupLatLng!.longitude,
+        startLocationLatitude: _pickupLatLng!.latitude,
         endLocationLongitude: _dropLatLng!.longitude,
+        endLocationLatitude: _dropLatLng!.latitude,
         passengerRideDistance: _routeDistanceKm!,
-        passengerCost: cost,
         startCity: startCity,
         endCity: endCity,
       );
 
-      final response = await RideService.confirmPassengerRide(request);
+      final costSplit = await RideService.confirmPassengerRide(request);
 
       if (!mounted) return;
 
+      // Find this passenger's cost from the cost split response
+      final myPassengerCost = costSplit.passengerCosts
+          .where((p) => p.userId == userId)
+          .toList();
+      final myCost = myPassengerCost.isNotEmpty
+          ? myPassengerCost.first.totalPassengerCost
+          : cost;
+
       SnackBarHelper.showSuccess(
         context,
-        response.message ?? 'Ride confirmed successfully! Looking for drivers...',
+        'Ride confirmed! Your share: LKR ${myCost?.toStringAsFixed(2) ?? cost.toStringAsFixed(2)}',
       );
 
-      debugPrint('[RideConfirm] Confirmed — ShareRideDetailId: ${response.shareRideDetailId}, '
-          'Status: ${response.status}');
+      debugPrint('[RideConfirm] Confirmed — RideDetailId: ${costSplit.rideDetailId}, '
+          'Passengers: ${costSplit.totalPassengers}, '
+          'Your cost: $myCost');
+
+      // TODO: Show CostBreakdownCard bottom sheet with costSplit details
     } on ApiException catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(context, e.message);
