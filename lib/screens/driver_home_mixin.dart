@@ -157,6 +157,7 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
           distanceKm: distanceKm,
           duration: duration ?? '',
           rideId: rideId,
+          rideCost: priceResp.totalRidePrice ?? 0.0,
         ),
       );
     } catch (e) {

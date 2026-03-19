@@ -23,6 +23,7 @@ class NavigationArgs {
   final double distanceKm;
   final String duration;
   final int rideId;
+  final double rideCost;
 
   const NavigationArgs({
     required this.origin,
@@ -33,6 +34,7 @@ class NavigationArgs {
     required this.distanceKm,
     required this.duration,
     required this.rideId,
+    required this.rideCost,
   });
 }
 
@@ -92,6 +94,9 @@ class _NavigationScreenState extends State<NavigationScreen>
   int _currentStepIndex = 0;
   bool _loadingSteps = true;
 
+  // ── ride confirmation ────────────────────────────────────────────
+  bool _rideConfirmed = false;
+
   // ── arrival ─────────────────────────────────────────────────────
   bool _hasArrived = false;
   bool _isCompletingRide = false;
@@ -116,7 +121,6 @@ class _NavigationScreenState extends State<NavigationScreen>
     _driverLatLng = widget.args.origin;
 
     _createDriverIcon();
-    _startLocationStream();
     _fetchSteps();
   }
 
@@ -138,6 +142,21 @@ class _NavigationScreenState extends State<NavigationScreen>
         distanceFilter: 5,
       ),
     ).listen(_onLocationUpdate);
+    // Transition camera to nav view
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted && _driverLatLng != null && _followDriver) {
+        _mapController?.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: _driverLatLng!,
+              zoom: 18.5,
+              bearing: _bearing,
+              tilt: 60,
+            ),
+          ),
+        );
+      }
+    });
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -504,21 +523,8 @@ class _NavigationScreenState extends State<NavigationScreen>
               Future.delayed(const Duration(milliseconds: 400), () {
                 c.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
               });
-              // Transition to nav view after 2.5s
-              Future.delayed(const Duration(milliseconds: 2500), () {
-                if (mounted && _driverLatLng != null && _followDriver) {
-                  c.animateCamera(
-                    CameraUpdate.newCameraPosition(
-                      CameraPosition(
-                        target: _driverLatLng!,
-                        zoom: 18.5,
-                        bearing: _bearing,
-                        tilt: 60,
-                      ),
-                    ),
-                  );
-                }
-              });
+              // Transition to nav view only after ride is confirmed
+              // (triggered manually in _buildConfirmRidePanel)
             },
             initialCameraPosition: CameraPosition(
               target: widget.args.origin,
@@ -534,27 +540,299 @@ class _NavigationScreenState extends State<NavigationScreen>
             polylines: polylines,
           ),
 
-          // ── Top instruction + bottom HUD ──
+          if (!_rideConfirmed) ...[  
+            // ── Confirm & Start Ride panel ──
+            _buildConfirmRidePanel(),
+          ] else ...[
+            // ── Top instruction + bottom HUD ──
+            SafeArea(
+              child: Column(
+                children: [
+                  _buildInstructionBanner(),
+                  const Spacer(),
+                  _buildLiveHudPanel(),
+                ],
+              ),
+            ),
+            // ── Re-center button ──
+            Positioned(
+              right: 16,
+              bottom: 230,
+              child: _buildRecenterButton(),
+            ),
+            // ── Arrived overlay ──
+            if (_hasArrived) _buildArrivedOverlay(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // CONFIRM RIDE PANEL
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Widget _buildConfirmRidePanel() {
+    return Positioned.fill(
+      child: Column(
+        children: [
+          // Back button top-left
           SafeArea(
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: _navy.withOpacity(0.9),
+                      shape: BoxShape.circle,
+                      boxShadow: const [
+                        BoxShadow(color: Color(0x44000000), blurRadius: 8),
+                      ],
+                    ),
+                    child: const Icon(Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white, size: 16),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const Spacer(),
+          // Bottom details card
+          Container(
+            margin: const EdgeInsets.fromLTRB(14, 0, 14, 24),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: _navy,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: const [
+                BoxShadow(
+                    color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 8)),
+              ],
+            ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildInstructionBanner(),
-                const Spacer(),
-                _buildLiveHudPanel(),
+                // Header
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: _green.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.directions_car_rounded,
+                          color: _green, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Ride Summary',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: _green.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: _green.withOpacity(0.4)),
+                      ),
+                      child: Text(
+                        'Ride #${widget.args.rideId}',
+                        style: const TextStyle(
+                          color: _green,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                // Route info
+                _buildRouteRow(
+                  icon: Icons.my_location_rounded,
+                  iconColor: _green,
+                  label: 'Pickup',
+                  value: widget.args.originAddress,
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 19),
+                  child: Column(
+                    children: List.generate(
+                      3,
+                      (_) => Container(
+                        width: 2,
+                        height: 6,
+                        margin: const EdgeInsets.symmetric(vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                _buildRouteRow(
+                  icon: Icons.location_on_rounded,
+                  iconColor: const Color(0xFFFF6B35),
+                  label: 'Drop',
+                  value: widget.args.destAddress,
+                ),
+                const SizedBox(height: 16),
+                // Stats row
+                Row(
+                  children: [
+                    _buildStatChip(
+                      Icons.route_rounded,
+                      '${widget.args.distanceKm.toStringAsFixed(1)} km',
+                      'Distance',
+                      _green,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildStatChip(
+                      Icons.access_time_rounded,
+                      widget.args.duration,
+                      'Duration',
+                      const Color(0xFFFF6B35),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildStatChip(
+                      Icons.payments_rounded,
+                      'Rs. ${widget.args.rideCost.toStringAsFixed(2)}',
+                      'Cost',
+                      const Color(0xFFFFD700),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Confirm button
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() => _rideConfirmed = true);
+                      _startLocationStream();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _green,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.navigation_rounded,
+                            color: Colors.white, size: 20),
+                        SizedBox(width: 10),
+                        Text(
+                          'Confirm & Start Ride',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
-
-          // ── Re-center button ──
-          Positioned(
-            right: 16,
-            bottom: 230,
-            child: _buildRecenterButton(),
-          ),
-
-          // ── Arrived overlay ──
-          if (_hasArrived) _buildArrivedOverlay(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRouteRow({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                    color: Colors.white.withOpacity(0.4),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatChip(
+      IconData icon, String value, String label, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 4),
+            Text(value,
+                style: TextStyle(
+                    color: color,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800)),
+            const SizedBox(height: 2),
+            Text(label,
+                style: TextStyle(
+                    color: color.withOpacity(0.6),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600)),
+          ],
+        ),
       ),
     );
   }

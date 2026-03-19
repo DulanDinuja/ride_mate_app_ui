@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as dev;
 
 import '../models/api_exception.dart';
 import '../models/passenger_ride_confirm_request.dart';
@@ -53,9 +54,9 @@ class RideService {
       );
 
       if (response.statusCode == 200) {
-        return RidePriceCalculationResponse.fromJson(
-          jsonDecode(response.body) as Map<String, dynamic>,
-        );
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        dev.log('[RideService] calculateRidePrice raw: $decoded', name: 'RideService');
+        return RidePriceCalculationResponse.fromJson(decoded);
       } else {
         final error = jsonDecode(response.body);
         if (error is Map) {

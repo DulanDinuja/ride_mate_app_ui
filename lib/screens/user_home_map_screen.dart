@@ -393,10 +393,17 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   }
 
   void _onConfirm() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Ride confirmed! Looking for drivers...'),
-      backgroundColor: Color(0xFF03AF74),
-    ));
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PassengerBookingSheet(
+        pickupAddress: _pickupAddress,
+        dropAddress: _dropAddress,
+        distanceKm: _routeDistanceKm ?? 0,
+        duration: _routeDuration ?? '',
+      ),
+    );
   }
 
   Future<void> _fetchRoute() async {
@@ -2374,6 +2381,252 @@ Future<void> _onChangeProfilePhoto() async {
             label: 'Home',
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Passenger booking confirmation bottom sheet ──
+
+class _PassengerBookingSheet extends StatefulWidget {
+  final String pickupAddress;
+  final String dropAddress;
+  final double distanceKm;
+  final String duration;
+
+  const _PassengerBookingSheet({
+    required this.pickupAddress,
+    required this.dropAddress,
+    required this.distanceKm,
+    required this.duration,
+  });
+
+  @override
+  State<_PassengerBookingSheet> createState() => _PassengerBookingSheetState();
+}
+
+class _PassengerBookingSheetState extends State<_PassengerBookingSheet> {
+  static const Color _navy = Color(0xFF040F1B);
+  static const Color _green = Color(0xFF03AF74);
+  static const Color _orange = Color(0xFFFF6B35);
+
+  bool _isBooking = false;
+  bool _booked = false;
+
+  Future<void> _confirmBooking() async {
+    setState(() => _isBooking = true);
+    // Simulate booking — replace with real API call when ride-search is implemented
+    await Future.delayed(const Duration(seconds: 1));
+    if (!mounted) return;
+    setState(() {
+      _isBooking = false;
+      _booked = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: _navy,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const [
+          BoxShadow(color: Color(0x66000000), blurRadius: 24, offset: Offset(0, -4)),
+        ],
+      ),
+      child: _booked ? _buildSuccessView() : _buildDetailsView(),
+    );
+  }
+
+  Widget _buildDetailsView() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Handle bar
+        Center(
+          child: Container(
+            width: 40, height: 4,
+            margin: const EdgeInsets.only(bottom: 18),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+        // Header
+        Row(
+          children: [
+            Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(
+                color: _green.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.directions_car_rounded, color: _green, size: 22),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Confirm Your Ride',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        // Pickup
+        _buildRouteRow(Icons.my_location_rounded, _green, 'Pickup', widget.pickupAddress),
+        Padding(
+          padding: const EdgeInsets.only(left: 19),
+          child: Column(
+            children: List.generate(3, (_) => Container(
+              width: 2, height: 6,
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(1),
+              ),
+            )),
+          ),
+        ),
+        // Drop
+        _buildRouteRow(Icons.location_on_rounded, _orange, 'Drop', widget.dropAddress),
+        const SizedBox(height: 16),
+        // Stats
+        Row(
+          children: [
+            _buildChip(Icons.route_rounded, '${widget.distanceKm.toStringAsFixed(1)} km', 'Distance', _green),
+            const SizedBox(width: 8),
+            _buildChip(Icons.access_time_rounded, widget.duration, 'Duration', _orange),
+          ],
+        ),
+        const SizedBox(height: 18),
+        // Confirm button
+        SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: ElevatedButton(
+            onPressed: _isBooking ? null : _confirmBooking,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _green,
+              disabledBackgroundColor: _green.withOpacity(0.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              elevation: 0,
+            ),
+            child: _isBooking
+                ? const SizedBox(
+                    width: 22, height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                  )
+                : const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                      SizedBox(width: 10),
+                      Text(
+                        'Confirm & Book Ride',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+        // Cancel
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSuccessView() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 12),
+        Container(
+          width: 72, height: 72,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: _green.withOpacity(0.15)),
+          child: const Icon(Icons.check_circle_rounded, color: _green, size: 44),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Ride Booked!',
+          style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Looking for a driver near you...',
+          style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _green,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              elevation: 0,
+            ),
+            child: const Text('Done', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _buildRouteRow(IconData icon, Color color, String label, String value) {
+    return Row(
+      children: [
+        Container(
+          width: 38, height: 38,
+          decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 2),
+              Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChip(IconData icon, String value, String label, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 4),
+            Text(value, style: TextStyle(color: color, fontSize: 15, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(color: color.withOpacity(0.6), fontSize: 10, fontWeight: FontWeight.w600)),
+          ],
+        ),
       ),
     );
   }
