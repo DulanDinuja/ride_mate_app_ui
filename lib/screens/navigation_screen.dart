@@ -58,17 +58,7 @@ class _NavigationScreenState extends State<NavigationScreen>
   static const Color _green = Color(0xFF03AF74);
   static const Color _navy = Color(0xFF040F1B);
 
-  static const String _darkMapStyle = '''
-[
-  {"elementType":"geometry","stylers":[{"color":"#1d1f24"}]},
-  {"elementType":"labels.text.fill","stylers":[{"color":"#8a8f98"}]},
-  {"elementType":"labels.text.stroke","stylers":[{"color":"#1d1f24"}]},
-  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#3a3f48"}]},
-  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#525861"}]},
-  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#5f6670"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#0f2a36"}]}
-]
-''';
+  static const String _darkMapStyle = '[{"elementType":"geometry","stylers":[{"color":"#1d1f24"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#8a8f98"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#1d1f24"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#3a3f48"}]},{"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#525861"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#5f6670"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#0f2a36"}]}]';
 
   // ── map controller ──────────────────────────────────────────────
   GoogleMapController? _mapController;
@@ -452,7 +442,6 @@ class _NavigationScreenState extends State<NavigationScreen>
           GoogleMap(
             onMapCreated: (c) {
               _mapController = c;
-              c.setMapStyle(_darkMapStyle).catchError((_) {});
               // Initial zoom to show full route
               final bounds = _boundsFromLatLngs([
                 widget.args.origin,
@@ -463,6 +452,7 @@ class _NavigationScreenState extends State<NavigationScreen>
                 c.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
               });
             },
+            style: _darkMapStyle,
             initialCameraPosition: CameraPosition(
               target: widget.args.origin,
               zoom: 15,
