@@ -12,17 +12,14 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/routes/app_routes.dart';
-import '../models/cost_split_response.dart';
 import '../models/driver_profile.dart';
-import '../models/passenger_ride_confirm_request.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/driver_service.dart';
 import '../services/file_service.dart';
-import '../services/ride_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
-import 'cost_split_screen.dart';
+import 'available_rides_screen.dart';
 import 'driver_home_mixin.dart';
 
 class UserHomeMapScreen extends StatefulWidget {
@@ -1284,6 +1281,7 @@ Future<void> _onChangeProfilePhoto() async {
                       AppRoutes.activeRide,
                       arguments: {
                         'rideDetailId': activeRideDetailId!,
+                        'driverProfileId': driverProfile?.id,
                         'pickupAddress': _pickupAddress,
                         'dropAddress': _dropAddress,
                         'totalDistance': _routeDistanceKm ?? 0.0,
@@ -2786,78 +2784,21 @@ class _PassengerConfirmSheetState extends State<_PassengerConfirmSheet> {
   static const Color _accent = Color(0xFF03AF74);
   static const Color _navy = Color(0xFF040F1B);
 
-  bool _isConfirming = false;
-  String? _error;
-
-  // TODO: In a real flow, the passenger selects a ride from available rides.
-  // This rideDetailId would come from the ride search results.
-  final TextEditingController _rideIdController = TextEditingController();
-
-  Future<void> _confirmRide() async {
-    final rideIdText = _rideIdController.text.trim();
-    if (rideIdText.isEmpty) {
-      setState(() => _error = 'Please enter the Ride ID to join.');
-      return;
-    }
-    final rideDetailId = int.tryParse(rideIdText);
-    if (rideDetailId == null) {
-      setState(() => _error = 'Invalid Ride ID.');
-      return;
-    }
-
-    final userId = widget.userProfile?.userId;
-    if (userId == null) {
-      setState(() => _error = 'User not logged in.');
-      return;
-    }
-
-    setState(() {
-      _isConfirming = true;
-      _error = null;
-    });
-
-    try {
-      final request = PassengerRideConfirmRequest(
-        rideDetailId: rideDetailId,
-        userId: userId,
-        startLocationLatitude: widget.pickupLatLng.latitude,
-        startLocationLongitude: widget.pickupLatLng.longitude,
-        endLocationLatitude: widget.dropLatLng.latitude,
-        endLocationLongitude: widget.dropLatLng.longitude,
-        passengerRideDistance: widget.distanceKm,
-        startCity: widget.pickupAddress,
-        endCity: widget.dropAddress,
-      );
-
-      final costSplit = await RideService.confirmPassengerRide(request);
-
-      if (!mounted) return;
-
-      // Show success and navigate to cost split view
-      Navigator.pop(context);
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => CostSplitScreen(
-            rideDetailId: rideDetailId,
-            initialData: costSplit,
-            isDriver: false,
-          ),
+  void _findRides() {
+    Navigator.pop(context); // close sheet
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AvailableRidesScreen(
+          pickupAddress: widget.pickupAddress,
+          dropAddress: widget.dropAddress,
+          distanceKm: widget.distanceKm,
+          pickupLatLng: widget.pickupLatLng,
+          dropLatLng: widget.dropLatLng,
+          userProfile: widget.userProfile,
         ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(
-          () => _error = e.toString().replaceFirst('Exception: ', ''));
-    } finally {
-      if (mounted) setState(() => _isConfirming = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    _rideIdController.dispose();
-    super.dispose();
+      ),
+    );
   }
 
   @override
@@ -2889,7 +2830,7 @@ class _PassengerConfirmSheetState extends State<_PassengerConfirmSheet> {
               const SizedBox(height: 20),
               // Title
               const Text(
-                'Join This Ride',
+                'Find a Ride',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
@@ -2960,99 +2901,33 @@ class _PassengerConfirmSheetState extends State<_PassengerConfirmSheet> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-
-              // Ride ID input
-              TextField(
-                controller: _rideIdController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Ride ID',
-                  hintText: 'Enter the ride ID to join',
-                  prefixIcon:
-                      const Icon(Icons.tag, color: _accent),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                        color: _accent.withOpacity(0.3)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                        color: _accent.withOpacity(0.2)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide:
-                        const BorderSide(color: _accent, width: 2),
-                  ),
-                ),
-              ),
-
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.error_outline,
-                          size: 18, color: Colors.red.shade700),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _error!,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.red.shade700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
               const SizedBox(height: 20),
 
-              // Confirm button
+              // Find Rides button
               SizedBox(
                 width: double.infinity,
                 height: 52,
-                child: ElevatedButton(
-                  onPressed: _isConfirming ? null : _confirmRide,
+                child: ElevatedButton.icon(
+                  onPressed: _findRides,
+                  icon: const Icon(Icons.search, color: Colors.white),
+                  label: const Text(
+                    'Find Available Rides',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _accent,
-                    disabledBackgroundColor: _accent.withOpacity(0.4),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16)),
                   ),
-                  child: _isConfirming
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Confirm & Join Ride',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                'Cost will be split proportionally among all riders',
+                'Browse available rides heading your way',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey.shade500,
