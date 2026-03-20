@@ -7,6 +7,7 @@ class RideDetailRequest {
   final double startLocationLatitude;
   final double endLocationLatitude;
   final String startCity;
+  final String? endCity;
   final int availableSeats;
   final String startTime;
   final double totalRideDistance;
@@ -22,6 +23,7 @@ class RideDetailRequest {
     required this.startLocationLatitude,
     required this.endLocationLatitude,
     required this.startCity,
+    this.endCity,
     required this.availableSeats,
     required this.startTime,
     required this.totalRideDistance,
@@ -39,6 +41,7 @@ class RideDetailRequest {
       'startLocationLatitude': startLocationLatitude,
       'endLocationLatitude': endLocationLatitude,
       'startCity': startCity,
+      if (endCity != null) 'endCity': endCity,
       'availableSeats': availableSeats,
       'startTime': startTime,
       'totalRideDistance': totalRideDistance,
