@@ -189,6 +189,17 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                         controller: scrollController,
                         padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 20.0),
                         children: [
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: IconButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                              color: const Color(0xFF040F1B),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
                           const Text(
                             'Verify Your Email',
                             style: TextStyle(
