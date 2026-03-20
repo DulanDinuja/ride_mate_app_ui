@@ -41,7 +41,6 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   // ── profile ──
   bool _isLoadingProfile = true;
   bool _isUploadingPhoto = false;
-  bool _isChangingRole = false;
   String? _loadError;
   UserProfile? _userProfile;
 
@@ -899,72 +898,6 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
     }
   }
 
-  Future<void> _onChangeRole() async {
-    final profile = _userProfile;
-    if (profile == null) return;
-
-    final userId = await TokenService.getUserId();
-    if (userId == null) return;
-
-    final isPassenger = profile.role.toUpperCase() == 'PASSENGER';
-    final newRole = isPassenger ? 'DRIVER' : 'PASSENGER';
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(isPassenger ? 'Become a Driver?' : 'Switch to Passenger?'),
-        content: Text(
-          isPassenger
-              ? 'You will need to complete your driver profile with vehicle details, photos, driving licence, insurance and revenue licence.'
-              : 'Switch your role back to Passenger?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(isPassenger ? 'Continue' : 'Confirm'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    setState(() => _isChangingRole = true);
-    try {
-      await UserService.updateRole(userId, newRole);
-      await _loadUserProfile();
-      if (!mounted) return;
-
-      if (newRole == 'DRIVER') {
-        // Launch the full driver registration flow
-        Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
-      } else {
-        // Reset driver-specific state
-        resetDriverState();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Role changed to Passenger.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _isChangingRole = false);
-    }
-  }
-
 Future<void> _onChangeProfilePhoto() async {
   try {
     // STEP 1: Pick image
@@ -1184,19 +1117,6 @@ Future<void> _onChangeProfilePhoto() async {
                 leading: const Icon(Icons.badge_outlined),
                 title: const Text('Role'),
                 subtitle: Text(profile == null ? 'Not available' : _safeValue(profile.role)),
-                trailing: _isChangingRole
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Switch(
-                        value: (profile?.role.toUpperCase() ?? '') == 'DRIVER',
-                        activeColor: const Color(0xFF03AF74),
-                        onChanged: profile == null || _isChangingRole
-                            ? null
-                            : (_) => _onChangeRole(),
-                      ),
               ),
               const Divider(height: 1),
               ListTile(
@@ -1503,6 +1423,33 @@ Future<void> _onChangeProfilePhoto() async {
             markers: markers,
             polylines: _polylines,
           ),
+          // ── Offer Ride / Request Ride toggle ──
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+              child: Row(
+                children: [
+                  Expanded(child: _buildRideModeSwitcher()),
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: () {
+                      // Open account / menu
+                      setState(() => _selectedIndex = 0);
+                    },
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF040F1B),
+                      ),
+                      child: const Icon(Icons.menu_rounded, color: Colors.white, size: 24),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           _buildRidePanel(),
           if (_isLocating)
             _buildBanner('Getting your current location...', Colors.black87),
@@ -1515,6 +1462,80 @@ Future<void> _onChangeProfilePhoto() async {
     );
   }
 
+  Widget _buildRideModeSwitcher() {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF040F1B),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                if (!isDriver) {
+                  // Show prompt — need to become a driver
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Switch to Driver role from the Ride Start screen to offer rides.'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDriver ? const Color(0xFF03AF74) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(26),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  'Offer Ride',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isDriver ? Colors.white : Colors.white54,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                if (isDriver) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Switch to Passenger role from the Ride Start screen to request rides.'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: !isDriver ? const Color(0xFF03AF74) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(26),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  'Request Ride',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: !isDriver ? Colors.white : Colors.white54,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRidePanel() {
     final scheme = Theme.of(context).colorScheme;
     final border = scheme.outline.withOpacity(0.3);
@@ -1522,7 +1543,7 @@ Future<void> _onChangeProfilePhoto() async {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.fromLTRB(14, 68, 14, 10),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
