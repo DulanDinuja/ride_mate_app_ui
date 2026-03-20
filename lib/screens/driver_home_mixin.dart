@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -13,7 +12,7 @@ import '../services/driver_service.dart';
 import '../services/ride_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
-import 'navigation_screen.dart';
+import 'ride_start_screen.dart';
 import 'user_home_map_screen.dart';
 
 /// Mixin that encapsulates all driver-specific state, logic, and widgets
@@ -150,20 +149,23 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
 
       setState(() => activeRideDetailId = rideId);
 
-      // 3. Navigate to NavigationScreen
+      // 3. Navigate to RideStartScreen to show trip details
       Navigator.pushNamed(
         context,
-        AppRoutes.navigation,
-        arguments: NavigationArgs(
-          origin: pickup,
-          destination: drop,
-          originAddress: currentPickupAddress,
-          destAddress: currentDropAddress,
-          polylinePoints: currentPolylinePoints,
+        AppRoutes.rideStart,
+        arguments: RideStartArgs(
+          rideDetailId: rideId,
+          pickupAddress: currentPickupAddress,
+          dropAddress: currentDropAddress,
+          totalCost: priceResp.totalRidePrice ?? 0.0,
           distanceKm: distanceKm,
-          duration: duration ?? '',
-          rideId: rideId,
-          rideCost: priceResp.totalRidePrice ?? 0.0,
+          perKmRate: priceResp.perKmRate ?? 0.0,
+          duration: duration,
+          pickupLat: pickup.latitude,
+          pickupLng: pickup.longitude,
+          dropLat: drop.latitude,
+          dropLng: drop.longitude,
+          polylinePoints: currentPolylinePoints,
         ),
       );
     } catch (e) {
