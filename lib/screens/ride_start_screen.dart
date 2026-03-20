@@ -12,6 +12,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 /// Arguments passed to this screen from the driver offer-ride flow.
 class RideStartArgs {
   final int rideDetailId;
+  final int? driverProfileId;
   final String pickupAddress;
   final String dropAddress;
   final double totalCost;
@@ -26,6 +27,7 @@ class RideStartArgs {
 
   const RideStartArgs({
     required this.rideDetailId,
+    this.driverProfileId,
     required this.pickupAddress,
     required this.dropAddress,
     required this.totalCost,
@@ -480,6 +482,7 @@ class _RideStartScreenState extends State<RideStartScreen> {
                         AppRoutes.activeRide,
                         arguments: {
                           'rideDetailId': _args!.rideDetailId,
+                          'driverProfileId': _args!.driverProfileId,
                           'pickupAddress': _args!.pickupAddress,
                           'dropAddress': _args!.dropAddress,
                           'totalDistance': _args!.distanceKm,
