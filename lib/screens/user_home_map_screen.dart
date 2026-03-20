@@ -17,6 +17,7 @@ import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/driver_service.dart';
 import '../services/file_service.dart';
+import '../services/ride_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import 'available_rides_screen.dart';
@@ -38,6 +39,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   // ── profile ──
   bool _isLoadingProfile = true;
   bool _isUploadingPhoto = false;
+  bool _isChangingRole = false;
   String? _loadError;
   UserProfile? _userProfile;
 
@@ -63,6 +65,15 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
 
   // ── map / ride ──
   static const LatLng _defaultCenter = LatLng(6.9271, 79.8612);
+
+  // Sri Lanka bounding box — restrict camera & search to this area
+  static const LatLng _slSouthWest = LatLng(5.916, 79.521);
+  static const LatLng _slNorthEast = LatLng(9.836, 81.879);
+  static final LatLngBounds _sriLankaBounds = LatLngBounds(
+    southwest: _slSouthWest,
+    northeast: _slNorthEast,
+  );
+
   static const String _darkMapStyle = '''
 [
   {"elementType":"geometry","stylers":[{"color":"#1d1f24"}]},
@@ -96,6 +107,11 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   double? _routeDistanceKm;
   String? _routeDuration;
   bool _isFetchingRoute = false;
+
+  // ── active ride ──
+  bool _isLoadingActiveRide = false;
+  bool _isEndingRide = false;
+  Map<String, dynamic>? _activeRideData;
 
   // ── search mode ──
   bool _isSearchMode = false;
@@ -195,7 +211,8 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
       final nominatimUrl = Uri.parse(
         'https://nominatim.openstreetmap.org/reverse'
         '?lat=${latLng.latitude}&lon=${latLng.longitude}'
-        '&format=json&zoom=16&addressdetails=1',
+        '&format=json&zoom=16&addressdetails=1'
+        '&countrycodes=lk',
       );
       // On web, browsers forbid setting User-Agent; omit custom headers.
       final headers = kIsWeb
@@ -234,6 +251,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/geocode/json'
         '?latlng=${latLng.latitude},${latLng.longitude}'
+        '&region=lk'
         '&key=$_gMapsKey',
       );
       final resp = await http.get(url);
@@ -678,7 +696,9 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
         '&limit=10'
         '&lang=en'
         '&lat=${loc.latitude}'
-        '&lon=${loc.longitude}',
+        '&lon=${loc.longitude}'
+        '&bbox=${_slSouthWest.longitude},${_slSouthWest.latitude},'
+        '${_slNorthEast.longitude},${_slNorthEast.latitude}',
       );
       final resp = await http.get(url);
       if (!mounted) return;
@@ -687,7 +707,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
         final features = (data['features'] as List?) ?? [];
         debugPrint('[Places] Photon returned ${features.length} results');
 
-        // Prefer Sri Lanka results, but show all if none match
+        // Only show Sri Lanka results
         final sriLankaResults = features.where((f) {
           final country =
               (f['properties'] as Map<String, dynamic>?)?['country'] as String?;
@@ -695,12 +715,9 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
               country.toLowerCase().contains('sri lanka');
         }).toList();
 
-        final resultsToUse =
-            sriLankaResults.isNotEmpty ? sriLankaResults : features;
-
         setState(() {
           _placePredictions =
-              resultsToUse.take(7).map<Map<String, dynamic>>((f) {
+              sriLankaResults.take(7).map<Map<String, dynamic>>((f) {
             final props = f['properties'] as Map<String, dynamic>? ?? {};
             final coords =
                 (f['geometry']?['coordinates'] as List?) ?? [0.0, 0.0];
@@ -875,6 +892,8 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
       // If user is a driver, fetch the driver profile for vehicle type info
       if (profile.role.toUpperCase() == 'DRIVER') {
         await fetchDriverProfile(userId);
+        // Load active ride for the driver
+        _loadActiveRide();
       }
 
       // Check driver profile if user is willing to drive
@@ -892,6 +911,153 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
           _isLoadingProfile = false;
         });
       }
+    }
+  }
+
+  /// Load the driver's active ride from the backend.
+  Future<void> _loadActiveRide() async {
+    final dp = driverProfile;
+    if (dp == null) return;
+
+    setState(() => _isLoadingActiveRide = true);
+    try {
+      final data = await RideService.getDriverActiveRide(dp.id);
+      if (!mounted) return;
+      setState(() {
+        _activeRideData = data;
+        if (data != null) {
+          activeRideDetailId = (data['id'] as num?)?.toInt();
+        }
+        _isLoadingActiveRide = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingActiveRide = false);
+    }
+  }
+
+  /// End the currently active ride.
+  Future<void> _endActiveRide() async {
+    final rideId = activeRideDetailId;
+    if (rideId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('End This Ride?'),
+        content: const Text(
+          'This will mark the ride as completed. Passengers will be notified.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('End Ride', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isEndingRide = true);
+    try {
+      await RideService.endRide(rideId);
+      if (!mounted) return;
+      setState(() {
+        activeRideDetailId = null;
+        _activeRideData = null;
+        _isEndingRide = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ride ended successfully! 🎉'),
+          backgroundColor: Color(0xFF03AF74),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isEndingRide = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  /// Switch role between DRIVER and PASSENGER via the Offer/Request toggle.
+  Future<void> _onSwitchRole({required bool toDriver}) async {
+    final profile = _userProfile;
+    if (profile == null || _isChangingRole) return;
+
+    // Already in the target role — nothing to do
+    final currentIsDriver = profile.role.toUpperCase() == 'DRIVER';
+    if (toDriver == currentIsDriver) return;
+
+    final userId = await TokenService.getUserId();
+    if (userId == null || !mounted) return;
+
+    final newRole = toDriver ? 'DRIVER' : 'PASSENGER';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(toDriver ? 'Switch to Driver?' : 'Switch to Passenger?'),
+        content: Text(
+          toDriver
+              ? 'You will switch to Driver mode. You may need to complete your driver profile if not done.'
+              : 'Switch your role back to Passenger mode?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isChangingRole = true);
+    try {
+      await UserService.updateRole(userId, newRole);
+      await _loadUserProfile();
+      if (!mounted) return;
+
+      if (newRole == 'DRIVER') {
+        // Check if driver registration is needed
+        if (_userProfile != null && !_userProfile!.isWillingToDrive) {
+          Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
+        }
+      } else {
+        // Reset driver-specific state
+        resetDriverState();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Switched to Passenger mode.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isChangingRole = false);
     }
   }
 
@@ -1230,120 +1396,279 @@ Future<void> _onChangeProfilePhoto() async {
   }
 
   Widget _buildActiveRidesTab() {
-    // If the driver has an active ride, show quick actions
-    if (isDriver && activeRideDetailId != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF03AF74).withOpacity(0.12),
+    // Loading state
+    if (_isLoadingActiveRide && _activeRideData == null && activeRideDetailId == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // If the driver has an active ride (from local state or fetched data)
+    if (isDriver && (activeRideDetailId != null || _activeRideData != null)) {
+      final ride = _activeRideData;
+      final rideId = activeRideDetailId ?? (ride?['id'] as num?)?.toInt();
+      final startCity = ride?['startCity'] as String? ?? _pickupAddress;
+      final endCity = ride?['endCity'] as String? ?? _dropAddress;
+      final totalDist = (ride?['totalRideDistance'] as num?)?.toDouble() ?? _routeDistanceKm ?? 0.0;
+      final totalCost = (ride?['totalRideCost'] as num?)?.toDouble() ?? ridePrice?.totalRidePrice ?? 0.0;
+      final perKm = (ride?['perKmRate'] as num?)?.toDouble() ?? ridePrice?.perKmRate ?? 0.0;
+      final seats = (ride?['availableSeats'] as num?)?.toInt() ?? driverAvailableSeats;
+      final status = ride?['status'] as String? ?? 'ACTIVE';
+      final tripRoute = ride?['tripRoute'] as String? ?? '';
+
+      return RefreshIndicator(
+        onRefresh: _loadActiveRide,
+        color: const Color(0xFF03AF74),
+        child: ListView(
+          padding: const EdgeInsets.all(18),
+          children: [
+            // ── Ride status header ──
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF040F1B), Color(0xFF0A1F35)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                child: const Icon(
-                  Icons.directions_car_filled,
-                  size: 40,
-                  color: Color(0xFF03AF74),
-                ),
+                borderRadius: BorderRadius.circular(22),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'You have an active ride!',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF040F1B),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Ride #$activeRideDetailId is in progress.\nPassengers can join along your route.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.black54,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pushNamed(
-                      context,
-                      AppRoutes.activeRide,
-                      arguments: {
-                        'rideDetailId': activeRideDetailId!,
-                        'driverProfileId': driverProfile?.id,
-                        'pickupAddress': _pickupAddress,
-                        'dropAddress': _dropAddress,
-                        'totalDistance': _routeDistanceKm ?? 0.0,
-                        'totalCost': ridePrice?.totalRidePrice ?? 0.0,
-                      },
-                    );
-                  },
-                  icon: const Icon(Icons.analytics_outlined),
-                  label: const Text(
-                    'View Ride & Cost Split',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF03AF74).withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.directions_car_filled,
+                            color: Color(0xFF03AF74), size: 26),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Ride #$rideId',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF03AF74),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                status,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF040F1B),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
+                  const SizedBox(height: 20),
+                  // Cost display
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text('TOTAL RIDE COST',
+                            style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1)),
+                        const SizedBox(height: 6),
+                        RichText(
+                          text: TextSpan(
+                            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
+                            children: [
+                              const TextSpan(text: 'LKR ', style: TextStyle(color: Color(0xFF03AF74))),
+                              TextSpan(text: totalCost.toStringAsFixed(2), style: const TextStyle(color: Colors.white)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            // ── Route details card ──
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 3)),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Route Details', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF040F1B))),
+                  const SizedBox(height: 14),
+                  // Pickup
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Column(
+                        children: [
+                          const Icon(Icons.radio_button_checked, color: Color(0xFF03AF74), size: 18),
+                          Container(width: 2, height: 30, color: const Color(0xFF03AF74).withOpacity(0.3)),
+                          const Icon(Icons.location_on, color: Colors.red, size: 18),
+                        ],
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Pickup', style: TextStyle(fontSize: 11, color: Colors.black38, fontWeight: FontWeight.w600)),
+                            Text(startCity, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF040F1B))),
+                            const SizedBox(height: 18),
+                            const Text('Destination', style: TextStyle(fontSize: 11, color: Colors.black38, fontWeight: FontWeight.w600)),
+                            Text(endCity, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF040F1B))),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (tripRoute.isNotEmpty) ...[
+                    const Divider(height: 24),
+                    Row(
+                      children: [
+                        const Icon(Icons.route, size: 16, color: Colors.black38),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(tripRoute, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // ── Stats row ──
+            Row(
+              children: [
+                _buildStatCard(Icons.straighten, '${totalDist.toStringAsFixed(1)} km', 'Distance'),
+                const SizedBox(width: 10),
+                _buildStatCard(Icons.speed, 'LKR ${perKm.toStringAsFixed(0)}/km', 'Rate'),
+                const SizedBox(width: 10),
+                _buildStatCard(Icons.event_seat, '$seats', 'Seats'),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // ── Action buttons ──
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _isEndingRide ? null : _endActiveRide,
+                icon: _isEndingRide
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.stop_circle_outlined),
+                label: Text(
+                  _isEndingRide ? 'Ending Ride...' : 'End Ride',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade600,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.red.shade300,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
               ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.pushNamed(
-                      context,
-                      AppRoutes.costSplit,
-                      arguments: {
-                        'rideDetailId': activeRideDetailId!,
-                        'isDriver': true,
-                      },
-                    );
-                  },
-                  icon: const Icon(Icons.pie_chart_outline),
-                  label: const Text(
-                    'View Full Breakdown',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF03AF74),
-                    side: const BorderSide(color: Color(0xFF03AF74)),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                  ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pushNamed(
+                    context,
+                    AppRoutes.activeRide,
+                    arguments: {
+                      'rideDetailId': rideId!,
+                      'pickupAddress': startCity,
+                      'dropAddress': endCity,
+                      'totalDistance': totalDist,
+                      'totalCost': totalCost,
+                    },
+                  );
+                },
+                icon: const Icon(Icons.analytics_outlined),
+                label: const Text(
+                  'View Ride Details',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF040F1B),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pushNamed(
+                    context,
+                    AppRoutes.costSplit,
+                    arguments: {
+                      'rideDetailId': rideId!,
+                      'isDriver': true,
+                    },
+                  );
+                },
+                icon: const Icon(Icons.pie_chart_outline),
+                label: const Text(
+                  'View Cost Split',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF03AF74),
+                  side: const BorderSide(color: Color(0xFF03AF74)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
         ),
       );
     }
 
+    // No active rides
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.local_taxi_outlined,
-                size: 64, color: Colors.grey.shade300),
+            Icon(Icons.local_taxi_outlined, size: 64, color: Colors.grey.shade300),
             const SizedBox(height: 16),
             const Text(
               'No active rides right now',
@@ -1357,6 +1682,39 @@ Future<void> _onChangeProfilePhoto() async {
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 13, color: Colors.black38),
             ),
+            if (isDriver) ...[
+              const SizedBox(height: 20),
+              TextButton.icon(
+                onPressed: _loadActiveRide,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Refresh'),
+                style: TextButton.styleFrom(foregroundColor: const Color(0xFF03AF74)),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(IconData icon, String value, String label) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 20, color: const Color(0xFF03AF74)),
+            const SizedBox(height: 6),
+            Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF040F1B))),
+            const SizedBox(height: 2),
+            Text(label, style: const TextStyle(fontSize: 10, color: Colors.black38, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -1420,6 +1778,9 @@ Future<void> _onChangeProfilePhoto() async {
             zoomControlsEnabled: false,
             markers: markers,
             polylines: _polylines,
+            // Restrict map to Sri Lanka
+            cameraTargetBounds: CameraTargetBounds(_sriLankaBounds),
+            minMaxZoomPreference: const MinMaxZoomPreference(7, 20),
           ),
           // ── Offer Ride / Request Ride toggle ──
           SafeArea(
@@ -1468,67 +1829,74 @@ Future<void> _onChangeProfilePhoto() async {
         color: const Color(0xFF040F1B),
         borderRadius: BorderRadius.circular(30),
       ),
-      child: Row(
+      child: Stack(
         children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                if (!isDriver) {
-                  // Show prompt — need to become a driver
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Switch to Driver role from the Ride Start screen to offer rides.'),
-                      backgroundColor: Colors.orange,
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: _isChangingRole
+                      ? null
+                      : () => _onSwitchRole(toDriver: true),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isDriver ? const Color(0xFF03AF74) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(26),
                     ),
-                  );
-                }
-              },
+                    alignment: Alignment.center,
+                    child: Text(
+                      'Offer Ride',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: isDriver ? Colors.white : Colors.white54,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: _isChangingRole
+                      ? null
+                      : () => _onSwitchRole(toDriver: false),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: !isDriver ? const Color(0xFF03AF74) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(26),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      'Request Ride',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: !isDriver ? Colors.white : Colors.white54,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (_isChangingRole)
+            Positioned.fill(
               child: Container(
                 decoration: BoxDecoration(
-                  color: isDriver ? const Color(0xFF03AF74) : Colors.transparent,
+                  color: Colors.black38,
                   borderRadius: BorderRadius.circular(26),
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  'Offer Ride',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: isDriver ? Colors.white : Colors.white54,
+                child: const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
                   ),
                 ),
               ),
             ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                if (isDriver) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Switch to Passenger role from the Ride Start screen to request rides.'),
-                      backgroundColor: Colors.orange,
-                    ),
-                  );
-                }
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: !isDriver ? const Color(0xFF03AF74) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(26),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  'Request Ride',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: !isDriver ? Colors.white : Colors.white54,
-                  ),
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
