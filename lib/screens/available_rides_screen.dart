@@ -5,6 +5,7 @@ import '../models/available_ride.dart';
 import '../models/ride_request.dart';
 import '../models/user_profile.dart';
 import '../services/ride_request_service.dart';
+import '../widgets/custom_back_button.dart';
 
 /// Screen that shows all available rides heading in the passenger's direction.
 /// The passenger can browse rides and request to join one.
@@ -137,6 +138,10 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
     return Scaffold(
       backgroundColor: _cream,
       appBar: AppBar(
+        leading: const Padding(
+          padding: EdgeInsets.all(6),
+          child: CustomBackButton(),
+        ),
         title: const Text('Available Rides'),
         backgroundColor: _navy,
         foregroundColor: Colors.white,
