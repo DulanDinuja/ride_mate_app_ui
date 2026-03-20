@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/cost_split_response.dart';
 import '../services/ride_service.dart';
+import '../widgets/custom_back_button.dart';
 
 /// Displays the full segment-based cost-split breakdown for a ride.
 /// Can receive an already-loaded [CostSplitResponse] via constructor
@@ -85,6 +86,10 @@ class _CostSplitScreenState extends State<CostSplitScreen> {
     return Scaffold(
       backgroundColor: _cream,
       appBar: AppBar(
+        leading: const Padding(
+          padding: EdgeInsets.all(6),
+          child: CustomBackButton(),
+        ),
         title: const Text('Cost Split Breakdown'),
         backgroundColor: _navy,
         foregroundColor: Colors.white,
