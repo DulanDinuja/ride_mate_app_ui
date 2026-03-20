@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
+import '../widgets/custom_back_button.dart';
+
 class SelfieCameraScreen extends StatefulWidget {
   const SelfieCameraScreen({
     super.key,
@@ -108,6 +110,10 @@ class _SelfieCameraScreenState extends State<SelfieCameraScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
+        leading: const Padding(
+          padding: EdgeInsets.all(6),
+          child: CustomBackButton(),
+        ),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: Text(widget.title),
