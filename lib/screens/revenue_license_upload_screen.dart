@@ -231,78 +231,80 @@ class _RevenueLicenseUploadScreenState extends State<RevenueLicenseUploadScreen>
               color: _panelBackground,
               borderRadius: BorderRadius.circular(48),
             ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(22, 24, 22, 28),
-              child: Column(
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                      color: const Color(0xFF111A2B),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildStepper(),
-                  const SizedBox(height: 44),
-                  const Text(
-                    'Revenue License',
-                    style: TextStyle(
-                      fontSize: 21,
-                      fontWeight: FontWeight.w700,
-                      color: _textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Please take clear photographs\nof following',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 18,
-                      height: 1.35,
-                      color: _textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  _buildPhotoCard(_RevenueLicenseSide.front),
-                  const SizedBox(height: 16),
-                  _buildPhotoCard(_RevenueLicenseSide.back),
-                  const SizedBox(height: 44),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 58,
-                    child: ElevatedButton(
-                      onPressed: _isSubmitting ? null : _onCompleteRegistrationPressed,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _buttonDark,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(22),
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(22, 72, 22, 28),
+                  child: Column(
+                    children: [
+                      _buildStepper(),
+                      const SizedBox(height: 44),
+                      const Text(
+                        'Revenue License',
+                        style: TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w700,
+                          color: _textPrimary,
                         ),
                       ),
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.5,
-                              ),
-                            )
-                          : const Text(
-                              'Complete Registration',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w500,
-                              ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Please take clear photographs\nof following',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 18,
+                          height: 1.35,
+                          color: _textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+                      _buildPhotoCard(_RevenueLicenseSide.front),
+                      const SizedBox(height: 16),
+                      _buildPhotoCard(_RevenueLicenseSide.back),
+                      const SizedBox(height: 44),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 58,
+                        child: ElevatedButton(
+                          onPressed: _isSubmitting ? null : _onCompleteRegistrationPressed,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _buttonDark,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(22),
                             ),
-                    ),
+                          ),
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : const Text(
+                                  'Complete Registration',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                Positioned(
+                  top: 16,
+                  left: 12,
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                    color: _textPrimary,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
