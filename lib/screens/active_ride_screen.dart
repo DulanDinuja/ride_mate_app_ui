@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/cost_split_response.dart';
 import '../services/ride_service.dart';
 import '../services/ride_request_service.dart';
+import '../widgets/custom_back_button.dart';
 import 'cost_split_screen.dart';
 import 'driver_ride_requests_screen.dart';
 
@@ -132,6 +133,10 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
     return Scaffold(
       backgroundColor: _cream,
       appBar: AppBar(
+        leading: const Padding(
+          padding: EdgeInsets.all(6),
+          child: CustomBackButton(),
+        ),
         title: const Text('Active Ride'),
         backgroundColor: _navy,
         foregroundColor: Colors.white,
