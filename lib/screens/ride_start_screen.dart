@@ -7,6 +7,7 @@ import '../models/user_profile.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import 'navigation_screen.dart';
+import 'ride_requests_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 /// Arguments passed to this screen from the driver offer-ride flow.
@@ -533,6 +534,37 @@ class _RideStartScreenState extends State<RideStartScreen> {
                   ),
                 ),
               ),
+              // View ride requests button (driver only)
+              if (_isDriverMode) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pushNamed(
+                        context,
+                        AppRoutes.rideRequests,
+                        arguments: RideRequestsArgs(
+                          rideDetailId: _args!.rideDetailId,
+                          totalRideCost: _args!.totalCost,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.people_outline),
+                    label: const Text(
+                      'View Ride Requests',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF02132A),
+                      side: const BorderSide(color: Color(0xFF02132A)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24)),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ],
         ),
