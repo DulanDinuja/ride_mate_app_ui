@@ -32,23 +32,7 @@ class HomeMapScreenState extends State<HomeMapScreen> {
     northeast: _slNorthEast,
   );
 
-  static const String _darkMapStyle = '''
-[
-  {"elementType":"geometry","stylers":[{"color":"#1d1f24"}]},
-  {"elementType":"labels.text.fill","stylers":[{"color":"#8a8f98"}]},
-  {"elementType":"labels.text.stroke","stylers":[{"color":"#1d1f24"}]},
-  {"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#3b3f47"}]},
-  {"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#6f7682"}]},
-  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#3a3f48"}]},
-  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#2a2e36"}]},
-  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#525861"}]},
-  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#5f6670"}]},
-  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#474e57"}]},
-  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2d3139"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#0f2a36"}]},
-  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#4d7a8d"}]}
-]
-''';
+  static const String _darkMapStyle = '[{"elementType":"geometry","stylers":[{"color":"#1d1f24"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#8a8f98"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#1d1f24"}]},{"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#3b3f47"}]},{"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#6f7682"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#3a3f48"}]},{"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#2a2e36"}]},{"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#525861"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#5f6670"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#474e57"}]},{"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2d3139"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#0f2a36"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#4d7a8d"}]}]';
 
   bool _showProfileCard = false;
   bool _showDriverProfileCard = false;
