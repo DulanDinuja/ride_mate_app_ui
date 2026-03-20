@@ -5,6 +5,7 @@ import '../models/vehicle_type.dart';
 import '../models/vehicle_make.dart';
 import '../models/vehicle_model.dart';
 import '../services/vehicle_service.dart';
+import '../widgets/custom_back_button.dart';
 
 class VehicleRegistrationScreen extends StatefulWidget {
   const VehicleRegistrationScreen({super.key});
@@ -432,11 +433,7 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
                 Positioned(
                   top: 16,
                   left: 12,
-                  child: IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                    color: _textPrimary,
-                  ),
+                  child: const CustomBackButton(),
                 ),
               ],
             ),
