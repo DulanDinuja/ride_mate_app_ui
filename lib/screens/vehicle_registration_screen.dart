@@ -234,209 +234,211 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
               color: _panelBackground,
               borderRadius: BorderRadius.circular(48),
             ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                      color: const Color(0xFF44526A),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ),
-                  _buildStepper(),
-                  const SizedBox(height: 38),
-                  const Text(
-                    'Choose your Vehicle',
-                    style: TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w500,
-                      color: _textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildVehicleTypeSelector(),
-                  const SizedBox(height: 32),
-                  const Text(
-                    'Make',
-                    style: TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w500,
-                      color: _textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildMakeDropdown(),
-                  const SizedBox(height: 26),
-                  const Text(
-                    'Model',
-                    style: TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w500,
-                      color: _textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildModelDropdown(),
-                  const SizedBox(height: 26),
-                  Row(
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 72, 24, 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Year of Manufacture',
-                              style: TextStyle(
-                                fontSize: 19,
-                                fontWeight: FontWeight.w500,
-                                color: _textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            GestureDetector(
-                              onTap: _pickYear,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                                decoration: BoxDecoration(
-                                  color: _fieldBackground,
-                                  borderRadius: BorderRadius.circular(20),
+                      _buildStepper(),
+                      const SizedBox(height: 38),
+                      const Text(
+                        'Choose your Vehicle',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w500,
+                          color: _textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      _buildVehicleTypeSelector(),
+                      const SizedBox(height: 32),
+                      const Text(
+                        'Make',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w500,
+                          color: _textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMakeDropdown(),
+                      const SizedBox(height: 26),
+                      const Text(
+                        'Model',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w500,
+                          color: _textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildModelDropdown(),
+                      const SizedBox(height: 26),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Year of Manufacture',
+                                  style: TextStyle(
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w500,
+                                    color: _textPrimary,
+                                  ),
                                 ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      '$_selectedYear',
-                                      style: const TextStyle(fontSize: 17, color: Color(0xFF8F95A1)),
+                                const SizedBox(height: 12),
+                                GestureDetector(
+                                  onTap: _pickYear,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                                    decoration: BoxDecoration(
+                                      color: _fieldBackground,
+                                      borderRadius: BorderRadius.circular(20),
                                     ),
-                                    const Icon(Icons.calendar_today_rounded, color: Color(0xFFB5B6B8), size: 20),
-                                  ],
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          '$_selectedYear',
+                                          style: const TextStyle(fontSize: 17, color: Color(0xFF8F95A1)),
+                                        ),
+                                        const Icon(Icons.calendar_today_rounded, color: Color(0xFFB5B6B8), size: 20),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 18),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Colour',
+                                  style: TextStyle(
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w500,
+                                    color: _textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                _buildDropdownField(
+                                  value: _selectedColour,
+                                  items: _colours,
+                                  onChanged: (value) {
+                                    if (value == null) return;
+                                    setState(() => _selectedColour = value);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 26),
+                      const Text(
+                        'Registration No (Number Plate)',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w500,
+                          color: _textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _registrationController,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          color: _textDark,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'CAR-1515',
+                          hintStyle: const TextStyle(color: Color(0xFF9AA0AA)),
+                          filled: true,
+                          fillColor: _fieldBackground,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 22,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: const BorderSide(color: _accent, width: 1.5),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      RichText(
+                        text: const TextSpan(
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.5,
+                            color: _textPrimary,
+                          ),
+                          children: [
+                            TextSpan(text: 'By continuing, I agree to the '),
+                            TextSpan(
+                              text: 'RideMate Terms of Service',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            TextSpan(
+                              text: ' and consent to disclose certain personal information to RideMate passengers under the ',
+                            ),
+                            TextSpan(
+                              text: 'RideMate Privacy Policy',
+                              style: TextStyle(fontWeight: FontWeight.w700),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 18),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Colour',
-                              style: TextStyle(
-                                fontSize: 19,
-                                fontWeight: FontWeight.w500,
-                                color: _textPrimary,
-                              ),
+                      const SizedBox(height: 30),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 58,
+                        child: ElevatedButton(
+                          onPressed: _onNextPressed,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _buttonDark,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(22),
                             ),
-                            const SizedBox(height: 12),
-                            _buildDropdownField(
-                              value: _selectedColour,
-                              items: _colours,
-                              onChanged: (value) {
-                                if (value == null) return;
-                                setState(() => _selectedColour = value);
-                              },
+                          ),
+                          child: const Text(
+                            'Next',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 26),
-                  const Text(
-                    'Registration No (Number Plate)',
-                    style: TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w500,
-                      color: _textPrimary,
-                    ),
+                ),
+                Positioned(
+                  top: 16,
+                  left: 12,
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                    color: _textPrimary,
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _registrationController,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      color: _textDark,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'CAR-1515',
-                      hintStyle: const TextStyle(color: Color(0xFF9AA0AA)),
-                      filled: true,
-                      fillColor: _fieldBackground,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 22,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: _accent, width: 1.5),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  RichText(
-                    text: const TextSpan(
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.5,
-                        color: _textPrimary,
-                      ),
-                      children: [
-                        TextSpan(text: 'By continuing, I agree to the '),
-                        TextSpan(
-                          text: 'RideMate Terms of Service',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        TextSpan(
-                          text:
-                              ' and consent to disclose certain personal information to RideMate passengers under the ',
-                        ),
-                        TextSpan(
-                          text: 'RideMate Privacy Policy',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 58,
-                    child: ElevatedButton(
-                      onPressed: _onNextPressed,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _buttonDark,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(22),
-                        ),
-                      ),
-                      child: const Text(
-                        'Next',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
