@@ -150,81 +150,83 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
               color: _panelBackground,
               borderRadius: BorderRadius.circular(48),
             ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(22, 24, 22, 28),
-              child: Column(
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                      color: const Color(0xFF111A2B),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildStepper(),
-                  const SizedBox(height: 44),
-                  const Text(
-                    'Vehicle Photos',
-                    style: TextStyle(
-                      fontSize: 42 / 2,
-                      fontWeight: FontWeight.w700,
-                      color: _textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Please take clear photographs\nof following',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 18,
-                      height: 1.35,
-                      color: _textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  Row(
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(22, 72, 22, 28),
+                  child: Column(
                     children: [
-                      Expanded(child: _buildPhotoCard(_VehiclePhotoSide.front)),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildPhotoCard(_VehiclePhotoSide.rear)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(child: _buildPhotoCard(_VehiclePhotoSide.left)),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildPhotoCard(_VehiclePhotoSide.right)),
-                    ],
-                  ),
-                  const SizedBox(height: 44),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 58,
-                    child: ElevatedButton(
-                      onPressed: _onNextPressed,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _buttonDark,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(22),
+                      _buildStepper(),
+                      const SizedBox(height: 44),
+                      const Text(
+                        'Vehicle Photos',
+                        style: TextStyle(
+                          fontSize: 42 / 2,
+                          fontWeight: FontWeight.w700,
+                          color: _textPrimary,
                         ),
                       ),
-                      child: const Text(
-                        'Next',
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Please take clear photographs\nof following',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.w500,
+                          height: 1.35,
+                          color: _textSecondary,
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 30),
+                      Row(
+                        children: [
+                          Expanded(child: _buildPhotoCard(_VehiclePhotoSide.front)),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildPhotoCard(_VehiclePhotoSide.rear)),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(child: _buildPhotoCard(_VehiclePhotoSide.left)),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildPhotoCard(_VehiclePhotoSide.right)),
+                        ],
+                      ),
+                      const SizedBox(height: 44),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 58,
+                        child: ElevatedButton(
+                          onPressed: _onNextPressed,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _buttonDark,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(22),
+                            ),
+                          ),
+                          child: const Text(
+                            'Next',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                Positioned(
+                  top: 16,
+                  left: 12,
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                    color: _textPrimary,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
