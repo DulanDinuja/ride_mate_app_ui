@@ -2,6 +2,27 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../core/routes/app_routes.dart';
+
+/// Arguments passed to this screen from the driver offer-ride flow.
+class RideStartArgs {
+  final int rideDetailId;
+  final String pickupAddress;
+  final String dropAddress;
+  final double totalCost;
+  final double distanceKm;
+  final double perKmRate;
+
+  const RideStartArgs({
+    required this.rideDetailId,
+    required this.pickupAddress,
+    required this.dropAddress,
+    required this.totalCost,
+    required this.distanceKm,
+    required this.perKmRate,
+  });
+}
+
 class RideStartScreen extends StatefulWidget {
   const RideStartScreen({super.key});
 
@@ -16,6 +37,17 @@ class _RideStartScreenState extends State<RideStartScreen> {
   static const Color _cardBackground = Color(0xFFFFFFF0);
   static const Color _accent = Color(0xFF10B47A);
   static const Color _navy = Color(0xFF02132A);
+
+  RideStartArgs? _args;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is RideStartArgs) {
+      _args = args;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -122,6 +154,12 @@ class _RideStartScreenState extends State<RideStartScreen> {
   }
 
   Widget _buildTripCard(BuildContext context) {
+    final pickupAddr = _args?.pickupAddress ?? 'Current Location';
+    final dropAddr = _args?.dropAddress ?? 'Destination';
+    final totalCost = _args?.totalCost ?? 0;
+    final distanceKm = _args?.distanceKm ?? 0;
+    final perKmRate = _args?.perKmRate ?? 0;
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 0),
@@ -168,17 +206,30 @@ class _RideStartScreenState extends State<RideStartScreen> {
               ),
               alignment: Alignment.center,
               child: RichText(
-                text: const TextSpan(
-                  style: TextStyle(
+                text: TextSpan(
+                  style: const TextStyle(
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
                   ),
                   children: [
-                    TextSpan(text: 'LKR ', style: TextStyle(color: _accent)),
-                    TextSpan(text: '1540.00', style: TextStyle(color: Color(0xFF02132A))),
+                    const TextSpan(text: 'LKR ', style: TextStyle(color: _accent)),
+                    TextSpan(
+                      text: totalCost.toStringAsFixed(2),
+                      style: const TextStyle(color: Color(0xFF02132A)),
+                    ),
                   ],
                 ),
               ),
+            ),
+            const SizedBox(height: 8),
+            // Per-km rate + distance info
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildInfoChip(Icons.straighten, '${distanceKm.toStringAsFixed(1)} km'),
+                const SizedBox(width: 10),
+                _buildInfoChip(Icons.speed, 'LKR ${perKmRate.toStringAsFixed(0)}/km'),
+              ],
             ),
             const SizedBox(height: 24),
             Row(
@@ -192,11 +243,11 @@ class _RideStartScreenState extends State<RideStartScreen> {
                   ],
                 ),
                 const SizedBox(width: 16),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'Current Location',
                         style: TextStyle(
                           fontSize: 19,
@@ -204,20 +255,20 @@ class _RideStartScreenState extends State<RideStartScreen> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       Text(
-                        '158/23, Danny Hettiarachchi\nMawatha',
-                        style: TextStyle(
+                        pickupAddr,
+                        style: const TextStyle(
                           fontSize: 43 / 2,
                           height: 1.2,
                           color: Color(0xFF101A2C),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      SizedBox(height: 16),
-                      Divider(color: Color(0xFFC8CAC1), thickness: 2),
-                      SizedBox(height: 16),
-                      Text(
+                      const SizedBox(height: 16),
+                      const Divider(color: Color(0xFFC8CAC1), thickness: 2),
+                      const SizedBox(height: 16),
+                      const Text(
                         'Destination',
                         style: TextStyle(
                           fontSize: 19,
@@ -225,10 +276,10 @@ class _RideStartScreenState extends State<RideStartScreen> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       Text(
-                        '57 Ramakrishna Rd, Colombo,\n00600',
-                        style: TextStyle(
+                        dropAddr,
+                        style: const TextStyle(
                           fontSize: 43 / 2,
                           height: 1.2,
                           color: Color(0xFF101A2C),
@@ -251,11 +302,26 @@ class _RideStartScreenState extends State<RideStartScreen> {
               ],
             ),
             const SizedBox(height: 24),
+            // Main action button
             SizedBox(
               width: double.infinity,
               height: 64,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+                  if (_args != null) {
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.activeRide,
+                      arguments: {
+                        'rideDetailId': _args!.rideDetailId,
+                        'pickupAddress': _args!.pickupAddress,
+                        'dropAddress': _args!.dropAddress,
+                        'totalDistance': _args!.distanceKm,
+                        'totalCost': _args!.totalCost,
+                      },
+                    );
+                  }
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _navy,
                   foregroundColor: Colors.white,
@@ -267,8 +333,64 @@ class _RideStartScreenState extends State<RideStartScreen> {
                 ),
               ),
             ),
+            // View cost split button
+            if (_args != null) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.costSplit,
+                      arguments: {
+                        'rideDetailId': _args!.rideDetailId,
+                        'isDriver': true,
+                      },
+                    );
+                  },
+                  icon: const Icon(Icons.pie_chart_outline),
+                  label: const Text(
+                    'View Cost Split',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _accent,
+                    side: const BorderSide(color: _accent),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24)),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoChip(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: _accent.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: _accent),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF02132A),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -300,11 +422,17 @@ class _RideMapPainter extends CustomPainter {
     final random = math.Random(7);
     for (var i = 0; i < 18; i++) {
       final y = (size.height / 18) * i + random.nextDouble() * 16;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y + random.nextDouble() * 28 - 14), minorRoad);
+      canvas.drawLine(
+          Offset(0, y),
+          Offset(size.width, y + random.nextDouble() * 28 - 14),
+          minorRoad);
     }
     for (var i = 0; i < 12; i++) {
       final x = (size.width / 12) * i + random.nextDouble() * 20;
-      canvas.drawLine(Offset(x, 0), Offset(x + random.nextDouble() * 30 - 15, size.height), minorRoad);
+      canvas.drawLine(
+          Offset(x, 0),
+          Offset(x + random.nextDouble() * 30 - 15, size.height),
+          minorRoad);
     }
 
     canvas.drawPath(
@@ -325,15 +453,19 @@ class _RideMapPainter extends CustomPainter {
     canvas.drawPath(
       Path()
         ..moveTo(size.width * 0.06, 0)
-        ..quadraticBezierTo(size.width * 0.2, size.height * 0.22, size.width * 0.14, size.height * 0.48)
-        ..quadraticBezierTo(size.width * 0.04, size.height * 0.78, size.width * 0.1, size.height),
+        ..quadraticBezierTo(
+            size.width * 0.2, size.height * 0.22, size.width * 0.14, size.height * 0.48)
+        ..quadraticBezierTo(
+            size.width * 0.04, size.height * 0.78, size.width * 0.1, size.height),
       water,
     );
     canvas.drawPath(
       Path()
         ..moveTo(size.width * 0.72, 0)
-        ..quadraticBezierTo(size.width * 0.62, size.height * 0.3, size.width * 0.7, size.height * 0.58)
-        ..quadraticBezierTo(size.width * 0.8, size.height * 0.8, size.width * 0.74, size.height),
+        ..quadraticBezierTo(
+            size.width * 0.62, size.height * 0.3, size.width * 0.7, size.height * 0.58)
+        ..quadraticBezierTo(
+            size.width * 0.8, size.height * 0.8, size.width * 0.74, size.height),
       water,
     );
 

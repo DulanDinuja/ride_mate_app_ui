@@ -2,16 +2,17 @@ import 'dart:convert';
 import 'dart:developer' as dev;
 
 import '../models/api_exception.dart';
+import '../models/cost_split_response.dart';
 import '../models/passenger_ride_confirm_request.dart';
-import '../models/passenger_ride_confirm_response.dart';
 import '../models/ride_detail_request.dart';
 import '../models/ride_price_calculation_response.dart';
 import 'api_client.dart';
 
 /// Handles all ride-related API calls (authenticated — token auto-attached).
 class RideService {
-  /// POST /ride-details/confirm — confirm a passenger ride.
-  static Future<PassengerRideConfirmResponse> confirmPassengerRide(
+  /// POST /ride-details/confirm — confirm a passenger joining a ride.
+  /// Returns the full cost-split breakdown after the passenger is added.
+  static Future<CostSplitResponse> confirmPassengerRide(
     PassengerRideConfirmRequest request,
   ) async {
     try {
@@ -21,12 +22,11 @@ class RideService {
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        return PassengerRideConfirmResponse.fromJson(
+        return CostSplitResponse.fromJson(
           jsonDecode(response.body) as Map<String, dynamic>,
         );
       } else {
         final error = jsonDecode(response.body);
-        // Handle ValidateRecordException from backend (field "message")
         if (error is Map) {
           final msg = error['message'] ?? error['errorMessage'];
           if (msg != null) {
@@ -94,6 +94,61 @@ class RideService {
           }
         }
         throw Exception('Failed to create ride');
+      }
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// GET /ride-details/{rideDetailId}/cost-split — get cost split breakdown.
+  static Future<CostSplitResponse> getCostSplit(int rideDetailId) async {
+    try {
+      final response = await ApiClient.get(
+        '/ride-details/$rideDetailId/cost-split',
+      );
+
+      if (response.statusCode == 200) {
+        return CostSplitResponse.fromJson(
+          jsonDecode(response.body) as Map<String, dynamic>,
+        );
+      } else {
+        final error = jsonDecode(response.body);
+        if (error is Map) {
+          final msg = error['message'] ?? error['errorMessage'];
+          if (msg != null) {
+            throw ApiException(msg.toString());
+          }
+        }
+        throw Exception('Failed to get cost split');
+      }
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// POST /ride-details/{rideDetailId}/cost-split/recalculate — recalculate cost split.
+  static Future<CostSplitResponse> recalculateCostSplit(
+      int rideDetailId) async {
+    try {
+      final response = await ApiClient.post(
+        '/ride-details/$rideDetailId/cost-split/recalculate',
+      );
+
+      if (response.statusCode == 200) {
+        return CostSplitResponse.fromJson(
+          jsonDecode(response.body) as Map<String, dynamic>,
+        );
+      } else {
+        final error = jsonDecode(response.body);
+        if (error is Map) {
+          final msg = error['message'] ?? error['errorMessage'];
+          if (msg != null) {
+            throw ApiException(msg.toString());
+          }
+        }
+        throw Exception('Failed to recalculate cost split');
       }
     } catch (e) {
       if (e is Exception) rethrow;

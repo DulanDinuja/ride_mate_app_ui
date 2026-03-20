@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../core/routes/app_routes.dart';
 import '../models/driver_profile.dart';
 import '../models/ride_detail_request.dart';
+import '../models/ride_price_calculation_response.dart';
 import '../models/user_profile.dart';
 import '../services/driver_service.dart';
 import '../services/ride_service.dart';
@@ -36,6 +38,8 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
   int driverAvailableSeats = 1;
   final TextEditingController driverNoteController = TextEditingController();
   bool showDriverProfileCard = false;
+  RidePriceCalculationResponse? ridePrice;
+  int? activeRideDetailId;
 
   /// Whether the current user has the DRIVER role.
   bool get isDriver => currentUserProfile?.role.toUpperCase() == 'DRIVER';
@@ -143,6 +147,8 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
       final rideId = result['id'] as int;
 
       if (!mounted) return;
+
+      setState(() => activeRideDetailId = rideId);
 
       // 3. Navigate to NavigationScreen
       Navigator.pushNamed(

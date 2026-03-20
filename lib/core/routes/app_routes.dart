@@ -18,6 +18,8 @@ import '../../screens/vehicle_insurance_upload_screen.dart';
 import '../../screens/revenue_license_upload_screen.dart';
 import '../../screens/ride_start_screen.dart';
 import '../../screens/navigation_screen.dart';
+import '../../screens/cost_split_screen.dart';
+import '../../screens/active_ride_screen.dart';
 import '../../models/user_verification_args.dart';
 import '../../models/driver_registration_data.dart';
 
@@ -44,6 +46,8 @@ class AppRoutes {
   static const String driverHomeMap = '/driver-home-map';
   static const String driverNavigation = '/driver-navigation';
   static const String navigation = '/navigation';
+  static const String costSplit = '/cost-split';
+  static const String activeRide = '/active-ride';
 
   // Generate routes
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -160,6 +164,33 @@ class AppRoutes {
         return MaterialPageRoute(
           builder: (_) => NavigationScreen(args: args),
         );
+
+      case costSplit:
+        final args = settings.arguments;
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => CostSplitScreen(
+              rideDetailId: args['rideDetailId'] as int?,
+              isDriver: args['isDriver'] as bool? ?? false,
+            ),
+          );
+        }
+        return _errorRoute('Cost split data is missing');
+
+      case activeRide:
+        final args = settings.arguments;
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => ActiveRideScreen(
+              rideDetailId: args['rideDetailId'] as int,
+              pickupAddress: args['pickupAddress'] as String? ?? '',
+              dropAddress: args['dropAddress'] as String? ?? '',
+              totalDistance: (args['totalDistance'] as num?)?.toDouble() ?? 0,
+              totalCost: (args['totalCost'] as num?)?.toDouble() ?? 0,
+            ),
+          );
+        }
+        return _errorRoute('Active ride data is missing');
 
       default:
         return _errorRoute('Route not found: ${settings.name}');
