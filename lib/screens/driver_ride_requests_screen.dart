@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/ride_request.dart';
 import '../services/ride_request_service.dart';
+import '../widgets/custom_back_button.dart';
 
 /// Screen where the driver sees incoming passenger ride requests
 /// and can accept or reject them.
@@ -127,6 +128,10 @@ class _DriverRideRequestsScreenState extends State<DriverRideRequestsScreen> {
     return Scaffold(
       backgroundColor: _cream,
       appBar: AppBar(
+        leading: const Padding(
+          padding: EdgeInsets.all(6),
+          child: CustomBackButton(),
+        ),
         title: const Text('Ride Requests'),
         backgroundColor: _navy,
         foregroundColor: Colors.white,
