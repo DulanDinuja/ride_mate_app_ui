@@ -29,6 +29,10 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
   String? get currentRouteDuration;
   List<LatLng> get currentPolylinePoints;
 
+  /// Called when backend says "already have an active ride" — host should
+  /// switch to the Active Rides tab.
+  void onActiveRideConflict();
+
   // ── driver state ─────────────────────────────────────────────────
   bool isDriverAvailable = false;
   bool _isOfferingRide = false;
@@ -64,7 +68,9 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
     try {
       final profile = await DriverService.getDriverProfileByUserId(userId);
       if (mounted) setState(() => driverProfile = profile);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[DriverMixin] fetchDriverProfile error: $e');
+    }
   }
 
   Future<void> checkDriverProfileStatus(String userId) async {
@@ -173,8 +179,15 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+
+      // If backend says driver already has an active ride, notify the host
+      if (msg.toLowerCase().contains('already have an active ride')) {
+        onActiveRideConflict();
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(e.toString().replaceFirst('Exception: ', '')),
+        content: Text(msg),
         backgroundColor: Colors.red.shade700,
       ));
     } finally {

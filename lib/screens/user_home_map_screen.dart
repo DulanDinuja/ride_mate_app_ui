@@ -63,6 +63,13 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   List<LatLng> get currentPolylinePoints =>
       _polylines.isNotEmpty ? _polylines.first.points : [];
 
+  @override
+  void onActiveRideConflict() {
+    // Switch to Active Rides tab and reload the ride data
+    setState(() => _selectedIndex = 2);
+    _loadActiveRide();
+  }
+
   // ── map / ride ──
   static const LatLng _defaultCenter = LatLng(6.9271, 79.8612);
 
@@ -111,6 +118,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   // ── active ride ──
   bool _isLoadingActiveRide = false;
   bool _isEndingRide = false;
+  bool _isCancellingRide = false;
   Map<String, dynamic>? _activeRideData;
 
   // ── search mode ──
@@ -892,8 +900,12 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
       // If user is a driver, fetch the driver profile for vehicle type info
       if (profile.role.toUpperCase() == 'DRIVER') {
         await fetchDriverProfile(userId);
-        // Load active ride for the driver
-        _loadActiveRide();
+        // Load active ride — driverProfile is now set
+        if (driverProfile != null) {
+          _loadActiveRide();
+        } else {
+          debugPrint('[UserHome] driverProfile still null after fetch — skipping active ride load');
+        }
       }
 
       // Check driver profile if user is willing to drive
@@ -917,19 +929,108 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   /// Load the driver's active ride from the backend.
   Future<void> _loadActiveRide() async {
     final dp = driverProfile;
-    if (dp == null) return;
+    if (dp == null && activeRideDetailId == null) {
+      debugPrint('[ActiveRide] No driver profile or rideId — skipping load');
+      return;
+    }
 
     setState(() => _isLoadingActiveRide = true);
     try {
-      final data = await RideService.getDriverActiveRide(dp.id);
-      if (!mounted) return;
-      setState(() {
-        _activeRideData = data;
-        if (data != null) {
-          activeRideDetailId = (data['id'] as num?)?.toInt();
+      // Primary method: Use the status-filtered endpoint
+      if (dp != null) {
+        try {
+          final rides = await RideService.getDriverRidesByStatus(dp.id, 'ACTIVE');
+          debugPrint('[ActiveRide] getDriverRidesByStatus returned ${rides.length} rides');
+          if (!mounted) return;
+          if (rides.isNotEmpty) {
+            final data = rides.first;
+            debugPrint('[ActiveRide] ride data: $data');
+            setState(() {
+              _activeRideData = data;
+              activeRideDetailId = (data['id'] as num?)?.toInt();
+              _isLoadingActiveRide = false;
+            });
+            return;
+          }
+        } catch (e) {
+          debugPrint('[ActiveRide] getDriverRidesByStatus error: $e');
+          // Endpoint might not exist — continue to fallback
         }
-        _isLoadingActiveRide = false;
-      });
+      }
+
+      // Fallback: Try the dedicated active-ride endpoint
+      if (dp != null) {
+        try {
+          final data = await RideService.getDriverActiveRide(dp.id);
+          debugPrint('[ActiveRide] getDriverActiveRide returned: $data');
+          if (!mounted) return;
+          if (data != null) {
+            setState(() {
+              _activeRideData = data;
+              activeRideDetailId = (data['id'] as num?)?.toInt();
+              _isLoadingActiveRide = false;
+            });
+            return;
+          }
+        } catch (e) {
+          debugPrint('[ActiveRide] getDriverActiveRide error: $e');
+          // Endpoint might not exist — continue
+        }
+      }
+
+      // Fallback: If we already know the rideId, load cost-split for details
+      if (activeRideDetailId != null) {
+        try {
+          final costSplit = await RideService.getCostSplit(activeRideDetailId!);
+          if (!mounted) return;
+          setState(() {
+            _activeRideData = {
+              'id': costSplit.rideDetailId,
+              'totalRideCost': costSplit.totalRideCost,
+              'totalRideDistance': costSplit.totalRideDistance,
+              'perKmRate': costSplit.perKmRate,
+              'startCity': costSplit.driverStartCity ?? _pickupAddress,
+              'endCity': _dropAddress,
+              'status': 'ACTIVE',
+              'availableSeats': driverAvailableSeats,
+              'tripRoute': '$_pickupAddress -> $_dropAddress',
+            };
+            _isLoadingActiveRide = false;
+          });
+          return;
+        } catch (_) {
+          // Cost split not available yet, continue
+        }
+      }
+
+      // If we have a local ride id but couldn't load details, show minimal card
+      if (activeRideDetailId != null) {
+        if (!mounted) return;
+        setState(() {
+          _activeRideData = {
+            'id': activeRideDetailId,
+            'totalRideCost': ridePrice?.totalRidePrice ?? 0.0,
+            'totalRideDistance': _routeDistanceKm ?? 0.0,
+            'perKmRate': ridePrice?.perKmRate ?? 0.0,
+            'startCity': _pickupAddress,
+            'endCity': _dropAddress,
+            'status': 'ACTIVE',
+            'availableSeats': driverAvailableSeats,
+            'tripRoute': '$_pickupAddress -> $_dropAddress',
+          };
+          _isLoadingActiveRide = false;
+        });
+        return;
+      }
+
+      // No active ride found
+      if (mounted) {
+        setState(() {
+          _activeRideData = null;
+          activeRideDetailId = null;
+          _isLoadingActiveRide = false;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _isLoadingActiveRide = false);
     }
@@ -980,6 +1081,60 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
     } catch (e) {
       if (!mounted) return;
       setState(() => _isEndingRide = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  /// Cancel the currently active ride.
+  Future<void> _cancelActiveRide() async {
+    final rideId = activeRideDetailId;
+    if (rideId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel This Ride?'),
+        content: const Text(
+          'This will cancel your active ride. You will be able to offer a new ride after cancellation.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No, Keep Ride'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes, Cancel Ride', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isCancellingRide = true);
+    try {
+      await RideService.cancelRide(rideId);
+      if (!mounted) return;
+      setState(() {
+        activeRideDetailId = null;
+        _activeRideData = null;
+        _isCancellingRide = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ride cancelled successfully! You can now offer a new ride.'),
+          backgroundColor: Color(0xFF03AF74),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isCancellingRide = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString().replaceFirst('Exception: ', '')),
@@ -1413,6 +1568,7 @@ Future<void> _onChangeProfilePhoto() async {
       final seats = (ride?['availableSeats'] as num?)?.toInt() ?? driverAvailableSeats;
       final status = ride?['status'] as String? ?? 'ACTIVE';
       final tripRoute = ride?['tripRoute'] as String? ?? '';
+      final startTime = ride?['startTime'] as String? ?? '';
 
       return RefreshIndicator(
         onRefresh: _loadActiveRide,
@@ -1562,6 +1718,19 @@ Future<void> _onChangeProfilePhoto() async {
                       ],
                     ),
                   ],
+                  if (startTime.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.access_time, size: 16, color: Colors.black38),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Started: ${_formatStartTime(startTime)}',
+                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1578,11 +1747,34 @@ Future<void> _onChangeProfilePhoto() async {
             ),
             const SizedBox(height: 16),
             // ── Action buttons ──
+            // Cancel Ride button
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: (_isCancellingRide || _isEndingRide) ? null : _cancelActiveRide,
+                icon: _isCancellingRide
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange))
+                    : const Icon(Icons.cancel_outlined),
+                label: Text(
+                  _isCancellingRide ? 'Cancelling...' : 'Cancel Ride',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.orange.shade700,
+                  side: BorderSide(color: Colors.orange.shade700),
+                  disabledForegroundColor: Colors.orange.shade300,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            // End Ride button
             SizedBox(
               width: double.infinity,
               height: 52,
               child: ElevatedButton.icon(
-                onPressed: _isEndingRide ? null : _endActiveRide,
+                onPressed: (_isEndingRide || _isCancellingRide) ? null : _endActiveRide,
                 icon: _isEndingRide
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.stop_circle_outlined),
@@ -1684,17 +1876,31 @@ Future<void> _onChangeProfilePhoto() async {
             ),
             if (isDriver) ...[
               const SizedBox(height: 20),
-              TextButton.icon(
-                onPressed: _loadActiveRide,
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Refresh'),
-                style: TextButton.styleFrom(foregroundColor: const Color(0xFF03AF74)),
-              ),
+              _isLoadingActiveRide
+                  ? const CircularProgressIndicator(color: Color(0xFF03AF74))
+                  : TextButton.icon(
+                      onPressed: _loadActiveRide,
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('Refresh'),
+                      style: TextButton.styleFrom(foregroundColor: const Color(0xFF03AF74)),
+                    ),
             ],
           ],
         ),
       ),
     );
+  }
+
+  String _formatStartTime(String isoTime) {
+    try {
+      final dt = DateTime.parse(isoTime);
+      final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+      final min = dt.minute.toString().padLeft(2, '0');
+      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} $hour:$min $ampm';
+    } catch (_) {
+      return isoTime;
+    }
   }
 
   Widget _buildStatCard(IconData icon, String value, String label) {
@@ -3093,6 +3299,9 @@ Future<void> _onChangeProfilePhoto() async {
             _mapController?.animateCamera(
               CameraUpdate.newLatLngZoom(_pickupLatLng!, 16),
             );
+          }
+          if (index == 2 && isDriver) {
+            _loadActiveRide();
           }
         },
         destinations: const [
