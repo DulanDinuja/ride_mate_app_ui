@@ -393,6 +393,9 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   }
 
   Future<void> _onMapTap(LatLng latLng) async {
+    // Ignore taps while search overlay is visible or a selection is being resolved
+    if (_isSearchMode || _isSearchingDrop) return;
+
     // If pickup is missing (location failed), let user set it by tapping the map
     if (_pickupLatLng == null) {
       final address = await _resolveAddress(latLng);
@@ -742,7 +745,9 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
     final description = prediction['description'] as String;
 
     final isPickup = _isPickupSearchMode;
-    _closeSearchMode();
+
+    // Do NOT close the search overlay yet — keep it as a touch barrier
+    // until coordinates are fully resolved, preventing stray map taps.
     setState(() => _isSearchingDrop = !isPickup);
 
     try {
@@ -783,6 +788,10 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
 
       if (!mounted) return;
 
+      // Close the search overlay NOW — coordinates are resolved,
+      // so _dropLatLng will be set in the same frame.
+      _closeSearchMode();
+
       if (isPickup) {
         setState(() {
           _pickupLatLng = latLng;
@@ -816,6 +825,8 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
       }
     } catch (e) {
       if (!mounted) return;
+      // Close the search overlay on error (it was kept open during resolution)
+      if (_isSearchMode) _closeSearchMode();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(e.toString().replaceFirst('Exception: ', '')),
         backgroundColor: Colors.red.shade700,
