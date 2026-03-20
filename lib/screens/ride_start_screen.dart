@@ -3,6 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../core/routes/app_routes.dart';
+import '../models/user_profile.dart';
+import '../services/token_service.dart';
+import '../services/user_service.dart';
+import 'navigation_screen.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 /// Arguments passed to this screen from the driver offer-ride flow.
 class RideStartArgs {
@@ -12,6 +17,12 @@ class RideStartArgs {
   final double totalCost;
   final double distanceKm;
   final double perKmRate;
+  final String? duration;
+  final double? pickupLat;
+  final double? pickupLng;
+  final double? dropLat;
+  final double? dropLng;
+  final List<LatLng>? polylinePoints;
 
   const RideStartArgs({
     required this.rideDetailId,
@@ -20,6 +31,12 @@ class RideStartArgs {
     required this.totalCost,
     required this.distanceKm,
     required this.perKmRate,
+    this.duration,
+    this.pickupLat,
+    this.pickupLng,
+    this.dropLat,
+    this.dropLng,
+    this.polylinePoints,
   });
 }
 
@@ -31,14 +48,22 @@ class RideStartScreen extends StatefulWidget {
 }
 
 class _RideStartScreenState extends State<RideStartScreen> {
-  bool _offerRideSelected = true;
+  bool _isDriverMode = true; // true = Offer Ride, false = Request Ride
   bool _showTripCard = true;
+  bool _isChangingRole = false;
 
   static const Color _cardBackground = Color(0xFFFFFFF0);
   static const Color _accent = Color(0xFF10B47A);
   static const Color _navy = Color(0xFF02132A);
 
   RideStartArgs? _args;
+  UserProfile? _userProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
 
   @override
   void didChangeDependencies() {
@@ -46,6 +71,88 @@ class _RideStartScreenState extends State<RideStartScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is RideStartArgs) {
       _args = args;
+    }
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final userId = await TokenService.getUserId();
+      if (userId == null) return;
+      final profile = await UserService.getUserProfileByUserId(userId);
+      if (!mounted) return;
+      setState(() {
+        _userProfile = profile;
+        _isDriverMode = profile.role.toUpperCase() == 'DRIVER';
+      });
+    } catch (_) {
+      // Profile load failed — keep defaults
+    }
+  }
+
+  Future<void> _onToggleRole(bool toDriver) async {
+    if (_isChangingRole) return;
+    if (_userProfile == null) return;
+
+    final currentIsDriver = _userProfile!.role.toUpperCase() == 'DRIVER';
+    if (toDriver == currentIsDriver) {
+      setState(() => _isDriverMode = toDriver);
+      return;
+    }
+
+    final userId = await TokenService.getUserId();
+    if (userId == null) return;
+    if (!mounted) return;
+
+    final newRole = toDriver ? 'DRIVER' : 'PASSENGER';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(toDriver ? 'Switch to Driver?' : 'Switch to Passenger?'),
+        content: Text(
+          toDriver
+              ? 'You will switch to Driver mode. You may need to complete your driver profile if not done.'
+              : 'Switch your role back to Passenger mode?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isChangingRole = true);
+    try {
+      await UserService.updateRole(userId, newRole);
+      // Reload profile
+      final profile = await UserService.getUserProfileByUserId(userId);
+      if (!mounted) return;
+      setState(() {
+        _userProfile = profile;
+        _isDriverMode = toDriver;
+      });
+
+      if (toDriver && _userProfile != null && !_userProfile!.isWillingToDrive) {
+        Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isChangingRole = false);
     }
   }
 
@@ -90,65 +197,92 @@ class _RideStartScreenState extends State<RideStartScreen> {
         color: _navy,
         borderRadius: BorderRadius.circular(40),
       ),
-      child: Row(
+      child: Stack(
         children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _offerRideSelected = true),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: _isChangingRole ? null : () => _onToggleRole(true),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _isDriverMode ? _accent : Colors.transparent,
+                      borderRadius: BorderRadius.circular(32),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      'Offer Ride',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w700,
+                        color: _isDriverMode ? Colors.white : const Color(0xFFFFFFF0),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: _isChangingRole ? null : () => _onToggleRole(false),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: !_isDriverMode ? _accent : Colors.transparent,
+                      borderRadius: BorderRadius.circular(32),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      'Request Ride',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w700,
+                        color: !_isDriverMode ? Colors.white : const Color(0xFFFFFFF0),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (_isChangingRole)
+            Positioned.fill(
               child: Container(
                 decoration: BoxDecoration(
-                  color: _offerRideSelected ? _accent : Colors.transparent,
+                  color: Colors.black26,
                   borderRadius: BorderRadius.circular(32),
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  'Offer Ride',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w700,
-                    color: _offerRideSelected ? Colors.white : const Color(0xFFFFFFF0),
+                child: const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Colors.white,
                   ),
                 ),
               ),
             ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _offerRideSelected = false),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: !_offerRideSelected ? _accent : Colors.transparent,
-                  borderRadius: BorderRadius.circular(32),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  'Request Ride',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w700,
-                    color: !_offerRideSelected ? Colors.white : const Color(0xFFFFFFF0),
-                  ),
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 
   Widget _buildMenuButton() {
-    return Container(
-      width: 78,
-      height: 78,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: _navy,
-      ),
-      child: const Icon(
-        Icons.menu_rounded,
-        color: Color(0xFFFFFFF0),
-        size: 40,
+    return GestureDetector(
+      onTap: () {
+        Navigator.pushNamed(context, AppRoutes.driverHomeMap);
+      },
+      child: Container(
+        width: 78,
+        height: 78,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: _navy,
+        ),
+        child: const Icon(
+          Icons.menu_rounded,
+          color: Color(0xFFFFFFF0),
+          size: 40,
+        ),
       ),
     );
   }
@@ -159,6 +293,7 @@ class _RideStartScreenState extends State<RideStartScreen> {
     final totalCost = _args?.totalCost ?? 0;
     final distanceKm = _args?.distanceKm ?? 0;
     final perKmRate = _args?.perKmRate ?? 0;
+    final duration = _args?.duration ?? '';
 
     return Container(
       width: double.infinity,
@@ -222,13 +357,17 @@ class _RideStartScreenState extends State<RideStartScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            // Per-km rate + distance info
+            // Per-km rate + distance + duration info
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _buildInfoChip(Icons.straighten, '${distanceKm.toStringAsFixed(1)} km'),
                 const SizedBox(width: 10),
                 _buildInfoChip(Icons.speed, 'LKR ${perKmRate.toStringAsFixed(0)}/km'),
+                if (duration.isNotEmpty) ...[
+                  const SizedBox(width: 10),
+                  _buildInfoChip(Icons.access_time_rounded, duration),
+                ],
               ],
             ),
             const SizedBox(height: 24),
@@ -302,24 +441,52 @@ class _RideStartScreenState extends State<RideStartScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            // Main action button
+            // Main action button — Start The Trip
             SizedBox(
               width: double.infinity,
               height: 64,
               child: ElevatedButton(
                 onPressed: () {
                   if (_args != null) {
-                    Navigator.pushNamed(
-                      context,
-                      AppRoutes.activeRide,
-                      arguments: {
-                        'rideDetailId': _args!.rideDetailId,
-                        'pickupAddress': _args!.pickupAddress,
-                        'dropAddress': _args!.dropAddress,
-                        'totalDistance': _args!.distanceKm,
-                        'totalCost': _args!.totalCost,
-                      },
-                    );
+                    // Navigate to navigation screen
+                    final pickupLat = _args!.pickupLat;
+                    final pickupLng = _args!.pickupLng;
+                    final dropLat = _args!.dropLat;
+                    final dropLng = _args!.dropLng;
+
+                    if (pickupLat != null &&
+                        pickupLng != null &&
+                        dropLat != null &&
+                        dropLng != null) {
+                      Navigator.pushNamed(
+                        context,
+                        AppRoutes.navigation,
+                        arguments: NavigationArgs(
+                          origin: LatLng(pickupLat, pickupLng),
+                          destination: LatLng(dropLat, dropLng),
+                          originAddress: _args!.pickupAddress,
+                          destAddress: _args!.dropAddress,
+                          polylinePoints: _args!.polylinePoints ?? [],
+                          distanceKm: _args!.distanceKm,
+                          duration: _args!.duration ?? '',
+                          rideId: _args!.rideDetailId,
+                          rideCost: _args!.totalCost,
+                        ),
+                      );
+                    } else {
+                      // Fallback: go to active ride screen
+                      Navigator.pushNamed(
+                        context,
+                        AppRoutes.activeRide,
+                        arguments: {
+                          'rideDetailId': _args!.rideDetailId,
+                          'pickupAddress': _args!.pickupAddress,
+                          'dropAddress': _args!.dropAddress,
+                          'totalDistance': _args!.distanceKm,
+                          'totalCost': _args!.totalCost,
+                        },
+                      );
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -346,7 +513,7 @@ class _RideStartScreenState extends State<RideStartScreen> {
                       AppRoutes.costSplit,
                       arguments: {
                         'rideDetailId': _args!.rideDetailId,
-                        'isDriver': true,
+                        'isDriver': _isDriverMode,
                       },
                     );
                   },
