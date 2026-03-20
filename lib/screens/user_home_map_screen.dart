@@ -1747,28 +1747,6 @@ Future<void> _onChangeProfilePhoto() async {
             ),
             const SizedBox(height: 16),
             // ── Action buttons ──
-            // Cancel Ride button
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: (_isCancellingRide || _isEndingRide) ? null : _cancelActiveRide,
-                icon: _isCancellingRide
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange))
-                    : const Icon(Icons.cancel_outlined),
-                label: Text(
-                  _isCancellingRide ? 'Cancelling...' : 'Cancel Ride',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.orange.shade700,
-                  side: BorderSide(color: Colors.orange.shade700),
-                  disabledForegroundColor: Colors.orange.shade300,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
             // End Ride button
             SizedBox(
               width: double.infinity,
