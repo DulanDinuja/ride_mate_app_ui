@@ -23,6 +23,15 @@ class HomeMapScreen extends StatefulWidget {
 
 class HomeMapScreenState extends State<HomeMapScreen> {
   static const LatLng _defaultCenter = LatLng(6.9271, 79.8612);
+
+  // Sri Lanka bounding box
+  static const LatLng _slSouthWest = LatLng(5.916, 79.521);
+  static const LatLng _slNorthEast = LatLng(9.836, 81.879);
+  static final LatLngBounds _sriLankaBounds = LatLngBounds(
+    southwest: _slSouthWest,
+    northeast: _slNorthEast,
+  );
+
   static const String _darkMapStyle = '''
 [
   {"elementType":"geometry","stylers":[{"color":"#1d1f24"}]},
@@ -178,6 +187,8 @@ class HomeMapScreenState extends State<HomeMapScreen> {
             myLocationEnabled: current != null,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
+            cameraTargetBounds: CameraTargetBounds(_sriLankaBounds),
+            minMaxZoomPreference: const MinMaxZoomPreference(7, 20),
           ),
           _buildLocationButton(),
           if (_isLocating) _buildStatusBanner('Getting your current location...'),
