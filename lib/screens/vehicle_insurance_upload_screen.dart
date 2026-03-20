@@ -197,6 +197,17 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
               padding: const EdgeInsets.fromLTRB(22, 24, 22, 28),
               child: Column(
                 children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                      color: const Color(0xFF111A2B),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   _buildStepper(),
                   const SizedBox(height: 44),
                   const Text(
