@@ -1245,9 +1245,21 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
       if (!mounted) return;
 
       if (newRole == 'DRIVER') {
-        // Check if driver registration is needed
-        if (_userProfile != null && !_userProfile!.isWillingToDrive) {
-          Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
+        // Check if driver is already registered by calling the driver profile API
+        try {
+          final driverProfile =
+              await DriverService.getDriverProfileByUserId(userId);
+          if (!driverProfile.isDriverProfileCompleted) {
+            // Driver profile exists but is not complete — go to registration
+            if (mounted) {
+              Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
+            }
+          }
+        } catch (_) {
+          // Driver profile not found — navigate to vehicle registration
+          if (mounted) {
+            Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
+          }
         }
       } else {
         // Reset driver-specific state

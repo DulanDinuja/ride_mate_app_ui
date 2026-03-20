@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../core/routes/app_routes.dart';
 import '../models/user_profile.dart';
+import '../services/driver_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import '../widgets/custom_back_button.dart';
@@ -187,8 +188,23 @@ class _RideStartScreenState extends State<RideStartScreen> {
         _isDriverMode = toDriver;
       });
 
-      if (toDriver && _userProfile != null && !_userProfile!.isWillingToDrive) {
-        Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
+      if (toDriver) {
+        // Check if driver is already registered by calling the driver profile API
+        try {
+          final driverProfile =
+              await DriverService.getDriverProfileByUserId(userId);
+          if (!driverProfile.isDriverProfileCompleted) {
+            // Driver profile exists but is not complete — go to registration
+            if (mounted) {
+              Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
+            }
+          }
+        } catch (_) {
+          // Driver profile not found — navigate to vehicle registration
+          if (mounted) {
+            Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
+          }
+        }
       }
     } catch (e) {
       if (!mounted) return;
