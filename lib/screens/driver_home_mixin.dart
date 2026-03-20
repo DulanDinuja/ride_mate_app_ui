@@ -134,6 +134,7 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
         endLocationLatitude: drop.latitude,
         endLocationLongitude: drop.longitude,
         startCity: currentPickupAddress,
+        endCity: currentDropAddress,
         availableSeats: driverAvailableSeats,
         startTime: startTime,
         totalRideDistance: distanceKm,
@@ -156,6 +157,7 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
         AppRoutes.rideStart,
         arguments: RideStartArgs(
           rideDetailId: rideId,
+          driverProfileId: driverProfile?.id,
           pickupAddress: currentPickupAddress,
           dropAddress: currentDropAddress,
           totalCost: priceResp.totalRidePrice ?? 0.0,
