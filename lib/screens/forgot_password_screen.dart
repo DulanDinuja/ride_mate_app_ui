@@ -146,6 +146,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
               ),
             ),
+            Positioned(
+              top: 48,
+              left: 20,
+              child: SafeArea(
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                ),
+              ),
+            ),
             Positioned.fill(
               top: 170,
               child: Container(
