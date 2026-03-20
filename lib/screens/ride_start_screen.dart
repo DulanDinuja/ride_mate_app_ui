@@ -1,11 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/routes/app_routes.dart';
 import '../models/user_profile.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
+import '../widgets/custom_back_button.dart';
 import 'navigation_screen.dart';
 import 'ride_requests_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -54,6 +56,7 @@ class _RideStartScreenState extends State<RideStartScreen> {
   bool _isDriverMode = true; // true = Offer Ride, false = Request Ride
   bool _showTripCard = true;
   bool _isChangingRole = false;
+  bool _tripStarted = false;
 
   static const Color _cardBackground = Color(0xFFFFFFF0);
   static const Color _accent = Color(0xFF10B47A);
@@ -61,6 +64,47 @@ class _RideStartScreenState extends State<RideStartScreen> {
 
   RideStartArgs? _args;
   UserProfile? _userProfile;
+
+  /// Opens Google Maps with directions from pickup to drop location.
+  Future<void> _openGoogleMaps() async {
+    if (_args == null) return;
+
+    final pickupLat = _args!.pickupLat;
+    final pickupLng = _args!.pickupLng;
+    final dropLat = _args!.dropLat;
+    final dropLng = _args!.dropLng;
+
+    if (pickupLat == null || pickupLng == null || dropLat == null || dropLng == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location coordinates are not available.')),
+        );
+      }
+      return;
+    }
+
+    // Try native Google Maps app first, fall back to web
+    final googleMapsUrl = Uri.parse(
+      'comgooglemaps://?saddr=$pickupLat,$pickupLng&daddr=$dropLat,$dropLng&directionsmode=driving',
+    );
+    final webUrl = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&origin=$pickupLat,$pickupLng&destination=$dropLat,$dropLng&travelmode=driving',
+    );
+
+    try {
+      if (await canLaunchUrl(googleMapsUrl)) {
+        await launchUrl(googleMapsUrl);
+      } else {
+        await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open Google Maps: $e')),
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -173,11 +217,19 @@ class _RideStartScreenState extends State<RideStartScreen> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(child: _buildRideModeSwitcher()),
-                  const SizedBox(width: 12),
-                  _buildMenuButton(),
+                  const CustomBackButton(),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: _buildRideModeSwitcher()),
+                      const SizedBox(width: 12),
+                      _buildMenuButton(),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -444,66 +496,53 @@ class _RideStartScreenState extends State<RideStartScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            // Main action button — Start The Trip
-            SizedBox(
-              width: double.infinity,
-              height: 64,
-              child: ElevatedButton(
-                onPressed: () {
-                  if (_args != null) {
-                    // Navigate to navigation screen
-                    final pickupLat = _args!.pickupLat;
-                    final pickupLng = _args!.pickupLng;
-                    final dropLat = _args!.dropLat;
-                    final dropLng = _args!.dropLng;
-
-                    if (pickupLat != null &&
-                        pickupLng != null &&
-                        dropLat != null &&
-                        dropLng != null) {
-                      Navigator.pushNamed(
-                        context,
-                        AppRoutes.navigation,
-                        arguments: NavigationArgs(
-                          origin: LatLng(pickupLat, pickupLng),
-                          destination: LatLng(dropLat, dropLng),
-                          originAddress: _args!.pickupAddress,
-                          destAddress: _args!.dropAddress,
-                          polylinePoints: _args!.polylinePoints ?? [],
-                          distanceKm: _args!.distanceKm,
-                          duration: _args!.duration ?? '',
-                          rideId: _args!.rideDetailId,
-                          rideCost: _args!.totalCost,
-                        ),
-                      );
-                    } else {
-                      // Fallback: go to active ride screen
-                      Navigator.pushNamed(
-                        context,
-                        AppRoutes.activeRide,
-                        arguments: {
-                          'rideDetailId': _args!.rideDetailId,
-                          'driverProfileId': _args!.driverProfileId,
-                          'pickupAddress': _args!.pickupAddress,
-                          'dropAddress': _args!.dropAddress,
-                          'totalDistance': _args!.distanceKm,
-                          'totalCost': _args!.totalCost,
-                        },
-                      );
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _navy,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            // Main action button — Start The Trip / Open with Google Map
+            if (!_tripStarted)
+              SizedBox(
+                width: double.infinity,
+                height: 64,
+                child: ElevatedButton(
+                  onPressed: () {
+                    setState(() => _tripStarted = true);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _navy,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  ),
+                  child: const Text(
+                    'Start The Trip',
+                    style: TextStyle(fontSize: 42 / 2, fontWeight: FontWeight.w700),
+                  ),
                 ),
-                child: const Text(
-                  'Start The Trip',
-                  style: TextStyle(fontSize: 42 / 2, fontWeight: FontWeight.w700),
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                height: 64,
+                child: ElevatedButton.icon(
+                  onPressed: _openGoogleMaps,
+                  icon: Image.asset(
+                    'assets/images/google_maps_icon.png',
+                    width: 28,
+                    height: 28,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.map_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                  label: const Text(
+                    'Open with Google Map',
+                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1A73E8),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  ),
                 ),
               ),
-            ),
             // View cost split button
             if (_args != null) ...[
               const SizedBox(height: 12),
