@@ -10,6 +10,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 
 import '../services/api_client.dart';
+import '../widgets/custom_back_button.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // NavigationArgs — shared by driver & passenger
@@ -512,18 +513,8 @@ class _NavigationScreenState extends State<NavigationScreen>
       ),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
-              ),
-              child: const Icon(Icons.arrow_back_ios_new_rounded,
-                  color: Colors.white, size: 16),
-            ),
+          CustomBackButton(
+            onPressed: () => Navigator.pop(context),
           ),
           const SizedBox(width: 12),
           if (_loadingSteps)
