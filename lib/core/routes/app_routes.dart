@@ -17,6 +17,7 @@ import '../../screens/driving_license_upload_screen.dart';
 import '../../screens/vehicle_insurance_upload_screen.dart';
 import '../../screens/revenue_license_upload_screen.dart';
 import '../../screens/ride_start_screen.dart';
+import '../../screens/ride_requests_screen.dart';
 import '../../screens/navigation_screen.dart';
 import '../../screens/cost_split_screen.dart';
 import '../../screens/active_ride_screen.dart';
@@ -48,6 +49,7 @@ class AppRoutes {
   static const String navigation = '/navigation';
   static const String costSplit = '/cost-split';
   static const String activeRide = '/active-ride';
+  static const String rideRequests = '/ride-requests';
 
   // Generate routes
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -195,6 +197,12 @@ class AppRoutes {
           );
         }
         return _errorRoute('Active ride data is missing');
+
+      case rideRequests:
+        return MaterialPageRoute(
+          builder: (_) => const RideRequestsScreen(),
+          settings: settings,
+        );
 
       default:
         return _errorRoute('Route not found: ${settings.name}');
