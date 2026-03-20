@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import '../core/routes/app_routes.dart';
 import '../models/user_verification_args.dart';
 import '../services/file_service.dart';
+import '../widgets/custom_back_button.dart';
 import 'selfie_camera_screen.dart';
 
 class UserVerificationScreen extends StatefulWidget {
@@ -131,13 +132,7 @@ class _UserVerificationScreenState extends State<UserVerificationScreen> {
         children: [
           Align(
             alignment: Alignment.centerLeft,
-            child: IconButton(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded),
-              color: _textPrimary,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
+            child: const CustomBackButton(),
           ),
           SizedBox(height: size.height * 0.01),
           const Text(
@@ -297,12 +292,8 @@ class _UserVerificationScreenState extends State<UserVerificationScreen> {
           // Back button
           Align(
             alignment: Alignment.centerLeft,
-            child: IconButton(
+            child: CustomBackButton(
               onPressed: () => setState(() => _capturedSelfie = null),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded),
-              color: _textPrimary,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
             ),
           ),
           SizedBox(height: size.height * 0.02),
