@@ -20,6 +20,7 @@ import '../services/file_service.dart';
 import '../services/ride_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
+import '../widgets/custom_back_button.dart';
 import 'available_rides_screen.dart';
 import 'driver_home_mixin.dart';
 
@@ -81,23 +82,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
     northeast: _slNorthEast,
   );
 
-  static const String _darkMapStyle = '''
-[
-  {"elementType":"geometry","stylers":[{"color":"#1d1f24"}]},
-  {"elementType":"labels.text.fill","stylers":[{"color":"#8a8f98"}]},
-  {"elementType":"labels.text.stroke","stylers":[{"color":"#1d1f24"}]},
-  {"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#3b3f47"}]},
-  {"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#6f7682"}]},
-  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#3a3f48"}]},
-  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#2a2e36"}]},
-  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#525861"}]},
-  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#5f6670"}]},
-  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#474e57"}]},
-  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2d3139"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#0f2a36"}]},
-  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#4d7a8d"}]}
-]
-''';
+  static const String _darkMapStyle = '[{"elementType":"geometry","stylers":[{"color":"#1d1f24"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#8a8f98"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#1d1f24"}]},{"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#3b3f47"}]},{"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#6f7682"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#3a3f48"}]},{"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#2a2e36"}]},{"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#525861"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#5f6670"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#474e57"}]},{"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2d3139"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#0f2a36"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#4d7a8d"}]}]';
 
   GoogleMapController? _mapController;
   LatLng? _pickupLatLng;
@@ -671,7 +656,9 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
       if (!mounted) return;
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
-        if (data['status'] == 'OK') {
+        final status = data['status'] as String? ?? 'UNKNOWN';
+        debugPrint('[Places] Google Autocomplete status: $status');
+        if (status == 'OK') {
           setState(() {
             _placePredictions = (data['predictions'] as List)
                 .map<Map<String, dynamic>>((p) => {
@@ -688,13 +675,82 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
             _isSearchingPlaces = false;
           });
           return; // Google succeeded — skip fallback
+        } else {
+          debugPrint('[Places] Google error_message: ${data['error_message'] ?? 'none'}');
         }
       }
     } catch (e) {
       debugPrint('[Places] Google Autocomplete error: $e');
     }
 
-    // ── Fallback: Photon API (autocomplete-friendly, CORS-safe, works on web) ──
+    // ── Fallback: Nominatim search (free, reliable, no API key needed) ──
+    try {
+      debugPrint('[Places] Trying Nominatim for "$input"');
+      final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/search'
+        '?q=${Uri.encodeComponent(input)}'
+        '&format=json'
+        '&addressdetails=1'
+        '&limit=8'
+        '&countrycodes=lk'
+        '&accept-language=en',
+      );
+      final headers = <String, String>{
+        'User-Agent': 'RideMateApp/1.0',
+        'Accept-Language': 'en',
+      };
+      final resp = await http.get(url, headers: headers);
+      if (!mounted) return;
+      if (resp.statusCode == 200) {
+        final results = json.decode(resp.body) as List;
+        debugPrint('[Places] Nominatim returned ${results.length} results');
+
+        if (results.isNotEmpty) {
+          setState(() {
+            _placePredictions = results.take(8).map<Map<String, dynamic>>((r) {
+              final addr = r['address'] as Map<String, dynamic>? ?? {};
+              final displayName = r['display_name'] as String? ?? '';
+              final lat = double.tryParse(r['lat']?.toString() ?? '') ?? 0.0;
+              final lon = double.tryParse(r['lon']?.toString() ?? '') ?? 0.0;
+
+              // Build main text (short name)
+              final mainText = addr['road'] ??
+                  addr['suburb'] ??
+                  addr['neighbourhood'] ??
+                  addr['city'] ??
+                  addr['town'] ??
+                  addr['village'] ??
+                  displayName.split(',').first.trim();
+
+              // Build secondary text
+              final secondaryParts = <String>[];
+              for (final key in ['suburb', 'city', 'town', 'state_district', 'state']) {
+                final val = addr[key] as String?;
+                if (val != null && val.isNotEmpty && val != mainText) {
+                  secondaryParts.add(val);
+                }
+              }
+
+              return {
+                'place_id': '',
+                'description': displayName,
+                'main_text': mainText as String,
+                'secondary_text': secondaryParts.take(2).join(', '),
+                'source': 'nominatim',
+                'lat': lat,
+                'lon': lon,
+              };
+            }).toList();
+            _isSearchingPlaces = false;
+          });
+          return; // Nominatim succeeded — skip Photon
+        }
+      }
+    } catch (e) {
+      debugPrint('[Places] Nominatim search error: $e');
+    }
+
+    // ── Fallback 2: Photon API ──
     try {
       debugPrint('[Places] Trying Photon for "$input"');
       final loc = _pickupLatLng ?? _defaultCenter;
@@ -1943,7 +1999,6 @@ Future<void> _onChangeProfilePhoto() async {
           GoogleMap(
             onMapCreated: (c) {
               _mapController = c;
-              c.setMapStyle(_darkMapStyle).catchError((_) {});
               if (_pickupLatLng != null) {
                 Future.delayed(const Duration(milliseconds: 300), () {
                   if (mounted && _pickupLatLng != null) {
@@ -1952,6 +2007,7 @@ Future<void> _onChangeProfilePhoto() async {
                 });
               }
             },
+            style: _darkMapStyle,
             onTap: _onMapTap,
             initialCameraPosition: CameraPosition(
               target: _pickupLatLng ?? _defaultCenter,
@@ -2488,11 +2544,8 @@ Future<void> _onChangeProfilePhoto() async {
                       // ── Header row ──
                       Row(
                         children: [
-                          IconButton(
-                            icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                                color: Colors.white, size: 20),
+                          CustomBackButton(
                             onPressed: _closeSearchMode,
-                            splashRadius: 22,
                           ),
                           Expanded(
                             child: Text(
