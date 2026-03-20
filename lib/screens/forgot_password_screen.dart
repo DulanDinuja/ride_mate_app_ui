@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/custom_back_button.dart';
 import '../services/auth_service.dart';
 import '../services/token_service.dart';
 import '../models/send_verification_code_request.dart';
@@ -150,10 +151,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               top: 48,
               left: 20,
               child: SafeArea(
-                child: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-                ),
+                child: const CustomBackButton(),
               ),
             ),
             Positioned.fill(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../widgets/custom_back_button.dart';
 import '../widgets/custom_button.dart';
 import '../services/auth_service.dart';
 import '../models/send_verification_code_request.dart';
@@ -191,13 +192,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                         children: [
                           Align(
                             alignment: Alignment.centerLeft,
-                            child: IconButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                              color: const Color(0xFF040F1B),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
+                            child: const CustomBackButton(),
                           ),
                           const SizedBox(height: 8),
                           const Text(
