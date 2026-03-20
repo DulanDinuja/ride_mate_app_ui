@@ -186,6 +186,7 @@ class AppRoutes {
           return MaterialPageRoute(
             builder: (_) => ActiveRideScreen(
               rideDetailId: args['rideDetailId'] as int,
+              driverProfileId: args['driverProfileId'] as int?,
               pickupAddress: args['pickupAddress'] as String? ?? '',
               dropAddress: args['dropAddress'] as String? ?? '',
               totalDistance: (args['totalDistance'] as num?)?.toDouble() ?? 0,
