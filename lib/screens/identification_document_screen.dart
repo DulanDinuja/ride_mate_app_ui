@@ -8,6 +8,7 @@ import '../models/user_verification_args.dart';
 import '../services/file_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
+import '../widgets/custom_back_button.dart';
 import 'selfie_camera_screen.dart';
 
 class IdentificationDocumentScreen extends StatefulWidget {
@@ -202,13 +203,7 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
                 children: [
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                      color: _textPrimary,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
+                    child: const CustomBackButton(),
                   ),
                   const SizedBox(height: 10),
                   const Text(
@@ -331,12 +326,8 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
                 children: [
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: IconButton(
+                    child: CustomBackButton(
                       onPressed: () => setState(() => _capturedDocument = null),
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                      color: _textPrimary,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -488,12 +479,8 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
                 children: [
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: IconButton(
+                    child: CustomBackButton(
                       onPressed: () => setState(() => _capturedRearDocument = null),
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                      color: _textPrimary,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
                     ),
                   ),
                   const SizedBox(height: 10),
