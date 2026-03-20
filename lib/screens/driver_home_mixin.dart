@@ -141,6 +141,7 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
         tripRoute: tripRoute,
         status: 'ACTIVE',
         totalRideCost: priceResp.totalRidePrice ?? 0.0,
+        perKmRate: priceResp.perKmRate,
       );
 
       final result = await RideService.createRideDetail(request);
