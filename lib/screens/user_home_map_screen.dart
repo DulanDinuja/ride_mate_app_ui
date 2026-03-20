@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geocoding/geocoding.dart';
@@ -157,9 +158,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
 
       final address = await _resolveAddress(latLng);
       if (!mounted) return;
-      if (address != _coordString(latLng)) {
-        setState(() => _pickupAddress = address);
-      }
+      setState(() => _pickupAddress = address);
     } catch (e) {
       if (!mounted) return;
       setState(() => _locationError = e.toString().replaceFirst('Exception: ', ''));
@@ -176,58 +175,40 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
 
   Future<String> _resolveAddress(LatLng latLng) async {
     // ── Method 1: Native platform geocoder (free, no API key needed) ──
-    try {
-      final placemarks = await placemarkFromCoordinates(
-        latLng.latitude,
-        latLng.longitude,
-      );
-      if (placemarks.isNotEmpty) {
-        final address = _buildShortAddress(placemarks.first);
-        if (address.isNotEmpty) {
-          debugPrint('[Geocoding] Native resolved: $address');
-          return address;
-        }
-      }
-    } catch (e) {
-      debugPrint('[Geocoding] Native geocoder failed: $e');
-    }
-
-    // ── Method 2: Google Geocoding REST API ──
-    try {
-      final url = Uri.parse(
-        'https://maps.googleapis.com/maps/api/geocode/json'
-        '?latlng=${latLng.latitude},${latLng.longitude}'
-        '&key=$_gMapsKey',
-      );
-      final resp = await http.get(url);
-      if (resp.statusCode == 200) {
-        final data = json.decode(resp.body);
-        final status = data['status'] as String?;
-        debugPrint('[Geocoding] Google API status: $status');
-        if (status == 'OK') {
-          final results = data['results'] as List?;
-          if (results != null && results.isNotEmpty) {
-            final shortName = _extractShortName(results);
-            if (shortName != null && shortName.isNotEmpty) return shortName;
-            return results[0]['formatted_address'] as String;
+    // Skip on web — the native geocoder is unreliable in browsers.
+    if (!kIsWeb) {
+      try {
+        final placemarks = await placemarkFromCoordinates(
+          latLng.latitude,
+          latLng.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          final address = _buildShortAddress(placemarks.first);
+          if (address.isNotEmpty) {
+            debugPrint('[Geocoding] Native resolved: $address');
+            return address;
           }
         }
+      } catch (e) {
+        debugPrint('[Geocoding] Native geocoder failed: $e');
       }
-    } catch (e) {
-      debugPrint('[Geocoding] Google API failed: $e');
     }
 
-    // ── Method 3: OpenStreetMap Nominatim (free, no API key, works everywhere) ──
+    // ── Method 2: OpenStreetMap Nominatim (free, CORS-friendly, works on web) ──
     try {
       final nominatimUrl = Uri.parse(
         'https://nominatim.openstreetmap.org/reverse'
         '?lat=${latLng.latitude}&lon=${latLng.longitude}'
         '&format=json&zoom=16&addressdetails=1',
       );
-      final resp = await http.get(nominatimUrl, headers: {
-        'User-Agent': 'RideMateApp/1.0',
-        'Accept-Language': 'en',
-      });
+      // On web, browsers forbid setting User-Agent; omit custom headers.
+      final headers = kIsWeb
+          ? <String, String>{'Accept-Language': 'en'}
+          : <String, String>{
+              'User-Agent': 'RideMateApp/1.0',
+              'Accept-Language': 'en',
+            };
+      final resp = await http.get(nominatimUrl, headers: headers);
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
         final addr = data['address'] as Map<String, dynamic>?;
@@ -250,6 +231,31 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
       }
     } catch (e) {
       debugPrint('[Geocoding] Nominatim failed: $e');
+    }
+
+    // ── Method 3: Google Geocoding REST API ──
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/geocode/json'
+        '?latlng=${latLng.latitude},${latLng.longitude}'
+        '&key=$_gMapsKey',
+      );
+      final resp = await http.get(url);
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        final status = data['status'] as String?;
+        debugPrint('[Geocoding] Google API status: $status');
+        if (status == 'OK') {
+          final results = data['results'] as List?;
+          if (results != null && results.isNotEmpty) {
+            final shortName = _extractShortName(results);
+            if (shortName != null && shortName.isNotEmpty) return shortName;
+            return results[0]['formatted_address'] as String;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[Geocoding] Google API failed: $e');
     }
 
     // ── Last resort: raw coordinates ──
@@ -2824,7 +2830,6 @@ class _PassengerConfirmSheetState extends State<_PassengerConfirmSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
     return Container(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
