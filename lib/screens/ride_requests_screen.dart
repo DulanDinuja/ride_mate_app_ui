@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import '../services/ride_service.dart';
 import '../services/user_service.dart';
+import '../widgets/custom_back_button.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // RideRequestsArgs
@@ -263,19 +264,7 @@ class _RideRequestsScreenState extends State<RideRequestsScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: Row(
                     children: [
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _navy.withOpacity(0.8),
-                          ),
-                          child: const Icon(Icons.arrow_back_ios_new,
-                              color: Colors.white, size: 18),
-                        ),
-                      ),
+                      const CustomBackButton(),
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
