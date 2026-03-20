@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/custom_back_button.dart';
 import '../core/routes/app_routes.dart';
 import '../models/identification_type.dart';
 import '../models/user_verification_args.dart';
@@ -49,6 +50,13 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
             height: size.height,
             child: CustomPaint(
               painter: _MapHeaderPainter(),
+            ),
+          ),
+          // Back button
+          const SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(left: 16, top: 12),
+              child: CustomBackButton(),
             ),
           ),
           Align(
