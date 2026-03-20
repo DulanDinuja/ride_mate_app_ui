@@ -4,13 +4,16 @@ import 'package:flutter/material.dart';
 
 import '../models/cost_split_response.dart';
 import '../services/ride_service.dart';
+import '../services/ride_request_service.dart';
 import 'cost_split_screen.dart';
+import 'driver_ride_requests_screen.dart';
 
 /// Active ride screen for drivers.
 /// Shows the currently active ride, its passengers, and real-time cost split.
 /// The driver can view the full cost breakdown, and the screen auto-refreshes.
 class ActiveRideScreen extends StatefulWidget {
   final int rideDetailId;
+  final int? driverProfileId;
   final String pickupAddress;
   final String dropAddress;
   final double totalDistance;
@@ -19,6 +22,7 @@ class ActiveRideScreen extends StatefulWidget {
   const ActiveRideScreen({
     super.key,
     required this.rideDetailId,
+    this.driverProfileId,
     required this.pickupAddress,
     required this.dropAddress,
     required this.totalDistance,
@@ -38,15 +42,20 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
   bool _isLoading = true;
   String? _error;
   Timer? _refreshTimer;
+  int _pendingRequestCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadCostSplit();
+    _loadPendingRequests();
     // Auto-refresh every 15 seconds to pick up new passengers
     _refreshTimer = Timer.periodic(
       const Duration(seconds: 15),
-      (_) => _loadCostSplit(),
+      (_) {
+        _loadCostSplit();
+        _loadPendingRequests();
+      },
     );
   }
 
@@ -74,6 +83,35 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
         });
       }
     }
+  }
+
+  Future<void> _loadPendingRequests() async {
+    if (widget.driverProfileId == null) return;
+    try {
+      final requests = await RideRequestService.getDriverPendingRequests(
+          widget.driverProfileId!);
+      if (mounted) {
+        setState(() => _pendingRequestCount = requests.length);
+      }
+    } catch (_) {
+      // silently ignore — badge simply won't update
+    }
+  }
+
+  void _openRideRequests() {
+    if (widget.driverProfileId == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DriverRideRequestsScreen(
+          driverProfileId: widget.driverProfileId!,
+          rideDetailId: widget.rideDetailId,
+        ),
+      ),
+    ).then((_) {
+      _loadPendingRequests();
+      _loadCostSplit();
+    });
   }
 
   void _openFullBreakdown() {
@@ -125,6 +163,38 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
         // ── Passengers ──
         _buildPassengersSection(),
         const SizedBox(height: 16),
+
+        // ── View ride requests button (with pending count badge) ──
+        if (widget.driverProfileId != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _openRideRequests,
+                icon: Badge(
+                  isLabelVisible: _pendingRequestCount > 0,
+                  label: Text('$_pendingRequestCount'),
+                  backgroundColor: Colors.red,
+                  child: const Icon(Icons.person_add_alt_1),
+                ),
+                label: Text(
+                  _pendingRequestCount > 0
+                      ? 'Ride Requests ($_pendingRequestCount pending)'
+                      : 'Ride Requests',
+                  style: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _accent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
+          ),
 
         // ── View full breakdown button ──
         SizedBox(
