@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../core/routes/app_routes.dart';
 import '../models/driver_registration_data.dart';
+import '../widgets/custom_back_button.dart';
 import 'selfie_camera_screen.dart';
 
 class VehiclePhotosUploadScreen extends StatefulWidget {
@@ -220,11 +221,7 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
                 Positioned(
                   top: 16,
                   left: 12,
-                  child: IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                    color: _textPrimary,
-                  ),
+                  child: const CustomBackButton(),
                 ),
               ],
             ),
