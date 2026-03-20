@@ -193,180 +193,182 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
               color: _panelBackground,
               borderRadius: BorderRadius.circular(48),
             ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(22, 24, 22, 28),
-              child: Column(
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                      color: const Color(0xFF111A2B),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildStepper(),
-                  const SizedBox(height: 44),
-                  const Text(
-                    'Vehicle Insurance',
-                    style: TextStyle(
-                      fontSize: 21,
-                      fontWeight: FontWeight.w700,
-                      color: _textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Please take clear photographs\nof following',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 18,
-                      height: 1.35,
-                      color: _textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  _buildPhotoCard(_InsuranceSide.front),
-                  const SizedBox(height: 16),
-                  _buildPhotoCard(_InsuranceSide.back),
-                  const SizedBox(height: 30),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Insurance Number',
-                      style: TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w500,
-                        color: _textPrimary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _insuranceNumberController,
-                    style: const TextStyle(fontSize: 17, color: _textPrimary),
-                    decoration: InputDecoration(
-                      hintText: 'e.g. INS-12345',
-                      hintStyle: const TextStyle(color: Color(0xFF9AA0AA)),
-                      filled: true,
-                      fillColor: const Color(0xFFE9E9DC),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: _accent, width: 1.5),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Insurance Provider',
-                      style: TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w500,
-                        color: _textPrimary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _insuranceProviderController,
-                    style: const TextStyle(fontSize: 17, color: _textPrimary),
-                    decoration: InputDecoration(
-                      hintText: 'e.g. Sri Lanka Insurance',
-                      hintStyle: const TextStyle(color: Color(0xFF9AA0AA)),
-                      filled: true,
-                      fillColor: const Color(0xFFE9E9DC),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: _accent, width: 1.5),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Insurance Expiry Date',
-                      style: TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w500,
-                        color: _textPrimary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: _pickInsuranceExpiry,
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE9E9DC),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _insuranceExpiryDate == null
-                                ? 'Select expiry date'
-                                : '${_insuranceExpiryDate!.year}-${_insuranceExpiryDate!.month.toString().padLeft(2, '0')}-${_insuranceExpiryDate!.day.toString().padLeft(2, '0')}',
-                            style: TextStyle(
-                              fontSize: 17,
-                              color: _insuranceExpiryDate == null ? const Color(0xFF9AA0AA) : _textPrimary,
-                            ),
-                          ),
-                          const Icon(Icons.calendar_today_rounded, color: Color(0xFFB5B6B8), size: 20),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 44),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 58,
-                    child: ElevatedButton(
-                      onPressed: _onNextPressed,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _buttonDark,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(22),
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(22, 72, 22, 28),
+                  child: Column(
+                    children: [
+                      _buildStepper(),
+                      const SizedBox(height: 44),
+                      const Text(
+                        'Vehicle Insurance',
+                        style: TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w700,
+                          color: _textPrimary,
                         ),
                       ),
-                      child: const Text(
-                        'Next',
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Please take clear photographs\nof following',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.w500,
+                          height: 1.35,
+                          color: _textSecondary,
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 30),
+                      _buildPhotoCard(_InsuranceSide.front),
+                      const SizedBox(height: 16),
+                      _buildPhotoCard(_InsuranceSide.back),
+                      const SizedBox(height: 30),
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Insurance Number',
+                          style: TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w500,
+                            color: _textPrimary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _insuranceNumberController,
+                        style: const TextStyle(fontSize: 17, color: _textPrimary),
+                        decoration: InputDecoration(
+                          hintText: 'e.g. INS-12345',
+                          hintStyle: const TextStyle(color: Color(0xFF9AA0AA)),
+                          filled: true,
+                          fillColor: const Color(0xFFE9E9DC),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: const BorderSide(color: _accent, width: 1.5),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Insurance Provider',
+                          style: TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w500,
+                            color: _textPrimary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _insuranceProviderController,
+                        style: const TextStyle(fontSize: 17, color: _textPrimary),
+                        decoration: InputDecoration(
+                          hintText: 'e.g. Sri Lanka Insurance',
+                          hintStyle: const TextStyle(color: Color(0xFF9AA0AA)),
+                          filled: true,
+                          fillColor: const Color(0xFFE9E9DC),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: const BorderSide(color: _accent, width: 1.5),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Insurance Expiry Date',
+                          style: TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w500,
+                            color: _textPrimary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      GestureDetector(
+                        onTap: _pickInsuranceExpiry,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE9E9DC),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                _insuranceExpiryDate == null
+                                    ? 'Select expiry date'
+                                    : '${_insuranceExpiryDate!.year}-${_insuranceExpiryDate!.month.toString().padLeft(2, '0')}-${_insuranceExpiryDate!.day.toString().padLeft(2, '0')}',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  color: _insuranceExpiryDate == null ? const Color(0xFF9AA0AA) : _textPrimary,
+                                ),
+                              ),
+                              const Icon(Icons.calendar_today_rounded, color: Color(0xFFB5B6B8), size: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 44),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 58,
+                        child: ElevatedButton(
+                          onPressed: _onNextPressed,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _buttonDark,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(22),
+                            ),
+                          ),
+                          child: const Text(
+                            'Next',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                Positioned(
+                  top: 16,
+                  left: 12,
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                    color: _textPrimary,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
