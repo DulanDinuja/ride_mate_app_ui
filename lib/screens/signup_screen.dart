@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/custom_back_button.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
 import '../services/auth_service.dart';
@@ -160,6 +161,17 @@ class _SignupScreenState extends State<SignupScreen> {
                   Color(0xFF020D19),
                 ],
                 stops: [0.0, 0.5, 1.0],
+              ),
+            ),
+          ),
+
+          // Back Button
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 16, top: 12),
+              child: const Align(
+                alignment: Alignment.topLeft,
+                child: CustomBackButton(),
               ),
             ),
           ),
