@@ -1,0 +1,64 @@
+workflows:
+  # ──────────────────────────────────────────────────────────
+  #  Production – Android APK / AAB
+  # ──────────────────────────────────────────────────────────
+  android-production:
+    name: Android Production Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: stable
+      groups:
+        - production   # ← Codemagic env-var group (see below)
+
+    scripts:
+      - name: Install dependencies
+        script: flutter pub get
+
+      - name: Build APK (Production)
+        script: |
+          flutter build apk --release \
+            --dart-define=ENV=prod \
+            --dart-define=BASE_URL=$BASE_URL
+
+      - name: Build AAB (Production)
+        script: |
+          flutter build appbundle --release \
+            --dart-define=ENV=prod \
+            --dart-define=BASE_URL=$BASE_URL
+
+    artifacts:
+      - build/**/outputs/**/*.apk
+      - build/**/outputs/**/*.aab
+
+  # ──────────────────────────────────────────────────────────
+  #  Production – iOS
+  # ──────────────────────────────────────────────────────────
+  ios-production:
+    name: iOS Production Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: stable
+      groups:
+        - production   # ← same group
+
+    scripts:
+      - name: Install dependencies
+        script: flutter pub get
+
+      - name: Install CocoaPods
+        script: |
+          cd ios && pod install
+
+      - name: Build iOS (Production)
+        script: |
+          flutter build ios --release --no-codesign \
+            --dart-define=ENV=prod \
+            --dart-define=BASE_URL=$BASE_URL
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+

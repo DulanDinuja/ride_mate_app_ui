@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../core/config/app_config.dart';
 import 'token_service.dart';
 
 /// Base HTTP client used by all service classes.
@@ -14,10 +15,11 @@ import 'token_service.dart';
 ///
 /// • [publicPost] — unauthenticated request (no token attached).
 class ApiClient {
-  static const String baseUrl = 'http://localhost:8080/ride-mate';
-  // Android emulator  → http://10.0.2.2:8080/ride-mate
-  // iOS simulator     → http://localhost:8080/ride-mate
-  // Physical device   → http://YOUR_IP:8080/ride-mate
+  /// Base URL is resolved from [AppConfig] which reads `--dart-define` values.
+  ///
+  /// Local  (default): `http://localhost:8080/ride-mate`
+  /// Prod   (Codemagic): set via `BASE_URL` environment variable.
+  static String get baseUrl => AppConfig.baseUrl;
 
   // ─── Headers ──────────────────────────────────────────────────────
 
