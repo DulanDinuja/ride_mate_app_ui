@@ -56,7 +56,6 @@ class _NavigationScreenState extends State<NavigationScreen>
   static const String _gMapsKey = 'AIzaSyAaIKIFaESxfhuchdlrRRQh7r6y9UhU9Uo';
   static const Color _green = Color(0xFF03AF74);
   static const Color _navy = Color(0xFF040F1B);
-  static const Color _primaryGreen = Color(0xFF169F7E);
 
   static const String _darkMapStyle = '''
 [
@@ -84,18 +83,10 @@ class _NavigationScreenState extends State<NavigationScreen>
   List<LatLng> _remainingPolyline = [];
   List<LatLng> _travelledPolyline = [];
 
-  // ── live HUD state ──────────────────────────────────────────────
-  double _remainingDistanceKm = 0.0;
-  String _remainingDuration = '';
-  double _currentSpeedKmh = 0.0;
-
   // ── navigation steps ────────────────────────────────────────────
   List<_NavStep> _steps = [];
   int _currentStepIndex = 0;
   bool _loadingSteps = true;
-
-  // ── ride confirmation ────────────────────────────────────────────
-  bool _rideConfirmed = false;
 
   // ── arrival ─────────────────────────────────────────────────────
   bool _hasArrived = false;
@@ -104,8 +95,7 @@ class _NavigationScreenState extends State<NavigationScreen>
   // ── driver marker icon ──────────────────────────────────────────
   BitmapDescriptor? _driverIcon;
 
-  // ── camera follow toggle ────────────────────────────────────────
-  bool _followDriver = true;
+
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // LIFECYCLE
@@ -116,12 +106,11 @@ class _NavigationScreenState extends State<NavigationScreen>
     super.initState();
     _fullPolylinePoints = List<LatLng>.from(widget.args.polylinePoints);
     _remainingPolyline = List<LatLng>.from(_fullPolylinePoints);
-    _remainingDistanceKm = widget.args.distanceKm;
-    _remainingDuration = widget.args.duration;
     _driverLatLng = widget.args.origin;
 
     _createDriverIcon();
     _fetchSteps();
+    _startLocationStream();
   }
 
   @override
@@ -142,21 +131,7 @@ class _NavigationScreenState extends State<NavigationScreen>
         distanceFilter: 5,
       ),
     ).listen(_onLocationUpdate);
-    // Transition camera to nav view
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted && _driverLatLng != null && _followDriver) {
-        _mapController?.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: _driverLatLng!,
-              zoom: 18.5,
-              bearing: _bearing,
-              tilt: 60,
-            ),
-          ),
-        );
-      }
-    });
+
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -179,10 +154,7 @@ class _NavigationScreenState extends State<NavigationScreen>
       );
     }
 
-    // b) Speed (m/s → km/h)
-    final speedKmh = (position.speed > 0 ? position.speed : 0.0) * 3.6;
-
-    // c) Trim polyline — find closest point and split
+    // b) Trim polyline — find closest point and split
     final closestIdx = _findClosestPolylineIndex(latLng, _remainingPolyline);
     final travelled = <LatLng>[
       ..._travelledPolyline,
@@ -192,39 +164,26 @@ class _NavigationScreenState extends State<NavigationScreen>
         ? [latLng, ..._remainingPolyline.sublist(closestIdx)]
         : [latLng];
 
-    // d) Recalculate remaining distance
-    final remDist = _computePolylineDistance(remaining);
-
-    // e) Estimate remaining duration
-    final avgSpeed = speedKmh > 5 ? speedKmh : 30.0;
-    final etaMinutes = (remDist / avgSpeed) * 60;
-    final etaStr = _formatDuration(etaMinutes);
-
     if (!mounted) return;
     setState(() {
       _previousLatLng = _driverLatLng;
       _driverLatLng = latLng;
       _bearing = newBearing;
-      _currentSpeedKmh = speedKmh;
       _travelledPolyline = travelled;
       _remainingPolyline = remaining;
-      _remainingDistanceKm = remDist;
-      _remainingDuration = etaStr;
     });
 
-    // f) Animate camera to follow driver (Google Maps nav style)
-    if (_followDriver) {
-      _mapController?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: latLng,
-            zoom: 18.5,
-            bearing: newBearing,
-            tilt: 60,
-          ),
+    // f) Animate camera to follow driver
+    _mapController?.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: latLng,
+          zoom: 18.5,
+          bearing: newBearing,
+          tilt: 60,
         ),
-      );
-    }
+      ),
+    );
 
     // g) Update navigation step
     _updateCurrentStep(latLng);
@@ -313,27 +272,6 @@ class _NavigationScreenState extends State<NavigationScreen>
       }
     }
     return closest;
-  }
-
-  double _computePolylineDistance(List<LatLng> points) {
-    double total = 0;
-    for (int i = 0; i < points.length - 1; i++) {
-      total += Geolocator.distanceBetween(
-        points[i].latitude,
-        points[i].longitude,
-        points[i + 1].latitude,
-        points[i + 1].longitude,
-      );
-    }
-    return total / 1000.0;
-  }
-
-  String _formatDuration(double minutes) {
-    if (minutes < 1) return '< 1 min';
-    if (minutes < 60) return '${minutes.round()} min';
-    final h = (minutes / 60).floor();
-    final m = (minutes % 60).round();
-    return m > 0 ? '$h h $m min' : '$h h';
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -523,8 +461,6 @@ class _NavigationScreenState extends State<NavigationScreen>
               Future.delayed(const Duration(milliseconds: 400), () {
                 c.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
               });
-              // Transition to nav view only after ride is confirmed
-              // (triggered manually in _buildConfirmRidePanel)
             },
             initialCameraPosition: CameraPosition(
               target: widget.args.origin,
@@ -540,299 +476,13 @@ class _NavigationScreenState extends State<NavigationScreen>
             polylines: polylines,
           ),
 
-          if (!_rideConfirmed) ...[  
-            // ── Confirm & Start Ride panel ──
-            _buildConfirmRidePanel(),
-          ] else ...[
-            // ── Top instruction + bottom HUD ──
-            SafeArea(
-              child: Column(
-                children: [
-                  _buildInstructionBanner(),
-                  const Spacer(),
-                  _buildLiveHudPanel(),
-                ],
-              ),
-            ),
-            // ── Re-center button ──
-            Positioned(
-              right: 16,
-              bottom: 230,
-              child: _buildRecenterButton(),
-            ),
-            // ── Arrived overlay ──
-            if (_hasArrived) _buildArrivedOverlay(),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // CONFIRM RIDE PANEL
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  Widget _buildConfirmRidePanel() {
-    return Positioned.fill(
-      child: Column(
-        children: [
-          // Back button top-left
+          // ── Top instruction banner ──
           SafeArea(
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: _navy.withOpacity(0.9),
-                      shape: BoxShape.circle,
-                      boxShadow: const [
-                        BoxShadow(color: Color(0x44000000), blurRadius: 8),
-                      ],
-                    ),
-                    child: const Icon(Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white, size: 16),
-                  ),
-                ),
-              ),
-            ),
+            child: _buildInstructionBanner(),
           ),
-          const Spacer(),
-          // Bottom details card
-          Container(
-            margin: const EdgeInsets.fromLTRB(14, 0, 14, 24),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: _navy,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: const [
-                BoxShadow(
-                    color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 8)),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: _green.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.directions_car_rounded,
-                          color: _green, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Ride Summary',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: _green.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: _green.withOpacity(0.4)),
-                      ),
-                      child: Text(
-                        'Ride #${widget.args.rideId}',
-                        style: const TextStyle(
-                          color: _green,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                // Route info
-                _buildRouteRow(
-                  icon: Icons.my_location_rounded,
-                  iconColor: _green,
-                  label: 'Pickup',
-                  value: widget.args.originAddress,
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 19),
-                  child: Column(
-                    children: List.generate(
-                      3,
-                      (_) => Container(
-                        width: 2,
-                        height: 6,
-                        margin: const EdgeInsets.symmetric(vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(1),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                _buildRouteRow(
-                  icon: Icons.location_on_rounded,
-                  iconColor: const Color(0xFFFF6B35),
-                  label: 'Drop',
-                  value: widget.args.destAddress,
-                ),
-                const SizedBox(height: 16),
-                // Stats row
-                Row(
-                  children: [
-                    _buildStatChip(
-                      Icons.route_rounded,
-                      '${widget.args.distanceKm.toStringAsFixed(1)} km',
-                      'Distance',
-                      _green,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildStatChip(
-                      Icons.access_time_rounded,
-                      widget.args.duration,
-                      'Duration',
-                      const Color(0xFFFF6B35),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildStatChip(
-                      Icons.payments_rounded,
-                      'Rs. ${widget.args.rideCost.toStringAsFixed(2)}',
-                      'Cost',
-                      const Color(0xFFFFD700),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Confirm button
-                SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() => _rideConfirmed = true);
-                      _startLocationStream();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _green,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16)),
-                      elevation: 0,
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.navigation_rounded,
-                            color: Colors.white, size: 20),
-                        SizedBox(width: 10),
-                        Text(
-                          'Confirm & Start Ride',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // ── Arrived overlay ──
+          if (_hasArrived) _buildArrivedOverlay(),
         ],
-      ),
-    );
-  }
-
-  Widget _buildRouteRow({
-    required IconData icon,
-    required Color iconColor,
-    required String label,
-    required String value,
-  }) {
-    return Row(
-      children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: iconColor, size: 18),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                    color: Colors.white.withOpacity(0.4),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatChip(
-      IconData icon, String value, String label, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(height: 4),
-            Text(value,
-                style: TextStyle(
-                    color: color,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800)),
-            const SizedBox(height: 2),
-            Text(label,
-                style: TextStyle(
-                    color: color.withOpacity(0.6),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600)),
-          ],
-        ),
       ),
     );
   }
@@ -930,271 +580,6 @@ class _NavigationScreenState extends State<NavigationScreen>
               ),
             ),
         ],
-      ),
-    );
-  }
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 6. LIVE HUD — bottom info panel
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  Widget _buildLiveHudPanel() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _navy.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x55000000),
-            blurRadius: 16,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // ── Live stats row ──
-          Row(
-            children: [
-              _buildLiveStatCard(
-                icon: Icons.route_rounded,
-                value: _remainingDistanceKm < 1
-                    ? '${(_remainingDistanceKm * 1000).round()} m'
-                    : '${_remainingDistanceKm.toStringAsFixed(1)} km',
-                label: 'Distance',
-                color: _green,
-              ),
-              const SizedBox(width: 8),
-              _buildLiveStatCard(
-                icon: Icons.access_time_filled_rounded,
-                value: _remainingDuration,
-                label: 'ETA',
-                color: const Color(0xFFFF6B35),
-              ),
-              const SizedBox(width: 8),
-              _buildLiveStatCard(
-                icon: Icons.speed_rounded,
-                value: '${_currentSpeedKmh.round()}',
-                label: 'km/h',
-                color: _primaryGreen,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // ── Destination row ──
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: Colors.redAccent.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.location_on_rounded,
-                      color: Colors.redAccent, size: 18),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Destination',
-                        style: TextStyle(
-                          color: Colors.white38,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        widget.args.destAddress,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: _green.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _green.withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _green,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Text(
-                        'Live',
-                        style: TextStyle(
-                          color: _green,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── Step chips ──
-          if (_steps.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 36,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _steps.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
-                itemBuilder: (_, i) {
-                  final active = i == _currentStepIndex;
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: active
-                          ? _green.withOpacity(0.2)
-                          : Colors.white.withOpacity(0.06),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: active
-                            ? _green.withOpacity(0.5)
-                            : Colors.transparent,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _maneuverIcon(_steps[i].maneuver),
-                          color: active ? _green : Colors.white54,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _steps[i].distance,
-                          style: TextStyle(
-                            color: active ? _green : Colors.white54,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLiveStatCard({
-    required IconData icon,
-    required String value,
-    required String label,
-    required Color color,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.15)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                color: color,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                color: color.withOpacity(0.6),
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Re-center button ──
-  Widget _buildRecenterButton() {
-    return GestureDetector(
-      onTap: () {
-        setState(() => _followDriver = true);
-        if (_driverLatLng != null) {
-          _mapController?.animateCamera(
-            CameraUpdate.newCameraPosition(
-              CameraPosition(
-                target: _driverLatLng!,
-                zoom: 18.5,
-                bearing: _bearing,
-                tilt: 60,
-              ),
-            ),
-          );
-        }
-      },
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: _navy.withOpacity(0.9),
-          shape: BoxShape.circle,
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x44000000),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: const Icon(Icons.my_location_rounded, color: _green, size: 22),
       ),
     );
   }
