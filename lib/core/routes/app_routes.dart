@@ -150,7 +150,10 @@ class AppRoutes {
         );
 
       case rideStart:
-        return MaterialPageRoute(builder: (_) => const RideStartScreen());
+        return MaterialPageRoute(
+          builder: (_) => const RideStartScreen(),
+          settings: settings,
+        );
 
       case driverHomeMap:
         return MaterialPageRoute(builder: (_) => const UserHomeMapScreen());
