@@ -2640,11 +2640,9 @@ Future<void> _onChangeProfilePhoto() async {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      // Pickup row – tappable to search when location failed
+                      // Pickup row – always tappable to change pickup location
                       GestureDetector(
-                        onTap: (_locationError != null || _pickupLatLng == null && !_isLocating)
-                            ? () => _openSearchMode(forPickup: true)
-                            : null,
+                        onTap: () => _openSearchMode(forPickup: true),
                         child: _buildLocationRow(
                           icon: Icons.my_location,
                           iconColor: const Color(0xFF03AF74),
