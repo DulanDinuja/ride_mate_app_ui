@@ -160,6 +160,18 @@ class _VehicleInsuranceUploadScreenState extends State<VehicleInsuranceUploadScr
       return;
     }
 
+    // Validate insurance expiry date is in the future
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final expiryDate = DateTime(_insuranceExpiryDate!.year, _insuranceExpiryDate!.month, _insuranceExpiryDate!.day);
+    
+    if (expiryDate.isBefore(today) || expiryDate.isAtSameMomentAs(today)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Insurance expiry date must be a future date')),
+      );
+      return;
+    }
+
     final data = ModalRoute.of(context)!.settings.arguments as DriverRegistrationData;
     data.insuranceNumber = _insuranceNumberController.text.trim();
     data.insuranceProvider = _insuranceProviderController.text.trim();

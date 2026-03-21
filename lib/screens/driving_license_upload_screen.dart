@@ -151,6 +151,18 @@ class _DrivingLicenseUploadScreenState extends State<DrivingLicenseUploadScreen>
       return;
     }
 
+    // Validate license expiry date is in the future
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final expiryDate = DateTime(_licenseExpiryDate!.year, _licenseExpiryDate!.month, _licenseExpiryDate!.day);
+    
+    if (expiryDate.isBefore(today) || expiryDate.isAtSameMomentAs(today)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('License expiry date must be a future date')),
+      );
+      return;
+    }
+
     final data = ModalRoute.of(context)!.settings.arguments as DriverRegistrationData;
     data.driverLicenseNumber = _licenseNumberController.text.trim();
     data.driverLicenseExpiry = '${_licenseExpiryDate!.year}-${_licenseExpiryDate!.month.toString().padLeft(2, '0')}-${_licenseExpiryDate!.day.toString().padLeft(2, '0')}';

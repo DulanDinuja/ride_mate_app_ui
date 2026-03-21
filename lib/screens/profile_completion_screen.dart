@@ -593,6 +593,15 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       return;
     }
 
+    // Validate date of birth is not in the future
+    final now = DateTime.now();
+    if (_selectedDateOfBirth!.isAfter(now)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Date of birth cannot be in the future!!')),
+      );
+      return;
+    }
+
     if (_selectedGender == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select your gender')),

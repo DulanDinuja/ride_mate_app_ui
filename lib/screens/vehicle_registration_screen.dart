@@ -199,6 +199,16 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
       );
       return;
     }
+    
+    // Validate year of manufacture is not in the future
+    final currentYear = DateTime.now().year;
+    if (_selectedYear > currentYear) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid vehicle manufacture year!!!')),
+      );
+      return;
+    }
+    
     if (_registrationController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter registration number')),
