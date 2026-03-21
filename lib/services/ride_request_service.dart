@@ -14,8 +14,7 @@ class RideRequestService {
   //  03 — Passenger: Discover rides
   // ─────────────────────────────────────────────────────────────────
 
-  /// GET /shared-ride/available — get ML-ranked available rides.
-  /// Matches Postman step 03 "Get Available Rides (ML-Ranked)".
+  /// GET /ride-requests/available-rides — get available rides filtered by route corridor.
   static Future<List<AvailableRide>> getAvailableRides({
     required double startLat,
     required double startLng,
@@ -29,14 +28,13 @@ class RideRequestService {
           '&startLng=$startLng'
           '&endLat=$endLat'
           '&endLng=$endLng'
-          '&passengerRideDistance=$passengerRideDistance'
-          '&radius=$radius';
+          '&radiusKm=$radius';
 
-      dev.log('[RideRequestService] GET /shared-ride/available?$query',
+      dev.log('[RideRequestService] GET /ride-requests/available-rides?$query',
           name: 'RideRequestService');
 
       final response =
-          await ApiClient.get('/shared-ride/available?$query');
+          await ApiClient.get('/ride-requests/available-rides?$query');
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
