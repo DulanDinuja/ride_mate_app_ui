@@ -388,80 +388,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           const SizedBox(height: 24),
 
-                          // Google Sign In Button
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: OutlinedButton(
-                              onPressed: () {
-                                // TODO: Implement Google sign in
-                              },
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Color(0xFF4A6063), width: 1.5),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.g_mobiledata,
-                                    size: 32,
-                                    color: Color(0xFF4A6063),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  const Text(
-                                    'Continue with Google',
-                                    style: TextStyle(
-                                      color: Color(0xFF040F1B),
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
+                          // Don't have an account text
+                          Center(
+                            child: Text(
+                              "Don't have an account?",
+                              style: TextStyle(
+                                color: Color(0xFF4A6063),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
 
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 16),
 
-                          // Sign Up Text
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text(
-                                "Don't have an account? ",
-                                style: TextStyle(
-                                  color: Color(0xFF4A6063),
-                                  fontSize: 14,
+                          // Sign Up Button
+                          CustomButton(
+                            text: 'Sign up',
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const SignupScreen(),
                                 ),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const SignupScreen(),
-                                    ),
-                                  );
-                                },
-                                style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  minimumSize: const Size(0, 0),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: const Text(
-                                  'Sign up',
-                                  style: TextStyle(
-                                    color: Color(0xFF040F1B),
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    decoration: TextDecoration.underline,
-                                  ),
-                                ),
-                              ),
-                            ],
+                              );
+                            },
+                            backgroundColor: const Color(0xFF040F1B),
                           ),
 
                           const SizedBox(height: 24),
