@@ -11,6 +11,8 @@ workflows:
       flutter: stable
       groups:
         - production   # ← Codemagic env-var group (see below)
+      android_signing:
+        - ride_mate_keystore  # ← keystore uploaded in Codemagic Code Signing
 
     scripts:
       - name: Install dependencies
