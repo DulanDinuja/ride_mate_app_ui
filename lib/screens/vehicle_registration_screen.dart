@@ -224,25 +224,19 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _screenBackground,
+      backgroundColor: _panelBackground,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              color: _panelBackground,
-              borderRadius: BorderRadius.circular(48),
-            ),
-            child: Stack(
-              children: [
-                SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 72, 24, 28),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildStepper(),
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          child: Stack(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 72, 24, 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildStepper(),
                       const SizedBox(height: 38),
                       const Text(
                         'Choose your Vehicle',
@@ -428,15 +422,14 @@ class _VehicleRegistrationScreenState extends State<VehicleRegistrationScreen> {
                         ),
                       ),
                     ],
-                  ),
                 ),
-                Positioned(
-                  top: 16,
-                  left: 12,
-                  child: const CustomBackButton(),
-                ),
-              ],
-            ),
+              ),
+              Positioned(
+                top: 16,
+                left: 12,
+                child: const CustomBackButton(),
+              ),
+            ],
           ),
         ),
       ),

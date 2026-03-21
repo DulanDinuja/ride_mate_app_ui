@@ -109,23 +109,16 @@ class _IdentificationDocumentScreenState extends State<IdentificationDocumentScr
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _screenBackground,
+      backgroundColor: _panelBackground,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              color: _panelBackground,
-              borderRadius: BorderRadius.circular(48),
-            ),
-            child: _capturedDocument == null
-                ? _buildInstructionView(context)
-                : _capturedRearDocument == null
-                    ? _buildPreviewView(context)
-                    : _buildFinalCapturePreviewView(context),
-          ),
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          child: _capturedDocument == null
+              ? _buildInstructionView(context)
+              : _capturedRearDocument == null
+                  ? _buildPreviewView(context)
+                  : _buildFinalCapturePreviewView(context),
         ),
       ),
     );
