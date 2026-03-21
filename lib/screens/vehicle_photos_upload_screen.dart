@@ -140,24 +140,18 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _screenBackground,
+      backgroundColor: _panelBackground,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              color: _panelBackground,
-              borderRadius: BorderRadius.circular(48),
-            ),
-            child: Stack(
-              children: [
-                SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(22, 72, 22, 28),
-                  child: Column(
-                    children: [
-                      _buildStepper(),
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          child: Stack(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(22, 72, 22, 28),
+                child: Column(
+                  children: [
+                    _buildStepper(),
                       const SizedBox(height: 44),
                       const Text(
                         'Vehicle Photos',
@@ -216,15 +210,14 @@ class _VehiclePhotosUploadScreenState extends State<VehiclePhotosUploadScreen> {
                         ),
                       ),
                     ],
-                  ),
                 ),
-                Positioned(
-                  top: 16,
-                  left: 12,
-                  child: const CustomBackButton(),
-                ),
-              ],
-            ),
+              ),
+              Positioned(
+                top: 16,
+                left: 12,
+                child: const CustomBackButton(),
+              ),
+            ],
           ),
         ),
       ),
