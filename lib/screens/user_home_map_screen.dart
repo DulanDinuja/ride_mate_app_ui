@@ -1647,6 +1647,12 @@ Future<void> _onChangeProfilePhoto() async {
                 onTap: _isUploadingPhoto ? null : _onChangeProfilePhoto,
               ),
               const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.directions_car_outlined),
+                title: const Text('Update/Add Vehicle Profile'),
+                onTap: () => Navigator.pushNamed(context, AppRoutes.manageVehicleProfiles),
+              ),
+              const Divider(height: 1),
             ],
           ),
         ),

@@ -21,6 +21,7 @@ import '../../screens/ride_requests_screen.dart';
 import '../../screens/navigation_screen.dart';
 import '../../screens/cost_split_screen.dart';
 import '../../screens/active_ride_screen.dart';
+import '../../screens/manage_vehicle_profiles_screen.dart';
 import '../../models/user_verification_args.dart';
 import '../../models/driver_registration_data.dart';
 import '../../models/user_profile.dart';
@@ -51,6 +52,7 @@ class AppRoutes {
   static const String costSplit = '/cost-split';
   static const String activeRide = '/active-ride';
   static const String rideRequests = '/ride-requests';
+  static const String manageVehicleProfiles = '/manage-vehicle-profiles';
 
   // Generate routes
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -207,6 +209,9 @@ class AppRoutes {
           builder: (_) => const RideRequestsScreen(),
           settings: settings,
         );
+
+      case manageVehicleProfiles:
+        return MaterialPageRoute(builder: (_) => const ManageVehicleProfilesScreen());
 
       default:
         return _errorRoute('Route not found: ${settings.name}');
