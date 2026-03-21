@@ -45,18 +45,13 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen>
       if (userId != null) {
         final profile = await UserService.getUserProfileByUserId(userId);
         if (!mounted) return;
-        if (profile.isProfileCompleted) {
-          // Both drivers and passengers use the same unified home screen
-          Navigator.pushReplacementNamed(context, AppRoutes.userHomeMap);
-        } else {
-          Navigator.pushReplacementNamed(context, AppRoutes.homeMap);
-        }
+        Navigator.pushReplacementNamed(context, AppRoutes.userHomeMap);
         return;
       }
     } catch (_) {}
     if (mounted) {
       setState(() => _isLoading = false);
-      Navigator.pushReplacementNamed(context, AppRoutes.homeMap);
+      Navigator.pushReplacementNamed(context, AppRoutes.userHomeMap);
     }
   }
 
