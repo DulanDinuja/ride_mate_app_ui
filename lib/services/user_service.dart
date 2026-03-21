@@ -65,6 +65,24 @@ class UserService {
     }
   }
 
+  /// PUT /user-profile/update/{id} — update existing user profile.
+  static Future<void> updateUserProfile(int profileId, Map<String, dynamic> data) async {
+    try {
+      final response = await ApiClient.put('/user-profile/update/$profileId', body: data);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) return;
+
+      final error = jsonDecode(response.body);
+      if (error.containsKey('errorMessage') && error['errorMessage'] != null) {
+        throw ApiException(error['errorMessage']);
+      }
+      throw Exception(error['message'] ?? 'Failed to update user profile');
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Network error: $e');
+    }
+  }
+
   /// POST /user-profile/create — create the user profile with personal & ID details.
   static Future<Map<String, dynamic>> createUserProfile(
       Map<String, dynamic> data) async {

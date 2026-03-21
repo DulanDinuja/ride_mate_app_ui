@@ -1,5 +1,6 @@
 class UserProfile {
   final int id;
+  final int? version;
   final int userId;
   final String firstName;
   final String lastName;
@@ -13,6 +14,11 @@ class UserProfile {
   final String preferredLanguage;
   final String userProfileCompleted;
   final String willingToDrive;
+  final int? identificationTypeId;
+  final String? identificationTypeName;
+  final String? identificationNumber;
+  final String? identificationFrontImageUrl;
+  final String? identificationBackImageUrl;
   final int? userVerificationImageDocumentId;
   final String? userVerificationImageUrl;
   final int? profileImageDocumentId;
@@ -21,6 +27,7 @@ class UserProfile {
 
   const UserProfile({
     required this.id,
+    this.version,
     required this.userId,
     required this.firstName,
     required this.lastName,
@@ -34,6 +41,11 @@ class UserProfile {
     required this.preferredLanguage,
     required this.userProfileCompleted,
     required this.willingToDrive,
+    this.identificationTypeId,
+    this.identificationTypeName,
+    this.identificationNumber,
+    this.identificationFrontImageUrl,
+    this.identificationBackImageUrl,
     this.userVerificationImageDocumentId,
     this.userVerificationImageUrl,
     this.profileImageDocumentId,
@@ -44,13 +56,10 @@ class UserProfile {
   bool get isProfileCompleted => userProfileCompleted == 'YES';
   bool get isWillingToDrive => willingToDrive == 'YES';
 
-  // bool get isProfileCompleted =>
-  //     userProfileCompleted == 'YES' ||
-  //         (dateOfBirth.trim().isNotEmpty && gender.trim().isNotEmpty);
-
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
       id: json['id'] as int,
+      version: json['version'] as int?,
       userId: json['userId'] as int,
       firstName: json['firstName'] as String,
       lastName: json['lastName'] as String,
@@ -59,17 +68,21 @@ class UserProfile {
       role: json['role'] as String,
       status: json['status'] as String,
       emailVerified: json['emailVerified'] as String,
-      dateOfBirth: json['dateOfBirth'] as String,
-      gender: json['gender'] as String,
-      preferredLanguage: json['preferredLanguage'] as String,
-      userProfileCompleted: json['userProfileCompleted'] as String,
+      dateOfBirth: (json['dateOfBirth'] as String?) ?? '',
+      gender: (json['gender'] as String?) ?? '',
+      preferredLanguage: (json['preferredLanguage'] as String?) ?? 'EN',
+      userProfileCompleted: (json['userProfileCompleted'] as String?) ?? 'NO',
       willingToDrive: (json['willingToDrive'] as String?) ?? 'NO',
-      userVerificationImageDocumentId:
-          json['userVerificationImageDocumentId'] as int?,
+      identificationTypeId: json['identificationTypeId'] as int?,
+      identificationTypeName: json['identificationTypeName'] as String?,
+      identificationNumber: json['identificationNumber'] as String?,
+      identificationFrontImageUrl: json['identificationFrontImageUrl'] as String?,
+      identificationBackImageUrl: json['identificationBackImageUrl'] as String?,
+      userVerificationImageDocumentId: json['userVerificationImageDocumentId'] as int?,
       userVerificationImageUrl: json['userVerificationImageUrl'] as String?,
       profileImageDocumentId: json['profileImageDocumentId'] as int?,
       profileImageUrl: json['profileImageUrl'] as String?,
-      createdDate: json['createdDate'] as String,
+      createdDate: (json['createdDate'] as String?) ?? '',
     );
   }
 }

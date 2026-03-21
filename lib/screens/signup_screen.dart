@@ -25,7 +25,6 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _agreedToTerms = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  String? _selectedRole;
   bool _isLoading = false;
 
   @override
@@ -50,13 +49,6 @@ class _SignupScreenState extends State<SignupScreen> {
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Passwords do not match')),
-      );
-      return;
-    }
-
-    if (_selectedRole == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a role')),
       );
       return;
     }
@@ -104,7 +96,7 @@ class _SignupScreenState extends State<SignupScreen> {
         email: _emailController.text.trim(),
         phoneNumber: _phoneController.text.trim(),
         password: _passwordController.text,
-        userRole: _selectedRole == 'Driver' ? UserRole.DRIVER : UserRole.PASSENGER,
+        userRole: UserRole.PASSENGER,
         firstName: _nameController.text.trim(),
         lastName: _lastNameController.text.trim(),
       );
@@ -368,40 +360,6 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
 
                           const SizedBox(height: 16),
-
-                          const Text(
-                            'I am a',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Color(0xFF4A5565),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: RadioListTile<String>(
-                                  title: const Text('Passenger'),
-                                  value: 'Passenger',
-                                  groupValue: _selectedRole,
-                                  onChanged: (value) => setState(() => _selectedRole = value),
-                                  activeColor: const Color(0xFF169F7E),
-                                ),
-                              ),
-                              Expanded(
-                                child: RadioListTile<String>(
-                                  title: const Text('Driver'),
-                                  value: 'Driver',
-                                  groupValue: _selectedRole,
-                                  onChanged: (value) => setState(() => _selectedRole = value),
-                                  activeColor: const Color(0xFF169F7E),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 24),
 
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,

@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import '../widgets/custom_back_button.dart';
 import '../core/routes/app_routes.dart';
 import '../models/identification_type.dart';
+import '../models/user_profile.dart';
 import '../models/user_verification_args.dart';
 import '../services/identification_type_service.dart';
+import '../services/user_service.dart';
 
 class ProfileCompletionScreen extends StatefulWidget {
-  const ProfileCompletionScreen({super.key});
+  final UserProfile? existingProfile;
+  const ProfileCompletionScreen({super.key, this.existingProfile});
 
   @override
   State<ProfileCompletionScreen> createState() => _ProfileCompletionScreenState();
@@ -18,17 +21,44 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   List<IdentificationType> _documentTypes = const [];
   final List<String> _genders = const ['Male', 'Female', 'Other'];
 
-  bool _willingToDrive = true;
+  bool _willingToDrive = false;
   int? _selectedDocumentTypeId;
   String? _selectedDocumentTypeName;
   String? _selectedGender;
   DateTime? _selectedDateOfBirth;
   bool _isLoadingDocumentTypes = true;
+  bool _isUpdating = false;
 
   @override
   void initState() {
     super.initState();
+    _prefillFromProfile();
     _loadDocumentTypes();
+  }
+
+  void _prefillFromProfile() {
+    final p = widget.existingProfile;
+    if (p == null) {
+      _willingToDrive = true;
+      return;
+    }
+
+    _willingToDrive = p.willingToDrive == 'YES';
+
+    final genderMap = {'MALE': 'Male', 'FEMALE': 'Female', 'OTHER': 'Other'};
+    _selectedGender = genderMap[p.gender.toUpperCase()];
+
+    if (p.dateOfBirth.isNotEmpty) {
+      _selectedDateOfBirth = DateTime.tryParse(p.dateOfBirth);
+    }
+
+    if (p.identificationNumber != null && p.identificationNumber!.isNotEmpty) {
+      _idNumberController.text = p.identificationNumber!;
+    }
+
+    if (p.identificationTypeId != null) {
+      _selectedDocumentTypeId = p.identificationTypeId;
+    }
   }
 
   @override
@@ -256,7 +286,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                             child: SizedBox(
                               height: 66,
                               child: ElevatedButton(
-                                onPressed: _onNextPressed,
+                                onPressed: _isUpdating ? null : _onNextPressed,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF10B47A),
                                   foregroundColor: Colors.white,
@@ -264,10 +294,19 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                                     borderRadius: BorderRadius.circular(22),
                                   ),
                                 ),
-                                child: const Text(
-                                  'Next',
-                                  style: TextStyle(fontSize: 40 / 2),
-                                ),
+                                child: _isUpdating
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        ),
+                                      )
+                                    : Text(
+                                        widget.existingProfile != null ? 'Update' : 'Next',
+                                        style: const TextStyle(fontSize: 40 / 2),
+                                      ),
                               ),
                             ),
                           ),
@@ -481,16 +520,25 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       setState(() {
         _documentTypes = types;
         _isLoadingDocumentTypes = false;
-        if (types.isNotEmpty) {
+
+        if (_selectedDocumentTypeId != null) {
+          // Match pre-selected id from profile
+          final match = types.where((t) => t.id == _selectedDocumentTypeId).firstOrNull;
+          if (match != null) {
+            _selectedDocumentTypeName = match.name;
+          } else if (types.isNotEmpty) {
+            // id not found in list, fall back to first
+            _selectedDocumentTypeId = types.first.id;
+            _selectedDocumentTypeName = types.first.name;
+          }
+        } else if (types.isNotEmpty) {
           _selectedDocumentTypeId = types.first.id;
           _selectedDocumentTypeName = types.first.name;
         }
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _isLoadingDocumentTypes = false;
-      });
+      setState(() => _isLoadingDocumentTypes = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to load document types: $e'),
@@ -556,6 +604,11 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     final dateOfBirthStr =
         '${dob.year}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
 
+    if (widget.existingProfile != null) {
+      _updateProfile(dateOfBirthStr);
+      return;
+    }
+
     Navigator.pushNamed(
       context,
       AppRoutes.userVerification,
@@ -568,6 +621,45 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
         dateOfBirth: dateOfBirthStr,
       ),
     );
+  }
+
+  Future<void> _updateProfile(String dateOfBirthStr) async {
+    setState(() => _isUpdating = true);
+    try {
+      final p = widget.existingProfile!;
+      await UserService.updateUserProfile(p.id, {
+        'version': p.version,
+        'dateOfBirth': dateOfBirthStr,
+        'gender': _selectedGender!.toUpperCase(),
+        'willingToDrive': _willingToDrive ? 'YES' : 'NO',
+        'userIdentificationDetails': {
+          'identificationTypeId': _selectedDocumentTypeId,
+          'identificationNumber': _idNumberController.text.trim(),
+          'status': 'ACTIVE',
+          'userId': p.userId,
+          'isVerified': 'NO',
+        },
+      });
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile updated successfully'),
+          backgroundColor: Color(0xFF10B47A),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Update failed: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isUpdating = false);
+    }
   }
 }
 

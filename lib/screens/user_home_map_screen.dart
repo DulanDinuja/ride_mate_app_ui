@@ -1540,7 +1540,11 @@ Future<void> _onChangeProfilePhoto() async {
               ListTile(
                 leading: const Icon(Icons.edit_outlined),
                 title: const Text('Update Profile Details'),
-                onTap: () => Navigator.pushNamed(context, AppRoutes.profileCompletion),
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  AppRoutes.profileCompletion,
+                  arguments: _userProfile,
+                ),
               ),
               const Divider(height: 1),
               ListTile(

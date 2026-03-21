@@ -23,6 +23,7 @@ import '../../screens/cost_split_screen.dart';
 import '../../screens/active_ride_screen.dart';
 import '../../models/user_verification_args.dart';
 import '../../models/driver_registration_data.dart';
+import '../../models/user_profile.dart';
 
 class AppRoutes {
   // Route names
@@ -85,7 +86,10 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const ForgotPasswordScreen());
 
       case profileCompletion:
-        return MaterialPageRoute(builder: (_) => const ProfileCompletionScreen());
+        return MaterialPageRoute(
+          builder: (_) => ProfileCompletionScreen(existingProfile: settings.arguments as UserProfile?),
+          settings: settings,
+        );
 
       case userVerification:
         final args = settings.arguments;
