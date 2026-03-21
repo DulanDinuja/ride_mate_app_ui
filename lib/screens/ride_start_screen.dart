@@ -9,7 +9,7 @@ import '../services/driver_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import '../widgets/custom_back_button.dart';
-import 'navigation_screen.dart';
+import 'active_ride_screen.dart';
 import 'ride_requests_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -520,6 +520,21 @@ class _RideStartScreenState extends State<RideStartScreen> {
                 child: ElevatedButton(
                   onPressed: () {
                     setState(() => _tripStarted = true);
+                    if (_args != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ActiveRideScreen(
+                            rideDetailId: _args!.rideDetailId,
+                            driverProfileId: _args!.driverProfileId,
+                            pickupAddress: _args!.pickupAddress,
+                            dropAddress: _args!.dropAddress,
+                            totalDistance: _args!.distanceKm,
+                            totalCost: _args!.totalCost,
+                          ),
+                        ),
+                      );
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _navy,
@@ -603,6 +618,7 @@ class _RideStartScreenState extends State<RideStartScreen> {
                         arguments: RideRequestsArgs(
                           rideDetailId: _args!.rideDetailId,
                           totalRideCost: _args!.totalCost,
+                          driverProfileId: _args!.driverProfileId,
                         ),
                       );
                     },

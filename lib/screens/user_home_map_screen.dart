@@ -12,17 +12,18 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/routes/app_routes.dart';
-import '../models/driver_profile.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/driver_service.dart';
 import '../services/file_service.dart';
+import '../services/ride_request_service.dart';
 import '../services/ride_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import '../widgets/custom_back_button.dart';
 import 'available_rides_screen.dart';
 import 'driver_home_mixin.dart';
+import 'ride_requests_screen.dart';
 
 class UserHomeMapScreen extends StatefulWidget {
   const UserHomeMapScreen({super.key});
@@ -100,11 +101,16 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   String? _routeDuration;
   bool _isFetchingRoute = false;
 
-  // ── active ride ──
+  // ── active ride (driver) ──
   bool _isLoadingActiveRide = false;
   bool _isEndingRide = false;
   bool _isCancellingRide = false;
   Map<String, dynamic>? _activeRideData;
+
+  // ── passenger ride status ──
+  bool _isLoadingPassengerRide = false;
+  bool _isCancellingPassengerRequest = false;
+  List<Map<String, dynamic>> _passengerActiveRequests = []; // PENDING or ACCEPTED
 
   // ── search mode ──
   bool _isSearchMode = false;
@@ -962,6 +968,9 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
         } else {
           debugPrint('[UserHome] driverProfile still null after fetch — skipping active ride load');
         }
+      } else {
+        // Passenger — load any pending/accepted ride requests
+        _loadPassengerActiveRide();
       }
 
       // Check driver profile if user is willing to drive
@@ -1197,6 +1206,76 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
           backgroundColor: Colors.red.shade700,
         ),
       );
+    }
+  }
+
+  /// Load passenger's active (PENDING or ACCEPTED) ride requests.
+  Future<void> _loadPassengerActiveRide() async {
+    final userId = _userProfile?.userId;
+    if (userId == null) return;
+    setState(() => _isLoadingPassengerRide = true);
+    try {
+      final requests = await RideRequestService.getPassengerRequests(int.parse(userId.toString()));
+      final active = requests
+          .where((r) => r.isPending || r.isAccepted)
+          .map((r) => {
+                'id': r.id,
+                'rideDetailId': r.rideDetailId,
+                'status': r.status,
+                'startCity': r.startCity ?? 'Pickup',
+                'endCity': r.endCity ?? 'Drop',
+                'passengerRideDistance': r.passengerRideDistance,
+                'estimatedCost': r.estimatedCost,
+                'createdDate': r.createdDate,
+              })
+          .toList();
+      if (mounted) setState(() => _passengerActiveRequests = active);
+    } catch (e) {
+      debugPrint('[PassengerRide] load error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingPassengerRide = false);
+    }
+  }
+
+  /// Cancel a passenger's own ride request.
+  Future<void> _cancelPassengerRequest(int requestId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Ride Request?'),
+        content: const Text('Are you sure you want to cancel this ride request?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes, Cancel', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isCancellingPassengerRequest = true);
+    try {
+      await RideRequestService.cancelRequest(requestId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ride request cancelled.'),
+          backgroundColor: Color(0xFF03AF74),
+        ),
+      );
+      await _loadPassengerActiveRide();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isCancellingPassengerRequest = false);
     }
   }
 
@@ -1851,6 +1930,7 @@ Future<void> _onChangeProfilePhoto() async {
                     AppRoutes.activeRide,
                     arguments: {
                       'rideDetailId': rideId!,
+                      'driverProfileId': driverProfile?.id,
                       'pickupAddress': startCity,
                       'dropAddress': endCity,
                       'totalDistance': totalDist,
@@ -1897,13 +1977,70 @@ Future<void> _onChangeProfilePhoto() async {
                 ),
               ),
             ),
+            const SizedBox(height: 10),
+            // Cancel ride (with no passengers) option
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton.icon(
+                onPressed: (_isEndingRide || _isCancellingRide) ? null : _cancelActiveRide,
+                icon: _isCancellingRide
+                    ? const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.red))
+                    : const Icon(Icons.cancel_outlined, size: 18),
+                label: Text(
+                  _isCancellingRide ? 'Cancelling...' : 'Cancel Ride',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red.shade600,
+                  side: BorderSide(color: Colors.red.shade300),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (driverProfile != null)
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.rideRequests,
+                      arguments: RideRequestsArgs(
+                        rideDetailId: rideId!,
+                        totalRideCost: totalCost,
+                        driverProfileId: driverProfile!.id,
+                      ),
+                    ).then((_) => _loadActiveRide());
+                  },
+                  icon: const Icon(Icons.people_outline),
+                  label: const Text(
+                    'View Ride Requests',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF040F1B),
+                    side: const BorderSide(color: Color(0xFF040F1B)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ),
             const SizedBox(height: 24),
           ],
         ),
       );
     }
 
-    // No active rides
+    // ── Passenger view ──
+    if (!isDriver) {
+      return _buildPassengerActiveRidesView();
+    }
+
+    // No active rides (driver with nothing active)
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -1917,26 +2054,316 @@ Future<void> _onChangeProfilePhoto() async {
               style: TextStyle(fontSize: 16, color: Colors.black54),
             ),
             const SizedBox(height: 8),
-            Text(
-              isDriver
-                  ? 'Go to Home tab and offer a ride to get started!'
-                  : 'Browse available rides on the Home tab.',
+            const Text(
+              'Go to Home tab and offer a ride to get started!',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: Colors.black38),
+              style: TextStyle(fontSize: 13, color: Colors.black38),
             ),
-            if (isDriver) ...[
-              const SizedBox(height: 20),
-              _isLoadingActiveRide
-                  ? const CircularProgressIndicator(color: Color(0xFF03AF74))
-                  : TextButton.icon(
-                      onPressed: _loadActiveRide,
-                      icon: const Icon(Icons.refresh, size: 18),
-                      label: const Text('Refresh'),
-                      style: TextButton.styleFrom(foregroundColor: const Color(0xFF03AF74)),
-                    ),
-            ],
+            const SizedBox(height: 20),
+            _isLoadingActiveRide
+                ? const CircularProgressIndicator(color: Color(0xFF03AF74))
+                : TextButton.icon(
+                    onPressed: _loadActiveRide,
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Refresh'),
+                    style: TextButton.styleFrom(foregroundColor: const Color(0xFF03AF74)),
+                  ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPassengerActiveRidesView() {
+    const accent = Color(0xFF03AF74);
+    const navy = Color(0xFF040F1B);
+
+    if (_isLoadingPassengerRide && _passengerActiveRequests.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: accent));
+    }
+
+    if (_passengerActiveRequests.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _loadPassengerActiveRide,
+        color: accent,
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            const SizedBox(height: 60),
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.directions_bus_outlined, size: 64, color: Colors.grey.shade300),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No active ride requests',
+                    style: TextStyle(fontSize: 16, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Browse available rides on the Home tab\nand request to join one.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13, color: Colors.black38, height: 1.4),
+                  ),
+                  const SizedBox(height: 20),
+                  TextButton.icon(
+                    onPressed: _loadPassengerActiveRide,
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Refresh'),
+                    style: TextButton.styleFrom(foregroundColor: accent),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadPassengerActiveRide,
+      color: accent,
+      child: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          for (final req in _passengerActiveRequests) ...[
+            _buildPassengerRideCard(req, accent, navy),
+            const SizedBox(height: 14),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPassengerRideCard(
+      Map<String, dynamic> req, Color accent, Color navy) {
+    final requestId = req['id'] as int;
+    final rideDetailId = req['rideDetailId'] as int;
+    final status = req['status'] as String? ?? 'PENDING';
+    final startCity = req['startCity'] as String? ?? 'Pickup';
+    final endCity = req['endCity'] as String? ?? 'Drop';
+    final distance = (req['passengerRideDistance'] as num?)?.toDouble() ?? 0.0;
+    final estimatedCost = (req['estimatedCost'] as num?)?.toDouble();
+    final isAccepted = status == 'ACCEPTED';
+    final isPending = status == 'PENDING';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Status header
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isAccepted ? accent.withOpacity(0.12) : Colors.orange.shade50,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isAccepted ? Icons.check_circle_outline : Icons.hourglass_top,
+                    color: isAccepted ? accent : Colors.orange.shade600,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isAccepted ? 'Ride Accepted! 🎉' : 'Request Pending',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: isAccepted ? accent : Colors.orange.shade700,
+                        ),
+                      ),
+                      Text(
+                        isAccepted
+                            ? 'Driver accepted your request'
+                            : 'Waiting for driver to respond',
+                        style: const TextStyle(fontSize: 12, color: Colors.black45),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isAccepted ? accent.withOpacity(0.1) : Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    status,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isAccepted ? accent : Colors.orange.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            // Route
+            Row(
+              children: [
+                Icon(Icons.radio_button_checked, size: 16, color: accent),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(startCity,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: navy)),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 7),
+              child: Container(width: 2, height: 14, color: Colors.grey.shade300),
+            ),
+            Row(
+              children: [
+                Icon(Icons.location_on, size: 16, color: Colors.red.shade400),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(endCity,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: navy)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            // Stats row
+            Row(
+              children: [
+                _buildMiniInfoChip(Icons.straighten, '${distance.toStringAsFixed(1)} km'),
+                const SizedBox(width: 8),
+                if (estimatedCost != null)
+                  _buildMiniInfoChip(Icons.payments_outlined,
+                      'LKR ${estimatedCost.toStringAsFixed(0)}'),
+                const Spacer(),
+                Text('Ride #$rideDetailId',
+                    style: const TextStyle(fontSize: 11, color: Colors.black38)),
+              ],
+            ),
+            if (isAccepted && estimatedCost != null) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  children: [
+                    const Text('YOUR RIDE COST',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+                            color: Colors.black38, letterSpacing: 1)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'LKR ${estimatedCost.toStringAsFixed(2)}',
+                      style: TextStyle(
+                          fontSize: 26, fontWeight: FontWeight.w900, color: accent),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            // Action buttons
+            Row(
+              children: [
+                if (isPending || isAccepted)
+                  Expanded(
+                    child: SizedBox(
+                      height: 44,
+                      child: OutlinedButton(
+                        onPressed: _isCancellingPassengerRequest
+                            ? null
+                            : () => _cancelPassengerRequest(requestId),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red.shade700,
+                          side: BorderSide(color: Colors.red.shade300),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: _isCancellingPassengerRequest
+                            ? const SizedBox(
+                                width: 18, height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.red))
+                            : const Text('Cancel Request',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                  ),
+                if (isAccepted) ...[
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 44,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pushNamed(
+                            context,
+                            AppRoutes.costSplit,
+                            arguments: {
+                              'rideDetailId': rideDetailId,
+                              'isDriver': false,
+                            },
+                          );
+                        },
+                        icon: const Icon(Icons.pie_chart_outline, size: 16),
+                        label: const Text('Cost Breakdown',
+                            style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: navy,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniInfoChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: Colors.grey.shade600),
+          const SizedBox(width: 4),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
+        ],
       ),
     );
   }
@@ -3347,8 +3774,12 @@ Future<void> _onChangeProfilePhoto() async {
               CameraUpdate.newLatLngZoom(_pickupLatLng!, 16),
             );
           }
-          if (index == 2 && isDriver) {
-            _loadActiveRide();
+          if (index == 2) {
+            if (isDriver) {
+              _loadActiveRide();
+            } else {
+              _loadPassengerActiveRide();
+            }
           }
         },
         destinations: const [

@@ -1,14 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../core/routes/app_routes.dart';
 import '../models/available_ride.dart';
+import '../models/passenger_estimated_cost_response.dart';
 import '../models/ride_request.dart';
 import '../models/user_profile.dart';
 import '../services/ride_request_service.dart';
+import '../services/token_service.dart';
 import '../widgets/custom_back_button.dart';
 
-/// Screen that shows all available rides heading in the passenger's direction.
-/// The passenger can browse rides and request to join one.
+/// Screen that shows all ML-ranked available rides heading in the passenger's direction.
+/// The passenger can browse rides, see estimated cost, and request to join one.
 class AvailableRidesScreen extends StatefulWidget {
   final String pickupAddress;
   final String dropAddress;
@@ -39,7 +44,8 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
   List<AvailableRide> _rides = [];
   bool _isLoading = true;
   String? _error;
-  int? _requestingRideId; // ride being requested
+  int? _requestingRideId;
+  int? _estimatingRideId;
 
   @override
   void initState() {
@@ -54,9 +60,12 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
     });
     try {
       final rides = await RideRequestService.getAvailableRides(
+        startLat: widget.pickupLatLng.latitude,
+        startLng: widget.pickupLatLng.longitude,
         endLat: widget.dropLatLng.latitude,
         endLng: widget.dropLatLng.longitude,
-        radiusKm: 15,
+        passengerRideDistance: widget.distanceKm,
+        radius: 15,
       );
       if (mounted) {
         setState(() {
@@ -74,11 +83,52 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
     }
   }
 
+  Future<void> _showEstimate(AvailableRide ride) async {
+    setState(() => _estimatingRideId = ride.rideDetailId);
+    try {
+      final estimate = await RideRequestService.estimateCost(
+        rideDetailId: ride.rideDetailId,
+        passengerRideDistance: widget.distanceKm,
+      );
+      if (!mounted) return;
+      await showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _EstimateCostSheet(
+          estimate: estimate,
+          ride: ride,
+          onConfirm: () {
+            Navigator.pop(context);
+            _requestToJoin(ride);
+          },
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        _showSnackBar(
+          e.toString().replaceFirst('Exception: ', ''),
+          isError: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _estimatingRideId = null);
+    }
+  }
+
   Future<void> _requestToJoin(AvailableRide ride) async {
-    final userId = widget.userProfile?.userId;
+    int? userId = widget.userProfile?.userId;
     if (userId == null) {
-      _showSnackBar('User not logged in', isError: true);
-      return;
+      // Try to get userId from token
+      final tokenUserId = await TokenService.getUserId();
+      if (tokenUserId == null) {
+        _showSnackBar('User not logged in', isError: true);
+        return;
+      }
+      userId = int.tryParse(tokenUserId.toString());
+      if (userId == null) {
+        _showSnackBar('Invalid user session', isError: true);
+        return;
+      }
     }
 
     setState(() => _requestingRideId = ride.rideDetailId);
@@ -86,7 +136,7 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
     try {
       final request = await RideRequestService.createRideRequest(
         rideDetailId: ride.rideDetailId,
-        userId: userId,
+        userId: userId!,
         passengerStartLat: widget.pickupLatLng.latitude,
         passengerStartLng: widget.pickupLatLng.longitude,
         passengerEndLat: widget.dropLatLng.latitude,
@@ -100,13 +150,12 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
 
       _showSnackBar('Request sent! Waiting for driver to accept.');
 
-      // Navigate to request status screen
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => _RideRequestStatusView(
             rideRequest: request,
-            userId: userId,
+            userId: userId!,
           ),
         ),
       );
@@ -180,40 +229,22 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
       ),
       child: Column(
         children: [
-          _routeRow(Icons.radio_button_checked, _accent, 'FROM',
-              widget.pickupAddress),
+          _routeRow(
+              Icons.radio_button_checked, _accent, 'FROM', widget.pickupAddress),
           Padding(
             padding: const EdgeInsets.only(left: 10),
-            child: Container(width: 2, height: 16, color: _accent.withOpacity(0.2)),
+            child: Container(
+                width: 2, height: 16, color: _accent.withOpacity(0.2)),
           ),
-          _routeRow(Icons.location_on, Colors.red.shade400, 'TO',
-              widget.dropAddress),
+          _routeRow(
+              Icons.location_on, Colors.red.shade400, 'TO', widget.dropAddress),
           const SizedBox(height: 8),
           Row(
             children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _accent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.straighten, size: 14, color: _accent),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${widget.distanceKm.toStringAsFixed(1)} km',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _accent,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _infoChip(Icons.straighten,
+                  '${widget.distanceKm.toStringAsFixed(1)} km'),
+              const SizedBox(width: 8),
+              _infoChip(Icons.search, '${_rides.length} ride${_rides.length != 1 ? 's' : ''} found'),
             ],
           ),
         ],
@@ -261,10 +292,7 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
                 'No rides available\nheading your way right now',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey.shade500,
-                  height: 1.4,
-                ),
+                    fontSize: 16, color: Colors.grey.shade500, height: 1.4),
               ),
               const SizedBox(height: 20),
               OutlinedButton.icon(
@@ -284,14 +312,19 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: _rides.length,
-        itemBuilder: (context, index) => _buildRideCard(_rides[index]),
+        itemBuilder: (context, index) => _buildRideCard(_rides[index], index),
       ),
     );
   }
 
-  Widget _buildRideCard(AvailableRide ride) {
+  Widget _buildRideCard(AvailableRide ride, int index) {
     final isRequesting = _requestingRideId == ride.rideDetailId;
+    final isEstimating = _estimatingRideId == ride.rideDetailId;
     final seatsLeft = ride.seatsRemaining;
+    final estimatedCost =
+        ride.estimatedCostPerPassenger ?? ride.totalRideCost;
+    final mlRank = ride.mlRank;
+    final mlProb = ride.mlAcceptanceProbability;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -311,9 +344,33 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Driver info row
+            // ML rank badge + driver info
             Row(
               children: [
+                if (mlRank != null)
+                  Container(
+                    margin: const EdgeInsets.only(right: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: mlRank == 1
+                          ? const Color(0xFFFFD700)
+                          : mlRank == 2
+                              ? Colors.grey.shade300
+                              : const Color(0xFFCD7F32).withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '#$mlRank',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: mlRank == 1
+                            ? Colors.orange.shade800
+                            : Colors.grey.shade700,
+                      ),
+                    ),
+                  ),
                 CircleAvatar(
                   radius: 22,
                   backgroundColor: _accent.withOpacity(0.1),
@@ -352,18 +409,32 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
                           Text(
                             ride.driverRating.toStringAsFixed(1),
                             style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                            ),
+                                fontSize: 12, color: Colors.grey.shade600),
                           ),
                           const SizedBox(width: 8),
                           Text(
                             '${ride.totalRidesAsDriver} rides',
                             style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade500,
-                            ),
+                                fontSize: 12, color: Colors.grey.shade500),
                           ),
+                          if (mlProb != null) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _accent.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${(mlProb * 100).toStringAsFixed(0)}% match',
+                                style: const TextStyle(
+                                    fontSize: 10,
+                                    color: _accent,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ],
@@ -371,8 +442,8 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
                 ),
                 // Seats badge
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: seatsLeft > 0
                         ? _accent.withOpacity(0.1)
@@ -384,16 +455,18 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
                     children: [
                       Icon(Icons.event_seat,
                           size: 14,
-                          color:
-                              seatsLeft > 0 ? _accent : Colors.red.shade400),
+                          color: seatsLeft > 0
+                              ? _accent
+                              : Colors.red.shade400),
                       const SizedBox(width: 4),
                       Text(
                         '$seatsLeft left',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color:
-                              seatsLeft > 0 ? _accent : Colors.red.shade400,
+                          color: seatsLeft > 0
+                              ? _accent
+                              : Colors.red.shade400,
                         ),
                       ),
                     ],
@@ -406,74 +479,139 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
 
             // Route
             _routeRow(Icons.radio_button_checked, _accent, 'FROM',
-                ride.startCity ?? 'Unknown'),
+                ride.startCity ?? 'Pickup'),
             const SizedBox(height: 6),
             _routeRow(Icons.location_on, Colors.red.shade400, 'TO',
-                ride.endCity ?? 'Unknown'),
+                ride.endCity ?? 'Drop'),
 
             const SizedBox(height: 12),
 
-            // Vehicle & cost info
+            // Cost row
             Row(
               children: [
-                _infoChip(Icons.directions_car, ride.vehicleDescription),
-                const Spacer(),
-                Text(
-                  'LKR ${ride.totalRideCost.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: _navy,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'YOUR ESTIMATED COST',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black38,
+                            letterSpacing: 0.8),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'LKR ${estimatedCost.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: _accent,
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Total ride',
+                      style: TextStyle(
+                          fontSize: 10, color: Colors.grey.shade500),
+                    ),
+                    Text(
+                      'LKR ${ride.totalRideCost.toStringAsFixed(0)}',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600),
+                    ),
+                  ],
                 ),
               ],
             ),
+
+            if (ride.vehicleDescription != 'Vehicle') ...[
+              const SizedBox(height: 8),
+              _infoChip(Icons.directions_car, ride.vehicleDescription),
+            ],
             if (ride.vehiclePlateNumber != null) ...[
               const SizedBox(height: 4),
               Text(
                 ride.vehiclePlateNumber!,
                 style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade500,
-                  fontWeight: FontWeight.w500,
-                ),
+                    fontSize: 12,
+                    color: Colors.grey.shade500,
+                    fontWeight: FontWeight.w500),
               ),
             ],
 
             const SizedBox(height: 16),
 
-            // Request button
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                onPressed: seatsLeft > 0 && !isRequesting
-                    ? () => _requestToJoin(ride)
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _accent,
-                  disabledBackgroundColor: _accent.withOpacity(0.3),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                ),
-                child: isRequesting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(
-                        seatsLeft > 0 ? 'Request to Join' : 'No Seats',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
+            // Estimate + Request buttons
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 44,
+                    child: OutlinedButton(
+                      onPressed: seatsLeft > 0 && !isEstimating && !isRequesting
+                          ? () => _showEstimate(ride)
+                          : null,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _navy,
+                        side: const BorderSide(color: _navy),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
-              ),
+                      child: isEstimating
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: _navy))
+                          : const Text('See Cost',
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: SizedBox(
+                    height: 44,
+                    child: ElevatedButton(
+                      onPressed: seatsLeft > 0 &&
+                              !isRequesting &&
+                              !isEstimating
+                          ? () => _requestToJoin(ride)
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _accent,
+                        disabledBackgroundColor: _accent.withOpacity(0.3),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: isRequesting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2.5, color: Colors.white),
+                            )
+                          : Text(
+                              seatsLeft > 0 ? 'Request to Join' : 'No Seats',
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white),
+                            ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -481,7 +619,8 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
     );
   }
 
-  Widget _routeRow(IconData icon, Color iconColor, String label, String value) {
+  Widget _routeRow(
+      IconData icon, Color iconColor, String label, String value) {
     return Row(
       children: [
         Icon(icon, size: 18, color: iconColor),
@@ -500,7 +639,9 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: _navy)),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: _navy)),
             ],
           ),
         ),
@@ -532,8 +673,186 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Simple status view shown after a passenger sends a ride request.
-// Polls for status changes.
+// Estimate cost bottom sheet
+// ═══════════════════════════════════════════════════════════════════
+
+class _EstimateCostSheet extends StatelessWidget {
+  final PassengerEstimatedCostResponse estimate;
+  final AvailableRide ride;
+  final VoidCallback onConfirm;
+
+  const _EstimateCostSheet({
+    required this.estimate,
+    required this.ride,
+    required this.onConfirm,
+  });
+
+  static const Color _accent = Color(0xFF03AF74);
+  static const Color _navy = Color(0xFF040F1B);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFFF0),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const Text(
+            'Estimated Cost',
+            style: TextStyle(
+                fontSize: 18, fontWeight: FontWeight.w800, color: _navy),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: _accent.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'LKR ${estimate.estimatedCost.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: _accent),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${estimate.sharePercentage.toStringAsFixed(0)}% share of the ride',
+                  style:
+                      TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Details grid
+          Row(
+            children: [
+              _detailTile('Distance',
+                  '${estimate.passengerRideDistance.toStringAsFixed(1)} km'),
+              const SizedBox(width: 10),
+              _detailTile('Per km', 'LKR ${estimate.perKmRate.toStringAsFixed(0)}'),
+              const SizedBox(width: 10),
+              _detailTile('Passengers',
+                  '${estimate.currentPassengerCount} + you'),
+            ],
+          ),
+          if (estimate.pricingNote != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline,
+                      size: 16, color: Colors.blue.shade600),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      estimate.pricingNote!,
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.blue.shade700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text('Cancel',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: onConfirm,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _accent,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text(
+                    'Request to Join',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailTile(String label, String value) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Column(
+          children: [
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 10,
+                    color: Colors.black45,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 2),
+            Text(value,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _navy)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Ride request status view — polls for accept/reject, shows cost on accept
 // ═══════════════════════════════════════════════════════════════════
 
 class _RideRequestStatusView extends StatefulWidget {
@@ -557,6 +876,7 @@ class _RideRequestStatusViewState extends State<_RideRequestStatusView> {
 
   late RideRequest _currentRequest;
   bool _isPolling = true;
+  bool _isCancelling = false;
 
   @override
   void initState() {
@@ -572,7 +892,9 @@ class _RideRequestStatusViewState extends State<_RideRequestStatusView> {
   }
 
   Future<void> _startPolling() async {
-    while (_isPolling && mounted && _currentRequest.isPending) {
+    while (_isPolling &&
+        mounted &&
+        (_currentRequest.isPending)) {
       await Future.delayed(const Duration(seconds: 5));
       if (!mounted || !_isPolling) return;
       try {
@@ -589,6 +911,48 @@ class _RideRequestStatusViewState extends State<_RideRequestStatusView> {
     }
   }
 
+  Future<void> _cancelRequest() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Request?'),
+        content: const Text(
+            'Are you sure you want to cancel this ride request?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('No')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child:
+                  const Text('Yes', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isCancelling = true);
+    try {
+      final updated =
+          await RideRequestService.cancelRequest(_currentRequest.id);
+      if (mounted) {
+        setState(() {
+          _currentRequest = updated;
+          _isCancelling = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCancelling = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red.shade700,
+        ));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -597,6 +961,7 @@ class _RideRequestStatusViewState extends State<_RideRequestStatusView> {
         title: const Text('Ride Request Status'),
         backgroundColor: _navy,
         foregroundColor: Colors.white,
+        automaticallyImplyLeading: false,
       ),
       body: Center(
         child: Padding(
@@ -609,31 +974,97 @@ class _RideRequestStatusViewState extends State<_RideRequestStatusView> {
               Text(
                 _statusTitle(),
                 style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: _navy,
-                ),
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: _navy),
               ),
               const SizedBox(height: 12),
               Text(
                 _statusMessage(),
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.grey.shade600,
-                  height: 1.4,
-                ),
+                    fontSize: 15,
+                    color: Colors.grey.shade600,
+                    height: 1.4),
               ),
               const SizedBox(height: 32),
-              if (_currentRequest.isPending)
+
+              if (_currentRequest.isPending) ...[
                 const CircularProgressIndicator(color: _accent),
-              if (_currentRequest.isAccepted)
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton(
+                    onPressed: _isCancelling ? null : _cancelRequest,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red.shade700,
+                      side: BorderSide(color: Colors.red.shade300),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: _isCancelling
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.red))
+                        : const Text('Cancel Request',
+                            style:
+                                TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+
+              // Accepted — show estimated cost
+              if (_currentRequest.isAccepted) ...[
+                if (_currentRequest.estimatedCost != null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: _accent.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'YOUR RIDE COST',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black45,
+                              letterSpacing: 1),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'LKR ${_currentRequest.estimatedCost!.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                              fontSize: 30,
+                              fontWeight: FontWeight.w900,
+                              color: _accent),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
                 SizedBox(
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.pop(context, 'accepted');
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        AppRoutes.costSplit,
+                        (route) => route.settings.name == AppRoutes.userHomeMap ||
+                            route.isFirst,
+                        arguments: {
+                          'rideDetailId': _currentRequest.rideDetailId,
+                          'isDriver': false,
+                        },
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _accent,
@@ -643,14 +1074,16 @@ class _RideRequestStatusViewState extends State<_RideRequestStatusView> {
                     child: const Text(
                       'View Ride Details',
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white),
                     ),
                   ),
                 ),
-              if (_currentRequest.isRejected)
+              ],
+
+              if (_currentRequest.isRejected ||
+                  _currentRequest.isCancelled) ...[
                 SizedBox(
                   width: double.infinity,
                   height: 52,
@@ -667,6 +1100,7 @@ class _RideRequestStatusViewState extends State<_RideRequestStatusView> {
                     ),
                   ),
                 ),
+              ],
             ],
           ),
         ),
@@ -680,9 +1114,7 @@ class _RideRequestStatusViewState extends State<_RideRequestStatusView> {
         width: 80,
         height: 80,
         decoration: BoxDecoration(
-          color: Colors.orange.shade50,
-          shape: BoxShape.circle,
-        ),
+            color: Colors.orange.shade50, shape: BoxShape.circle),
         child: Icon(Icons.hourglass_top,
             size: 40, color: Colors.orange.shade400),
       );
@@ -691,9 +1123,7 @@ class _RideRequestStatusViewState extends State<_RideRequestStatusView> {
         width: 80,
         height: 80,
         decoration: BoxDecoration(
-          color: _accent.withOpacity(0.1),
-          shape: BoxShape.circle,
-        ),
+            color: _accent.withOpacity(0.1), shape: BoxShape.circle),
         child: const Icon(Icons.check_circle, size: 40, color: _accent),
       );
     } else {
@@ -701,11 +1131,8 @@ class _RideRequestStatusViewState extends State<_RideRequestStatusView> {
         width: 80,
         height: 80,
         decoration: BoxDecoration(
-          color: Colors.red.shade50,
-          shape: BoxShape.circle,
-        ),
-        child:
-            Icon(Icons.cancel, size: 40, color: Colors.red.shade400),
+            color: Colors.red.shade50, shape: BoxShape.circle),
+        child: Icon(Icons.cancel, size: 40, color: Colors.red.shade400),
       );
     }
   }
@@ -713,6 +1140,7 @@ class _RideRequestStatusViewState extends State<_RideRequestStatusView> {
   String _statusTitle() {
     if (_currentRequest.isPending) return 'Request Pending';
     if (_currentRequest.isAccepted) return 'Request Accepted! 🎉';
+    if (_currentRequest.isCancelled) return 'Request Cancelled';
     return 'Request Declined';
   }
 
@@ -722,6 +1150,9 @@ class _RideRequestStatusViewState extends State<_RideRequestStatusView> {
     }
     if (_currentRequest.isAccepted) {
       return 'The driver has accepted your request!\nYou have been added to the ride.';
+    }
+    if (_currentRequest.isCancelled) {
+      return 'You have cancelled your request.\nYou can browse other rides.';
     }
     return 'Unfortunately the driver declined your request.\nYou can try requesting another ride.';
   }

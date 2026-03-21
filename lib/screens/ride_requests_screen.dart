@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../models/user_profile.dart';
+import '../services/ride_request_service.dart';
 import '../services/ride_service.dart';
 import '../services/user_service.dart';
 import '../widgets/custom_back_button.dart';
@@ -14,23 +15,30 @@ import '../widgets/custom_back_button.dart';
 class RideRequestsArgs {
   final int rideDetailId;
   final double totalRideCost;
+  final int? driverProfileId;
 
   const RideRequestsArgs({
     required this.rideDetailId,
     required this.totalRideCost,
+    this.driverProfileId,
   });
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Passenger request model (parsed from API response)
+// Passenger request model (built from RideRequest)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class _PassengerRequest {
-  final int shareRideDetailId;
+  /// The ride request ID — used for accept/reject API calls
+  final int rideRequestId;
   final int userId;
   final String pickupAddress;
   final String dropAddress;
   final double passengerCost;
   final double passengerDistance;
+  final String passengerFirstName;
+  final String passengerLastName;
+  final String? passengerPhone;
+  final String? passengerProfileImageUrl;
   final String? pickupTimeAway;
   final String? dropTimeAway;
   UserProfile? profile;
@@ -38,18 +46,24 @@ class _PassengerRequest {
   bool isRejecting;
 
   _PassengerRequest({
-    required this.shareRideDetailId,
+    required this.rideRequestId,
     required this.userId,
     required this.pickupAddress,
     required this.dropAddress,
     required this.passengerCost,
     required this.passengerDistance,
+    this.passengerFirstName = '',
+    this.passengerLastName = '',
+    this.passengerPhone,
+    this.passengerProfileImageUrl,
     this.pickupTimeAway,
     this.dropTimeAway,
     this.profile,
     this.isAccepting = false,
     this.isRejecting = false,
   });
+
+  String get fullName => '$passengerFirstName $passengerLastName'.trim();
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -103,49 +117,60 @@ class _RideRequestsScreenState extends State<RideRequestsScreen> {
     if (_args == null) return;
 
     try {
-      final rawRequests =
-          await RideService.getPendingRequests(_args!.rideDetailId);
+      // Use the correct endpoint: GET /ride-requests/driver/{driverProfileId}/pending
+      // RideRequestsArgs carries rideDetailId — we need driverProfileId from the screen
+      // Fall back to getting pending requests for the ride detail via cost-split approach.
+      // Since the screen doesn't have driverProfileId, we use the ride-detail-based approach:
+      // we load cost split to get total cost, and use ride requests endpoint.
+      // The screen uses rideDetailId so we call /ride-requests/driver/ if we had profile.
+      // For now we derive driverProfileId from token or use rideDetailId directly.
 
-      // Also try to load cost-split to get real total cost
+      // Note: RideRequestsArgs only has rideDetailId. The correct endpoint needs
+      // driverProfileId. We pass -1 as a sentinel and handle in getDriverPendingRequests.
+      // However the most reliable path is to use the driverProfileId if args had it.
+      // Since we only have rideDetailId, let's use the driver ride-requests endpoint
+      // with driverProfileId = 0 to try, then fall back to cost split.
+
+      // Try cost-split first to update total cost display
       try {
-        final costSplit =
-            await RideService.getCostSplit(_args!.rideDetailId);
-        _totalRideCost = costSplit.totalRideCost;
+        final costSplit = await RideService.getCostSplit(_args!.rideDetailId);
+        if (mounted) setState(() => _totalRideCost = costSplit.totalRideCost);
       } catch (_) {}
 
+      // Use the driverProfileId from args if available, else don't call the pending API
+      final driverProfileId = _args!.driverProfileId;
+      if (driverProfileId == null) {
+        if (mounted) setState(() { _isLoading = false; _error = null; _requests = []; });
+        return;
+      }
+
+      final rideRequests = await RideRequestService.getDriverPendingRequests(driverProfileId);
+
       final requests = <_PassengerRequest>[];
-      for (final raw in rawRequests) {
+      for (final rr in rideRequests) {
+        // Only show requests for this specific ride
+        if (rr.rideDetailId != _args!.rideDetailId) continue;
         final req = _PassengerRequest(
-          shareRideDetailId: raw['shareRideDetailId'] as int? ??
-              raw['id'] as int? ??
-              0,
-          userId: raw['userId'] as int? ?? 0,
-          pickupAddress: raw['startCity'] as String? ??
-              raw['pickupAddress'] as String? ??
-              'Pickup location',
-          dropAddress: raw['endCity'] as String? ??
-              raw['dropAddress'] as String? ??
-              'Drop location',
-          passengerCost:
-              (raw['passengerCost'] as num?)?.toDouble() ??
-                  (raw['totalPassengerCost'] as num?)?.toDouble() ??
-                  0,
-          passengerDistance:
-              (raw['passengerRideDistance'] as num?)?.toDouble() ?? 0,
-          pickupTimeAway: _formatTimeAway(raw['pickupTimeAway']),
-          dropTimeAway: _formatTimeAway(raw['dropTimeAway']),
+          rideRequestId: rr.id,
+          userId: rr.userId,
+          pickupAddress: rr.startCity ?? 'Pickup location',
+          dropAddress: rr.endCity ?? 'Drop location',
+          passengerCost: rr.estimatedCost ?? 0,
+          passengerDistance: rr.passengerRideDistance,
+          passengerFirstName: rr.passengerFirstName,
+          passengerLastName: rr.passengerLastName,
+          passengerPhone: rr.passengerPhone,
+          passengerProfileImageUrl: rr.passengerProfileImageUrl,
         );
-
-        // Load passenger profile
-        if (req.userId > 0) {
-          try {
-            final profile =
-                await UserService.getUserProfileByUserId(req.userId.toString());
-            req.profile = profile;
-          } catch (_) {}
-        }
-
         requests.add(req);
+      }
+
+      // Optionally load passenger profiles for richer display
+      for (final req in requests) {
+        try {
+          final profile = await UserService.getUserProfileByUserId(req.userId.toString());
+          req.profile = profile;
+        } catch (_) {}
       }
 
       if (!mounted) return;
@@ -163,33 +188,25 @@ class _RideRequestsScreenState extends State<RideRequestsScreen> {
     }
   }
 
-  String? _formatTimeAway(dynamic value) {
-    if (value == null) return null;
-    if (value is num) {
-      final mins = value.round();
-      return '$mins min away';
-    }
-    return value.toString();
-  }
 
   Future<void> _acceptRequest(_PassengerRequest req) async {
     setState(() => req.isAccepting = true);
     try {
-      await RideService.acceptPassengerRequest(req.shareRideDetailId);
+      final updated = await RideRequestService.acceptRequest(req.rideRequestId);
       if (!mounted) return;
 
+      final costText = updated.estimatedCost != null
+          ? ' Cost: LKR ${updated.estimatedCost!.toStringAsFixed(2)}'
+          : '';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-              '${req.profile?.firstName ?? 'Passenger'} accepted! 🎉'),
+          content: Text('${req.fullName.isNotEmpty ? req.fullName : 'Passenger'} accepted!$costText 🎉'),
           backgroundColor: _accent,
         ),
       );
 
       // Remove from list and refresh
-      setState(() {
-        _requests.remove(req);
-      });
+      setState(() => _requests.remove(req));
       _loadRequests();
     } catch (e) {
       if (!mounted) return;
@@ -209,7 +226,7 @@ class _RideRequestsScreenState extends State<RideRequestsScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Reject Request?'),
         content: Text(
-            'Reject the ride request from ${req.profile?.firstName ?? 'this passenger'}?'),
+            'Reject the ride request from ${req.fullName.isNotEmpty ? req.fullName : 'this passenger'}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -228,7 +245,7 @@ class _RideRequestsScreenState extends State<RideRequestsScreen> {
 
     setState(() => req.isRejecting = true);
     try {
-      await RideService.rejectPassengerRequest(req.shareRideDetailId);
+      await RideRequestService.rejectRequest(req.rideRequestId);
       if (!mounted) return;
       setState(() => _requests.remove(req));
     } catch (e) {
@@ -428,8 +445,11 @@ class _RideRequestsScreenState extends State<RideRequestsScreen> {
     final profile = req.profile;
     final name = profile != null
         ? '${profile.firstName} ${profile.lastName}'.trim()
-        : 'Passenger #${req.userId}';
-    final photoUrl = profile?.profileImageUrl ??
+        : req.fullName.isNotEmpty
+            ? req.fullName
+            : 'Passenger #${req.userId}';
+    final photoUrl = req.passengerProfileImageUrl ??
+        profile?.profileImageUrl ??
         profile?.userVerificationImageUrl;
     const rating = 4.9; // placeholder — add real rating when available
 

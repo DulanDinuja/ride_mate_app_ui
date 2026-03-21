@@ -44,6 +44,7 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
   String? _error;
   Timer? _refreshTimer;
   int _pendingRequestCount = 0;
+  bool _isEndingRide = false;
 
   @override
   void initState() {
@@ -113,6 +114,62 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
       _loadPendingRequests();
       _loadCostSplit();
     });
+  }
+
+  Future<void> _endRide() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('End This Ride?'),
+        content: const Text(
+          'This will mark the ride as COMPLETED.\nPassengers will see the final cost split.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('End Ride',
+                style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isEndingRide = true);
+    try {
+      await RideService.endRide(widget.rideDetailId);
+      if (!mounted) return;
+      // Show final cost split then pop back
+      await _loadCostSplit();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ride ended successfully! 🎉'),
+          backgroundColor: Color(0xFF03AF74),
+        ),
+      );
+      // Navigate to cost split screen for final summary
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CostSplitScreen(
+            rideDetailId: widget.rideDetailId,
+            initialData: _costSplit,
+            isDriver: true,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isEndingRide = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
   }
 
   void _openFullBreakdown() {
@@ -227,13 +284,18 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
           width: double.infinity,
           height: 52,
           child: OutlinedButton.icon(
-            onPressed: () {
-              Navigator.pop(context, 'ended');
-            },
-            icon: const Icon(Icons.stop_circle_outlined),
-            label: const Text(
-              'End Ride',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            onPressed: _isEndingRide ? null : _endRide,
+            icon: _isEndingRide
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.red))
+                : const Icon(Icons.stop_circle_outlined),
+            label: Text(
+              _isEndingRide ? 'Ending Ride...' : 'End Ride',
+              style: const TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.w700),
             ),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.red.shade700,

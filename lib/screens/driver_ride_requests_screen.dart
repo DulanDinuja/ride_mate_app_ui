@@ -75,9 +75,13 @@ class _DriverRideRequestsScreenState extends State<DriverRideRequestsScreen> {
   Future<void> _acceptRequest(RideRequest request) async {
     setState(() => _processingIds.add(request.id));
     try {
-      await RideRequestService.acceptRequest(request.id);
+      final updated = await RideRequestService.acceptRequest(request.id);
       if (mounted) {
-        _showSnackBar('${request.passengerFullName} added to your ride!');
+        final costText = updated.estimatedCost != null
+            ? ' Cost: LKR ${updated.estimatedCost!.toStringAsFixed(2)}'
+            : '';
+        _showSnackBar(
+            '${request.passengerFullName} added to your ride!$costText');
         _loadRequests();
       }
     } catch (e) {

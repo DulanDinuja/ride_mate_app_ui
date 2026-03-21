@@ -16,6 +16,8 @@ class RideRequest {
   final String? startCity;
   final String? endCity;
   final double passengerRideDistance;
+  /// Estimated cost populated by backend on accept (max(60/N,20)% algorithm)
+  final double? estimatedCost;
   final String status;
   final String? createdDate;
 
@@ -35,6 +37,7 @@ class RideRequest {
     this.startCity,
     this.endCity,
     required this.passengerRideDistance,
+    this.estimatedCost,
     required this.status,
     this.createdDate,
   });
@@ -44,12 +47,13 @@ class RideRequest {
   bool get isPending => status == 'PENDING';
   bool get isAccepted => status == 'ACCEPTED';
   bool get isRejected => status == 'REJECTED';
+  bool get isCancelled => status == 'CANCELLED';
 
   factory RideRequest.fromJson(Map<String, dynamic> json) {
     return RideRequest(
-      id: json['id'] as int,
-      rideDetailId: json['rideDetailId'] as int,
-      userId: json['userId'] as int,
+      id: (json['id'] as num).toInt(),
+      rideDetailId: (json['rideDetailId'] as num).toInt(),
+      userId: (json['userId'] as num).toInt(),
       passengerFirstName: json['passengerFirstName'] as String? ?? '',
       passengerLastName: json['passengerLastName'] as String? ?? '',
       passengerEmail: json['passengerEmail'] as String?,
@@ -62,9 +66,9 @@ class RideRequest {
       startCity: json['startCity'] as String?,
       endCity: json['endCity'] as String?,
       passengerRideDistance: (json['passengerRideDistance'] as num?)?.toDouble() ?? 0.0,
+      estimatedCost: (json['estimatedCost'] as num?)?.toDouble(),
       status: json['status'] as String? ?? 'PENDING',
       createdDate: json['createdDate'] as String?,
     );
   }
 }
-
