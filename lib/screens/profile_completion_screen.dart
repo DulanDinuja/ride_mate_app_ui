@@ -627,8 +627,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     setState(() => _isUpdating = true);
     try {
       final p = widget.existingProfile!;
-      await UserService.updateUserProfile(p.id, {
-        'version': p.version,
+      final body = <String, dynamic>{
         'dateOfBirth': dateOfBirthStr,
         'gender': _selectedGender!.toUpperCase(),
         'willingToDrive': _willingToDrive ? 'YES' : 'NO',
@@ -639,7 +638,12 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
           'userId': p.userId,
           'isVerified': 'NO',
         },
-      });
+      };
+      // Include version only if it is not null (optimistic locking)
+      if (p.version != null) {
+        body['version'] = p.version;
+      }
+      await UserService.updateUserProfile(p.userId, body);
 
       if (!mounted) return;
       Navigator.of(context).pop();

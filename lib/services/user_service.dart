@@ -65,10 +65,10 @@ class UserService {
     }
   }
 
-  /// PUT /user-profile/update/{id} — update existing user profile.
-  static Future<void> updateUserProfile(int profileId, Map<String, dynamic> data) async {
+  /// PUT /user-profile/update/{userId} — update existing user profile.
+  static Future<void> updateUserProfile(int userId, Map<String, dynamic> data) async {
     try {
-      final response = await ApiClient.put('/user-profile/update/$profileId', body: data);
+      final response = await ApiClient.put('/user-profile/update/$userId', body: data);
 
       if (response.statusCode >= 200 && response.statusCode < 300) return;
 
