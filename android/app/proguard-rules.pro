@@ -4,6 +4,9 @@
 -keep class com.google.android.gms.location.** { *; }
 -keep class com.google.android.gms.dynamic.** { *; }
 -keep class com.google.maps.** { *; }
+# Required for google_maps_flutter Android renderer
+-keep class io.flutter.plugins.googlemaps.** { *; }
+-keep class com.google.android.gms.internal.maps.** { *; }
 
 # ── Keep Geolocator classes ─────────────────────────────────────
 -keep class com.baseflow.geolocator.** { *; }
