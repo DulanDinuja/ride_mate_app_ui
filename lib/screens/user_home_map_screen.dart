@@ -697,8 +697,10 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
         '?q=${Uri.encodeComponent(input)}'
         '&format=json'
         '&addressdetails=1'
-        '&limit=8'
+        '&limit=15'
         '&countrycodes=lk'
+        '&viewbox=${_slSouthWest.longitude},${_slNorthEast.latitude},${_slNorthEast.longitude},${_slSouthWest.latitude}'
+        '&bounded=0'
         '&accept-language=en',
       );
       final headers = <String, String>{
@@ -713,7 +715,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
 
         if (results.isNotEmpty) {
           setState(() {
-            _placePredictions = results.take(8).map<Map<String, dynamic>>((r) {
+            _placePredictions = results.take(15).map<Map<String, dynamic>>((r) {
               final addr = r['address'] as Map<String, dynamic>? ?? {};
               final displayName = r['display_name'] as String? ?? '';
               final lat = double.tryParse(r['lat']?.toString() ?? '') ?? 0.0;
@@ -763,7 +765,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
       final url = Uri.parse(
         'https://photon.komoot.io/api/'
         '?q=${Uri.encodeComponent(input)}'
-        '&limit=10'
+        '&limit=15'
         '&lang=en'
         '&lat=${loc.latitude}'
         '&lon=${loc.longitude}'
@@ -787,7 +789,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
 
         setState(() {
           _placePredictions =
-              sriLankaResults.take(7).map<Map<String, dynamic>>((f) {
+              sriLankaResults.take(15).map<Map<String, dynamic>>((f) {
             final props = f['properties'] as Map<String, dynamic>? ?? {};
             final coords =
                 (f['geometry']?['coordinates'] as List?) ?? [0.0, 0.0];
