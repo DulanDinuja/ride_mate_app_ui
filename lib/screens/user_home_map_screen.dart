@@ -967,6 +967,8 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
         // Load active ride — driverProfile is now set
         if (driverProfile != null) {
           _loadActiveRide();
+          // Load vehicles for the selector in the ride panel
+          loadDriverVehicles(driverProfile!.id);
         } else {
           debugPrint('[UserHome] driverProfile still null after fetch — skipping active ride load');
         }
@@ -2714,6 +2716,8 @@ Future<void> _onChangeProfilePhoto() async {
                       if (isDriver) ...[
                         const SizedBox(height: 8),
                         buildSeatsSelector(scheme, border),
+                        const SizedBox(height: 8),
+                        buildVehicleSelector(scheme, border),
                         const SizedBox(height: 8),
                         buildNoteField(scheme, border),
                       ],

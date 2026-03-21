@@ -1,5 +1,6 @@
 import 'dart:convert';
 import '../models/driver_profile.dart';
+import '../models/driver_vehicles_response.dart';
 import '../models/api_exception.dart';
 import 'api_client.dart';
 import 'token_service.dart';
@@ -23,6 +24,23 @@ class DriverService {
         }
         throw Exception(error['message'] ?? 'Failed to fetch driver profile');
       }
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// GET /driver-profile/{driverProfileId}/vehicles
+  static Future<DriverVehiclesResponse> getDriverVehicles(int driverProfileId) async {
+    try {
+      final response = await ApiClient.get('/driver-profile/$driverProfileId/vehicles');
+      if (response.statusCode == 200) {
+        return DriverVehiclesResponse.fromJson(
+          jsonDecode(response.body) as Map<String, dynamic>,
+        );
+      }
+      final error = jsonDecode(response.body);
+      throw Exception(error['message'] ?? 'Failed to fetch vehicles');
     } catch (e) {
       if (e is Exception) rethrow;
       throw Exception('Network error: $e');
