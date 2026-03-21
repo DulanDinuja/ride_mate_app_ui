@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/config/app_config.dart';
 import '../widgets/custom_back_button.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
@@ -34,6 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleLogin() async {
+    debugPrint('>>> _handleLogin called, BASE_URL=${AppConfig.baseUrl}');
     // Validate fields
     if (_emailController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

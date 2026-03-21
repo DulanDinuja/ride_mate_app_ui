@@ -45,13 +45,17 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen>
       if (userId != null) {
         final profile = await UserService.getUserProfileByUserId(userId);
         if (!mounted) return;
-        Navigator.pushReplacementNamed(context, AppRoutes.userHomeMap);
+        if (profile.isProfileCompleted) {
+          Navigator.pushReplacementNamed(context, AppRoutes.userHomeMap);
+        } else {
+          Navigator.pushReplacementNamed(context, AppRoutes.profileCompletion);
+        }
         return;
       }
     } catch (_) {}
     if (mounted) {
       setState(() => _isLoading = false);
-      Navigator.pushReplacementNamed(context, AppRoutes.userHomeMap);
+      Navigator.pushReplacementNamed(context, AppRoutes.profileCompletion);
     }
   }
 
