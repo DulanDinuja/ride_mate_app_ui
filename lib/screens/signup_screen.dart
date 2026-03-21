@@ -46,13 +46,6 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match')),
-      );
-      return;
-    }
-
     // Validate all fields are filled
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -75,6 +68,14 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
+    // Validate email format
+    if (!_emailController.text.trim().contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid email address!!!')),
+      );
+      return;
+    }
+
     if (_phoneController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter your phone number')),
@@ -82,9 +83,32 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
+    // Validate phone number (must be 10 digits)
+    if (_phoneController.text.trim().length != 10 || !RegExp(r'^[0-9]+$').hasMatch(_phoneController.text.trim())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Phone number must be exactly 10 numbers!!!')),
+      );
+      return;
+    }
+
     if (_passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a password')),
+      );
+      return;
+    }
+
+    // Validate password length (minimum 8 characters)
+    if (_passwordController.text.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password must contain 8 characters!!!')),
+      );
+      return;
+    }
+
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match')),
       );
       return;
     }
@@ -244,7 +268,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           const SizedBox(height: 8),
                           CustomTextField(
                             controller: _nameController,
-                            hintText: 'John',
+                            hintText: 'First Name',
                             icon: Icons.person_outline,
                           ),
 
@@ -261,7 +285,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           const SizedBox(height: 8),
                           CustomTextField(
                             controller: _lastNameController,
-                            hintText: 'Doe',
+                            hintText: 'Last Name',
                             icon: Icons.person_outline,
                           ),
 
@@ -296,7 +320,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           const SizedBox(height: 8),
                           CustomTextField(
                             controller: _phoneController,
-                            hintText: '0712345678',
+                            hintText: '07XXXXXXXXX',
                             icon: Icons.phone_outlined,
                             keyboardType: TextInputType.phone,
                           ),
