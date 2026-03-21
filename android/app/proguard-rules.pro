@@ -24,3 +24,7 @@
 -dontwarn okhttp3.**
 -dontwarn okio.**
 
+# ── Play Core (referenced by Flutter deferred components) ────────
+-dontwarn com.google.android.play.core.**
+-keep class com.google.android.play.core.** { *; }
+
