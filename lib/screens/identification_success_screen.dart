@@ -67,7 +67,7 @@ class IdentificationSuccessScreen extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.of(context).pushNamedAndRemoveUntil(
-                        AppRoutes.homeMap,
+                        AppRoutes.userHomeMap,
                         (route) => false,
                       );
                     },

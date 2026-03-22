@@ -340,7 +340,14 @@ class _RideStartScreenState extends State<RideStartScreen> {
   Widget _buildMenuButton() {
     return GestureDetector(
       onTap: () {
-        Navigator.pushNamed(context, AppRoutes.driverHomeMap);
+        // Pop back to the home map instead of pushing a new instance
+        Navigator.popUntil(
+          context,
+          (route) =>
+              route.settings.name == AppRoutes.userHomeMap ||
+              route.settings.name == AppRoutes.driverHomeMap ||
+              route.isFirst,
+        );
       },
       child: Container(
         width: 78,

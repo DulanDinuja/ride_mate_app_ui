@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../core/routes/app_routes.dart';
 import '../models/cost_split_response.dart';
 import '../services/ride_service.dart';
 import '../services/ride_request_service.dart';
@@ -151,7 +152,8 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
         ),
       );
       // Navigate to cost split screen for final summary
-      Navigator.pushReplacement(
+      // Clear stale ride screens (RideStartScreen etc.) from the stack
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
           builder: (_) => CostSplitScreen(
@@ -160,6 +162,10 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
             isDriver: true,
           ),
         ),
+        (route) =>
+            route.settings.name == AppRoutes.userHomeMap ||
+            route.settings.name == AppRoutes.driverHomeMap ||
+            route.isFirst,
       );
     } catch (e) {
       if (!mounted) return;

@@ -46,16 +46,20 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen>
         final profile = await UserService.getUserProfileByUserId(userId);
         if (!mounted) return;
         if (profile.isProfileCompleted) {
-          Navigator.pushReplacementNamed(context, AppRoutes.userHomeMap);
+          // Clear entire stack so GetStartedScreen is not left in back history
+          Navigator.pushNamedAndRemoveUntil(
+              context, AppRoutes.userHomeMap, (route) => false);
         } else {
-          Navigator.pushReplacementNamed(context, AppRoutes.profileCompletion);
+          Navigator.pushNamedAndRemoveUntil(
+              context, AppRoutes.profileCompletion, (route) => false);
         }
         return;
       }
     } catch (_) {}
     if (mounted) {
       setState(() => _isLoading = false);
-      Navigator.pushReplacementNamed(context, AppRoutes.profileCompletion);
+      Navigator.pushNamedAndRemoveUntil(
+          context, AppRoutes.profileCompletion, (route) => false);
     }
   }
 

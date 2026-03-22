@@ -3763,57 +3763,88 @@ Future<void> _onChangeProfilePhoto() async {
       _buildMapTab(),
     ];
 
-    return Scaffold(
-      appBar: _selectedIndex == 3
-          ? null
-          : AppBar(
-              title: Text(_titleForTab()),
-              backgroundColor: const Color(0xFF040F1B),
-              foregroundColor: Colors.white,
-            ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: pages,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() => _selectedIndex = index);
-          if (index == 3 && _pickupLatLng != null) {
-            _mapController?.animateCamera(
-              CameraUpdate.newLatLngZoom(_pickupLatLng!, 16),
-            );
-          }
-          if (index == 2) {
-            if (isDriver) {
-              _loadActiveRide();
-            } else {
-              _loadPassengerActiveRide();
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        // Show exit confirmation instead of going back to GetStartedScreen
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Exit App?'),
+            content: const Text('Do you want to exit Ride Mate?'),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Exit'),
+              ),
+            ],
+          ),
+        );
+        if (shouldExit == true && context.mounted) {
+          // Exit the app
+          Navigator.pushNamedAndRemoveUntil(
+              context, AppRoutes.getStarted, (route) => false);
+        }
+      },
+      child: Scaffold(
+        appBar: _selectedIndex == 3
+            ? null
+            : AppBar(
+                title: Text(_titleForTab()),
+                backgroundColor: const Color(0xFF040F1B),
+                foregroundColor: Colors.white,
+              ),
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: pages,
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: (index) {
+            setState(() => _selectedIndex = index);
+            if (index == 3 && _pickupLatLng != null) {
+              _mapController?.animateCamera(
+                CameraUpdate.newLatLngZoom(_pickupLatLng!, 16),
+              );
             }
-          }
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Account',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.notifications_none),
-            selectedIcon: Icon(Icons.notifications),
-            label: 'Notifications',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.local_taxi_outlined),
-            selectedIcon: Icon(Icons.local_taxi),
-            label: 'Active Rides',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-        ],
+            if (index == 2) {
+              if (isDriver) {
+                _loadActiveRide();
+              } else {
+                _loadPassengerActiveRide();
+              }
+            }
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Account',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.notifications_none),
+              selectedIcon: Icon(Icons.notifications),
+              label: 'Notifications',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.local_taxi_outlined),
+              selectedIcon: Icon(Icons.local_taxi),
+              label: 'Active Rides',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+          ],
+        ),
       ),
     );
   }
