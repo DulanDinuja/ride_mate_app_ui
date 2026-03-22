@@ -22,6 +22,11 @@ import '../../screens/navigation_screen.dart';
 import '../../screens/cost_split_screen.dart';
 import '../../screens/active_ride_screen.dart';
 import '../../screens/manage_vehicle_profiles_screen.dart';
+import '../../screens/payment_methods_screen.dart';
+import '../../screens/payment_history_screen.dart';
+import '../../screens/driver_wallet_screen.dart';
+import '../../screens/withdrawal_request_screen.dart';
+import '../../screens/withdrawal_history_screen.dart';
 import '../../models/user_verification_args.dart';
 import '../../models/driver_registration_data.dart';
 import '../../models/user_profile.dart';
@@ -53,6 +58,13 @@ class AppRoutes {
   static const String activeRide = '/active-ride';
   static const String rideRequests = '/ride-requests';
   static const String manageVehicleProfiles = '/manage-vehicle-profiles';
+
+  // ─── Payment routes ──────────────────────────────────────────────
+  static const String paymentMethods = '/payment-methods';
+  static const String paymentHistory = '/payment-history';
+  static const String driverWallet = '/driver-wallet';
+  static const String withdrawalRequest = '/withdrawal-request';
+  static const String withdrawalHistory = '/withdrawal-history';
 
   // Generate routes
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -212,6 +224,69 @@ class AppRoutes {
 
       case manageVehicleProfiles:
         return MaterialPageRoute(builder: (_) => const ManageVehicleProfilesScreen());
+
+      // ─── Payment Routes ──────────────────────────────────────────
+      case paymentMethods:
+        final args = settings.arguments;
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => PaymentMethodsScreen(
+              userId: args['userId'] as int,
+              firstName: args['firstName'] as String? ?? '',
+              lastName: args['lastName'] as String? ?? '',
+              email: args['email'] as String? ?? '',
+              phone: args['phone'] as String? ?? '',
+            ),
+          );
+        }
+        return _errorRoute('Payment methods data is missing');
+
+      case paymentHistory:
+        final args = settings.arguments;
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => PaymentHistoryScreen(
+              userId: args['userId'] as int,
+            ),
+          );
+        }
+        return _errorRoute('Payment history data is missing');
+
+      case driverWallet:
+        final args = settings.arguments;
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => DriverWalletScreen(
+              driverProfileId: args['driverProfileId'] as int,
+            ),
+          );
+        }
+        return _errorRoute('Driver wallet data is missing');
+
+      case withdrawalRequest:
+        final args = settings.arguments;
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => WithdrawalRequestScreen(
+              driverProfileId: args['driverProfileId'] as int,
+              availableBalance:
+                  (args['availableBalance'] as num?)?.toDouble() ?? 0,
+              currency: args['currency'] as String? ?? 'LKR',
+            ),
+          );
+        }
+        return _errorRoute('Withdrawal request data is missing');
+
+      case withdrawalHistory:
+        final args = settings.arguments;
+        if (args is Map<String, dynamic>) {
+          return MaterialPageRoute(
+            builder: (_) => WithdrawalHistoryScreen(
+              driverProfileId: args['driverProfileId'] as int,
+            ),
+          );
+        }
+        return _errorRoute('Withdrawal history data is missing');
 
       default:
         return _errorRoute('Route not found: ${settings.name}');
