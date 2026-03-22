@@ -406,9 +406,6 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                 if (v == null || v.trim().isEmpty) {
                   return 'Description is required';
                 }
-                if (v.trim().length < 20) {
-                  return 'Please provide at least 20 characters';
-                }
                 return null;
               },
             ),
