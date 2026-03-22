@@ -153,7 +153,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                       _buildDocumentTypeDropdown(),
                       const SizedBox(height: 26),
                       const Text(
-                        'NIC Number / Passport Number',
+                        'Identification Number',
                         style: TextStyle(
                           fontSize: 19,
                           fontWeight: FontWeight.w500,
