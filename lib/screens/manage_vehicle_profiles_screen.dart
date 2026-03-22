@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../core/routes/app_routes.dart';
 import '../widgets/custom_back_button.dart';
 import '../services/vehicle_service.dart';
 import '../services/driver_service.dart';
 import '../services/token_service.dart';
+import 'update_vehicle_screen.dart';
 
 class ManageVehicleProfilesScreen extends StatefulWidget {
   const ManageVehicleProfilesScreen({super.key});
@@ -19,44 +19,14 @@ class _ManageVehicleProfilesScreenState extends State<ManageVehicleProfilesScree
   static const Color _creamBg = Color(0xFFFFFFF0);
 
   bool _isLoading = false;
-  bool _isUpdating = false;
   String? _errorMessage;
   Map<String, dynamic>? _vehicleData;
   List<Map<String, dynamic>> _vehicles = [];
-
-  // Controllers for editable fields
-  final Map<int, TextEditingController> _registrationControllers = {};
-  final Map<int, TextEditingController> _modelControllers = {};
-  final Map<int, TextEditingController> _yearControllers = {};
-  final Map<int, TextEditingController> _colorControllers = {};
-  final Map<int, TextEditingController> _seatsControllers = {};
-  final Map<int, bool> _isPrimaryValues = {};
 
   @override
   void initState() {
     super.initState();
     _loadVehicleProfiles();
-  }
-
-  @override
-  void dispose() {
-    // Dispose all controllers
-    for (var controller in _registrationControllers.values) {
-      controller.dispose();
-    }
-    for (var controller in _modelControllers.values) {
-      controller.dispose();
-    }
-    for (var controller in _yearControllers.values) {
-      controller.dispose();
-    }
-    for (var controller in _colorControllers.values) {
-      controller.dispose();
-    }
-    for (var controller in _seatsControllers.values) {
-      controller.dispose();
-    }
-    super.dispose();
   }
 
   Future<void> _loadVehicleProfiles() async {
@@ -66,7 +36,6 @@ class _ManageVehicleProfilesScreenState extends State<ManageVehicleProfilesScree
     });
 
     try {
-      // Get driver profile ID
       final userId = await TokenService.getUserId();
       if (userId == null) {
         throw Exception('User not logged in');
@@ -82,27 +51,6 @@ class _ManageVehicleProfilesScreenState extends State<ManageVehicleProfilesScree
         _vehicles = (vehicleData['vehicles'] as List<dynamic>)
             .map((v) => v as Map<String, dynamic>)
             .toList();
-
-        // Initialize controllers for each vehicle
-        for (var vehicle in _vehicles) {
-          final id = vehicle['id'] as int;
-          _registrationControllers[id] = TextEditingController(
-            text: vehicle['registrationNumber']?.toString() ?? '',
-          );
-          _modelControllers[id] = TextEditingController(
-            text: vehicle['model']?.toString() ?? '',
-          );
-          _yearControllers[id] = TextEditingController(
-            text: vehicle['year']?.toString() ?? '',
-          );
-          _colorControllers[id] = TextEditingController(
-            text: vehicle['color']?.toString() ?? '',
-          );
-          _seatsControllers[id] = TextEditingController(
-            text: vehicle['seats']?.toString() ?? '',
-          );
-          _isPrimaryValues[id] = vehicle['isPrimary']?.toString().toUpperCase() == 'YES';
-        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -183,7 +131,6 @@ class _ManageVehicleProfilesScreenState extends State<ManageVehicleProfilesScree
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Header card
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -201,56 +148,49 @@ class _ManageVehicleProfilesScreenState extends State<ManageVehicleProfilesScree
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: _accent.withOpacity(0.2),
-                      shape: BoxShape.circle,
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: _accent.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.directions_car,
+                  color: _accent,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Your Vehicles',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.directions_car,
-                      color: _accent,
-                      size: 26,
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_vehicleData?['totalVehicles'] ?? 0} vehicle(s)',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Your Vehicles',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${_vehicleData?['totalVehicles'] ?? 0} vehicle(s)',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 20),
-
-        // Vehicle list
         ..._vehicles.map((vehicle) => _buildVehicleCard(vehicle)),
       ],
     );
@@ -324,12 +264,16 @@ class _ManageVehicleProfilesScreenState extends State<ManageVehicleProfilesScree
   }
 
   Widget _buildVehicleCard(Map<String, dynamic> vehicle) {
-    final vehicleId = vehicle['id'] as int;
     final vehicleTypeName = vehicle['vehicleTypeName']?.toString() ?? 'N/A';
     final vehicleMakeName = vehicle['vehicleMakeName']?.toString() ?? 'N/A';
     final vehicleModelName = vehicle['vehicleModelName']?.toString() ?? 'N/A';
+    final registrationNumber = vehicle['registrationNumber']?.toString() ?? 'N/A';
+    final year = vehicle['year']?.toString() ?? 'N/A';
+    final color = vehicle['color']?.toString() ?? 'N/A';
+    final seats = vehicle['seats']?.toString() ?? 'N/A';
     final status = vehicle['status']?.toString() ?? 'PENDING';
     final isVerified = vehicle['isVerified']?.toString().toUpperCase() == 'YES';
+    final isPrimary = vehicle['isPrimary']?.toString().toUpperCase() == 'YES';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -348,7 +292,6 @@ class _ManageVehicleProfilesScreenState extends State<ManageVehicleProfilesScree
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Vehicle header
           Row(
             children: [
               Container(
@@ -401,220 +344,103 @@ class _ManageVehicleProfilesScreenState extends State<ManageVehicleProfilesScree
             ],
           ),
           const SizedBox(height: 20),
-
-          // Editable fields
-          _buildTextField(
-            label: 'Registration Number',
-            controller: _registrationControllers[vehicleId]!,
-            icon: Icons.confirmation_number_outlined,
-          ),
+          _buildDetailRow(Icons.confirmation_number_outlined, 'Registration', registrationNumber),
           const SizedBox(height: 12),
-          _buildTextField(
-            label: 'Model',
-            controller: _modelControllers[vehicleId]!,
-            icon: Icons.car_rental,
-          ),
+          _buildDetailRow(Icons.calendar_today, 'Year', year),
           const SizedBox(height: 12),
-          _buildTextField(
-            label: 'Year',
-            controller: _yearControllers[vehicleId]!,
-            icon: Icons.calendar_today,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          ),
+          _buildDetailRow(Icons.palette_outlined, 'Color', color),
           const SizedBox(height: 12),
-          _buildTextField(
-            label: 'Color',
-            controller: _colorControllers[vehicleId]!,
-            icon: Icons.palette_outlined,
-          ),
-          const SizedBox(height: 12),
-          _buildTextField(
-            label: 'Seats',
-            controller: _seatsControllers[vehicleId]!,
-            icon: Icons.event_seat,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          ),
+          _buildDetailRow(Icons.event_seat, 'Seats', seats),
           const SizedBox(height: 16),
-
-          // Primary vehicle toggle
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _accent.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _accent.withOpacity(0.2)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.star_outline, color: _accent, size: 20),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'Set as Primary Vehicle',
+          if (isPrimary)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: _accent.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _accent.withOpacity(0.3)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.star, color: _accent, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'Primary Vehicle',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: _navy,
+                      color: _accent,
                     ),
                   ),
-                ),
-                Switch(
-                  value: _isPrimaryValues[vehicleId] ?? false,
-                  onChanged: (value) {
-                    setState(() {
-                      _isPrimaryValues[vehicleId] = value;
-                    });
-                  },
-                  activeColor: _accent,
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
           const SizedBox(height: 20),
-
-          // Action buttons
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _navy,
-                    side: const BorderSide(color: _navy),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Back',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: () => _navigateToUpdateVehicle(vehicle),
+              icon: const Icon(Icons.edit, size: 18),
+              label: const Text(
+                'Update Vehicle',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _isUpdating ? null : () => _updateVehicle(vehicleId),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _accent,
-                    disabledBackgroundColor: _accent.withOpacity(0.5),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _isUpdating
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Update',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _accent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-            ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTextField({
-    required String label,
-    required TextEditingController controller,
-    required IconData icon,
-    TextInputType? keyboardType,
-    List<TextInputFormatter>? inputFormatters,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Row(
       children: [
+        Icon(icon, size: 18, color: Colors.grey.shade600),
+        const SizedBox(width: 10),
         Text(
-          label,
+          '$label:',
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
             color: Colors.grey.shade700,
           ),
         ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          keyboardType: keyboardType,
-          inputFormatters: inputFormatters,
-          decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: _accent, size: 20),
-            filled: true,
-            fillColor: Colors.grey.shade50,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: _navy,
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: _accent, width: 2),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
         ),
       ],
     );
   }
 
-  Future<void> _updateVehicle(int vehicleId) async {
-    setState(() => _isUpdating = true);
+  Future<void> _navigateToUpdateVehicle(Map<String, dynamic> vehicle) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UpdateVehicleScreen(vehicleData: vehicle),
+      ),
+    );
 
-    try {
-      final body = {
-        'registrationNumber': _registrationControllers[vehicleId]!.text.trim(),
-        'model': _modelControllers[vehicleId]!.text.trim(),
-        'year': int.tryParse(_yearControllers[vehicleId]!.text.trim()) ?? 0,
-        'color': _colorControllers[vehicleId]!.text.trim(),
-        'seats': int.tryParse(_seatsControllers[vehicleId]!.text.trim()) ?? 0,
-        'isPrimary': _isPrimaryValues[vehicleId] == true ? 'YES' : 'NO',
-      };
-
-      await VehicleService.updateVehicle(vehicleId: vehicleId, body: body);
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vehicle updated successfully!'),
-          backgroundColor: _accent,
-        ),
-      );
-
-      // Reload vehicles
-      await _loadVehicleProfiles();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isUpdating = false);
-      }
+    if (result == true) {
+      _loadVehicleProfiles();
     }
   }
 
