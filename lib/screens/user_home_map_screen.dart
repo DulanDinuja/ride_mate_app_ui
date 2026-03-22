@@ -1673,6 +1673,70 @@ Future<void> _onChangeProfilePhoto() async {
           ),
         ),
         const SizedBox(height: 12),
+        _buildSectionTitle('Payments & Wallet'),
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Column(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.credit_card_outlined),
+                title: const Text('Payment Methods'),
+                subtitle: const Text('Manage saved cards'),
+                trailing: const Icon(Icons.chevron_right_rounded, size: 18),
+                onTap: () {
+                  if (_userProfile == null) return;
+                  Navigator.pushNamed(
+                    context,
+                    AppRoutes.paymentMethods,
+                    arguments: {
+                      'userId': _userProfile!.userId,
+                      'firstName': _userProfile!.firstName,
+                      'lastName': _userProfile!.lastName,
+                      'email': _userProfile!.email,
+                      'phone': _userProfile!.phoneNumber,
+                    },
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.receipt_long_outlined),
+                title: const Text('Payment History'),
+                subtitle: const Text('View past transactions'),
+                trailing: const Icon(Icons.chevron_right_rounded, size: 18),
+                onTap: () {
+                  if (_userProfile == null) return;
+                  Navigator.pushNamed(
+                    context,
+                    AppRoutes.paymentHistory,
+                    arguments: {
+                      'userId': _userProfile!.userId,
+                    },
+                  );
+                },
+              ),
+              if (isDriver && driverProfile != null) ...[
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.account_balance_wallet_outlined),
+                  title: const Text('Driver Wallet'),
+                  subtitle: const Text('Earnings, withdrawals & balance'),
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 18),
+                  onTap: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.driverWallet,
+                      arguments: {
+                        'driverProfileId': driverProfile!.id,
+                      },
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
         _buildSectionTitle('Preferences & Support'),
         Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
