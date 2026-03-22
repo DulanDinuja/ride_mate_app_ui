@@ -9,6 +9,7 @@ import '../services/ride_request_service.dart';
 import '../widgets/custom_back_button.dart';
 import 'cost_split_screen.dart';
 import 'driver_ride_requests_screen.dart';
+import 'help_support_screen.dart';
 
 /// The driver can view the full cost breakdown, and the screen auto-refreshes.
 class ActiveRideScreen extends StatefulWidget {
@@ -193,6 +194,20 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _cream,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const HelpSupportScreen(isEmergencyMode: true),
+          ),
+        ),
+        backgroundColor: const Color(0xFFD32F2F),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.sos_rounded),
+        label: const Text('SOS',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+        elevation: 6,
+      ),
       appBar: AppBar(
         leading: const Padding(
           padding: EdgeInsets.all(6),
@@ -202,6 +217,19 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
         backgroundColor: _navy,
         foregroundColor: Colors.white,
         actions: [
+          // Emergency help icon in AppBar
+          IconButton(
+            icon: const Icon(Icons.health_and_safety_outlined,
+                color: Color(0xFFEF9A9A)),
+            tooltip: 'Emergency Help',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    const HelpSupportScreen(isEmergencyMode: true),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadCostSplit,

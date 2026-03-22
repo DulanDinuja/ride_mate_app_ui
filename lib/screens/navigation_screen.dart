@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 
 import '../services/api_client.dart';
 import '../widgets/custom_back_button.dart';
+import 'help_support_screen.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // NavigationArgs — shared by driver & passenger
@@ -471,6 +472,40 @@ class _NavigationScreenState extends State<NavigationScreen>
           SafeArea(
             child: _buildInstructionBanner(),
           ),
+
+          // ── SOS emergency button (bottom-right) ──
+          if (!_hasArrived)
+            Positioned(
+              right: 16,
+              bottom: 32,
+              child: GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const HelpSupportScreen(isEmergencyMode: true),
+                  ),
+                ),
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD32F2F),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFD32F2F).withOpacity(0.45),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.sos_rounded,
+                      color: Colors.white, size: 28),
+                ),
+              ),
+            ),
+
           // ── Arrived overlay ──
           if (_hasArrived) _buildArrivedOverlay(),
         ],

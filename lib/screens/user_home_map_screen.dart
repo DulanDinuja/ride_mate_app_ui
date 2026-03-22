@@ -24,6 +24,7 @@ import '../services/user_service.dart';
 import '../widgets/custom_back_button.dart';
 import 'available_rides_screen.dart';
 import 'driver_home_mixin.dart';
+import 'help_support_screen.dart';
 import 'ride_preferences_screen.dart';
 import 'ride_requests_screen.dart';
 
@@ -1736,7 +1737,13 @@ Future<void> _onChangeProfilePhoto() async {
               ListTile(
                 leading: const Icon(Icons.help_outline),
                 title: const Text('Help & Support'),
-                onTap: () => _showComingSoon('Help & support'),
+                trailing: const Icon(Icons.chevron_right_rounded, size: 18),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const HelpSupportScreen(),
+                  ),
+                ),
               ),
               const Divider(height: 1),
               ListTile(
