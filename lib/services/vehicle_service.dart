@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../models/api_exception.dart';
 import '../models/vehicle_type.dart';
 import '../models/vehicle_make.dart';
 import '../models/vehicle_model.dart';
@@ -78,6 +79,56 @@ class VehicleService {
           .whereType<Map<String, dynamic>>()
           .map(VehicleModel.fromJson)
           .toList();
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// GET /driver-profile/{driverProfileId}/vehicles
+  /// Fetches all vehicles for a driver profile
+  static Future<Map<String, dynamic>> getDriverVehicles(int driverProfileId) async {
+    try {
+      final response = await ApiClient.get(
+        '/driver-profile/$driverProfileId/vehicles',
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        final error = jsonDecode(response.body);
+        if (error.containsKey('errorMessage') && error['errorMessage'] != null) {
+          throw ApiException(error['errorMessage']);
+        }
+        throw Exception(error['message'] ?? 'Failed to fetch vehicles');
+      }
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// PUT /driver-profile/vehicles/{vehicleId}
+  /// Updates a specific vehicle
+  static Future<void> updateVehicle({
+    required int vehicleId,
+    required Map<String, dynamic> body,
+  }) async {
+    try {
+      final response = await ApiClient.put(
+        '/driver-profile/vehicle/$vehicleId',
+        body: body,
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return;
+      }
+
+      final error = jsonDecode(response.body);
+      if (error.containsKey('errorMessage') && error['errorMessage'] != null) {
+        throw ApiException(error['errorMessage']);
+      }
+      throw Exception(error['message'] ?? 'Failed to update vehicle');
     } catch (e) {
       if (e is Exception) rethrow;
       throw Exception('Network error: $e');
