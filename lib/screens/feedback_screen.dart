@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/user_profile.dart';
+import '../services/support_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import '../widgets/custom_back_button.dart';
@@ -102,9 +103,26 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     }
 
     setState(() => _submitting = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) setState(() => _submitting = false);
-    _showSuccessDialog();
+    try {
+      await SupportService.submitFeedback(
+        userId: _profile!.userId,
+        rating: _rating,
+        category: _selectedCategory!,
+        feedbackText: _feedbackCtrl.text.trim(),
+      );
+      if (mounted) setState(() => _submitting = false);
+      _showSuccessDialog();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Submission failed: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red.shade600,
+          ),
+        );
+      }
+    }
   }
 
   void _showSuccessDialog() {

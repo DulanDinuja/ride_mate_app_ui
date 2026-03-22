@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/user_profile.dart';
+import '../services/support_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import '../widgets/custom_back_button.dart';
@@ -77,10 +78,26 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     }
 
     setState(() => _submitting = true);
-    // Simulate API submission delay
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) setState(() { _submitting = false; _submitted = true; });
-    _showSuccessDialog();
+    try {
+      await SupportService.submitReport(
+        userId: _profile!.userId,
+        category: _selectedCategory!,
+        subject: _subjectCtrl.text.trim(),
+        description: _descCtrl.text.trim(),
+      );
+      if (mounted) setState(() { _submitting = false; _submitted = true; });
+      _showSuccessDialog();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Submission failed: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red.shade600,
+          ),
+        );
+      }
+    }
   }
 
   void _showSuccessDialog() {
