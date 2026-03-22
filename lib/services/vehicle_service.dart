@@ -116,7 +116,7 @@ class VehicleService {
   }) async {
     try {
       final response = await ApiClient.put(
-        '/driver-profile/vehicles/$vehicleId',
+        '/driver-profile/vehicle/$vehicleId',
         body: body,
       );
 
