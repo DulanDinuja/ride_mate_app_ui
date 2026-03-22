@@ -9,8 +9,6 @@ import '../widgets/custom_back_button.dart';
 import 'cost_split_screen.dart';
 import 'driver_ride_requests_screen.dart';
 
-/// Active ride screen for drivers.
-/// Shows the currently active ride, its passengers, and real-time cost split.
 /// The driver can view the full cost breakdown, and the screen auto-refreshes.
 class ActiveRideScreen extends StatefulWidget {
   final int rideDetailId;
