@@ -8,9 +8,11 @@ import '../models/available_ride.dart';
 import '../models/passenger_estimated_cost_response.dart';
 import '../models/ride_request.dart';
 import '../models/user_profile.dart';
+import '../services/ride_preferences_service.dart';
 import '../services/ride_request_service.dart';
 import '../services/token_service.dart';
 import '../widgets/custom_back_button.dart';
+import 'ride_preferences_screen.dart';
 
 /// Screen that shows all ML-ranked available rides heading in the passenger's direction.
 /// The passenger can browse rides, see estimated cost, and request to join one.
@@ -21,6 +23,8 @@ class AvailableRidesScreen extends StatefulWidget {
   final LatLng pickupLatLng;
   final LatLng dropLatLng;
   final UserProfile? userProfile;
+  /// Initial gender preference — can be changed from within the screen.
+  final GenderPreference genderPreference;
 
   const AvailableRidesScreen({
     super.key,
@@ -30,6 +34,7 @@ class AvailableRidesScreen extends StatefulWidget {
     required this.pickupLatLng,
     required this.dropLatLng,
     this.userProfile,
+    this.genderPreference = GenderPreference.both,
   });
 
   @override
@@ -41,16 +46,55 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
   static const Color _navy = Color(0xFF040F1B);
   static const Color _cream = Color(0xFFFFFFF0);
 
-  List<AvailableRide> _rides = [];
+  List<AvailableRide> _allRides = [];  // raw from backend
+  List<AvailableRide> _rides = [];     // filtered list shown in UI
   bool _isLoading = true;
   String? _error;
   int? _requestingRideId;
   int? _estimatingRideId;
 
+  /// Local mutable copy of the gender preference — can be updated from the screen.
+  late GenderPreference _localGenderPref;
+
   @override
   void initState() {
     super.initState();
+    _localGenderPref = widget.genderPreference;
     _loadAvailableRides();
+  }
+
+  /// Open Ride Preferences and apply any changes on return.
+  Future<void> _openRideFilter() async {
+    final result = await Navigator.push<GenderPreference>(
+      context,
+      MaterialPageRoute(builder: (_) => const RidePreferencesScreen()),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _localGenderPref = result;
+        _applyFilter();
+      });
+    }
+  }
+
+  /// Apply the gender preference filter to [_allRides] — updates [_rides] directly.
+  /// Must be called inside setState().
+  void _applyFilter() {
+    switch (_localGenderPref) {
+      case GenderPreference.male:
+        _rides = _allRides
+            .where((r) => r.driverGender?.toUpperCase() == 'MALE')
+            .toList();
+        break;
+      case GenderPreference.female:
+        _rides = _allRides
+            .where((r) => r.driverGender?.toUpperCase() == 'FEMALE')
+            .toList();
+        break;
+      case GenderPreference.both:
+        _rides = List.from(_allRides);
+        break;
+    }
   }
 
   Future<void> _loadAvailableRides() async {
@@ -69,7 +113,8 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
       );
       if (mounted) {
         setState(() {
-          _rides = rides;
+          _allRides = rides;
+          _applyFilter();   // updates _rides inside this setState
           _isLoading = false;
         });
       }
@@ -197,6 +242,41 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
         backgroundColor: _navy,
         foregroundColor: Colors.white,
         actions: [
+          // Ride Filter chip in AppBar
+          GestureDetector(
+            onTap: _openRideFilter,
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+              decoration: BoxDecoration(
+                color: _localGenderPref == GenderPreference.female
+                    ? Colors.pink.shade400
+                    : _localGenderPref == GenderPreference.male
+                        ? Colors.blue.shade400
+                        : _accent.withOpacity(0.25),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.tune_rounded, size: 14, color: Colors.white),
+                  const SizedBox(width: 5),
+                  Text(
+                    _localGenderPref == GenderPreference.female
+                        ? '♀ Female'
+                        : _localGenderPref == GenderPreference.male
+                            ? '♂ Male'
+                            : 'Filter',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadAvailableRides,
@@ -249,6 +329,58 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
               _infoChip(Icons.search, '${_rides.length} ride${_rides.length != 1 ? 's' : ''} found'),
             ],
           ),
+          // Gender preference active badge — tappable to change filter
+          if (_localGenderPref != GenderPreference.both) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: _openRideFilter,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _localGenderPref == GenderPreference.female
+                      ? Colors.pink.shade50
+                      : Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _localGenderPref == GenderPreference.female
+                        ? Colors.pink.shade200
+                        : Colors.blue.shade200,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.tune_rounded,
+                      size: 13,
+                      color: _localGenderPref == GenderPreference.female
+                          ? Colors.pink.shade600
+                          : Colors.blue.shade600,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _localGenderPref == GenderPreference.female
+                          ? '♀ Female drivers only'
+                          : '♂ Male drivers only',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: _localGenderPref == GenderPreference.female
+                            ? Colors.pink.shade700
+                            : Colors.blue.shade700,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(Icons.edit_outlined,
+                        size: 11,
+                        color: _localGenderPref == GenderPreference.female
+                            ? Colors.pink.shade400
+                            : Colors.blue.shade400),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

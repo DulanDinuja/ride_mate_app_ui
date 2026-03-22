@@ -16,6 +16,7 @@ import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/driver_service.dart';
 import '../services/file_service.dart';
+import '../services/ride_preferences_service.dart';
 import '../services/ride_request_service.dart';
 import '../services/ride_service.dart';
 import '../services/token_service.dart';
@@ -23,6 +24,7 @@ import '../services/user_service.dart';
 import '../widgets/custom_back_button.dart';
 import 'available_rides_screen.dart';
 import 'driver_home_mixin.dart';
+import 'ride_preferences_screen.dart';
 import 'ride_requests_screen.dart';
 
 class UserHomeMapScreen extends StatefulWidget {
@@ -44,6 +46,9 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   bool _isChangingRole = false;
   String? _loadError;
   UserProfile? _userProfile;
+
+  // ── ride preferences ──
+  GenderPreference _genderPreference = GenderPreference.both;
 
   // ── DriverHomeMixin interface ──
   @override
@@ -127,6 +132,12 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
     super.initState();
     _loadUserProfile();
     _loadCurrentLocation();
+    _loadRidePreferences();
+  }
+
+  Future<void> _loadRidePreferences() async {
+    final pref = await RidePreferencesService.loadGenderPreference();
+    if (mounted) setState(() => _genderPreference = pref);
   }
 
   @override
@@ -447,6 +458,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
         pickupLatLng: _pickupLatLng!,
         dropLatLng: _dropLatLng!,
         userProfile: _userProfile,
+        genderPreference: _genderPreference,
       ),
     );
   }
@@ -1675,7 +1687,50 @@ Future<void> _onChangeProfilePhoto() async {
               ListTile(
                 leading: const Icon(Icons.tune_outlined),
                 title: const Text('Ride Preferences'),
-                onTap: () => _showComingSoon('Ride preferences'),
+                subtitle: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _genderPreference == GenderPreference.female
+                            ? Colors.pink.shade50
+                            : _genderPreference == GenderPreference.male
+                                ? Colors.blue.shade50
+                                : const Color(0xFF03AF74).withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _genderPreference == GenderPreference.female
+                            ? '♀ Female Only'
+                            : _genderPreference == GenderPreference.male
+                                ? '♂ Male Only'
+                                : '⚡ Both Genders',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _genderPreference == GenderPreference.female
+                              ? Colors.pink.shade600
+                              : _genderPreference == GenderPreference.male
+                                  ? Colors.blue.shade600
+                                  : const Color(0xFF03AF74),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  final result = await Navigator.push<GenderPreference>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const RidePreferencesScreen(),
+                    ),
+                  );
+                  if (result != null && mounted) {
+                    setState(() => _genderPreference = result);
+                  }
+                },
               ),
               const Divider(height: 1),
               ListTile(
@@ -2802,6 +2857,77 @@ Future<void> _onChangeProfilePhoto() async {
                             ],
                           ),
                         ),
+                      // ── Ride Filter chip ──
+                      GestureDetector(
+                        onTap: () async {
+                          final result = await Navigator.push<GenderPreference>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const RidePreferencesScreen(),
+                            ),
+                          );
+                          if (result != null && mounted) {
+                            setState(() => _genderPreference = result);
+                          }
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _genderPreference == GenderPreference.female
+                                ? Colors.pink.shade50
+                                : _genderPreference == GenderPreference.male
+                                    ? Colors.blue.shade50
+                                    : const Color(0xFF03AF74).withOpacity(0.07),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _genderPreference == GenderPreference.female
+                                  ? Colors.pink.shade200
+                                  : _genderPreference == GenderPreference.male
+                                      ? Colors.blue.shade200
+                                      : const Color(0xFF03AF74).withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.tune_rounded,
+                                size: 16,
+                                color: _genderPreference == GenderPreference.female
+                                    ? Colors.pink.shade600
+                                    : _genderPreference == GenderPreference.male
+                                        ? Colors.blue.shade600
+                                        : const Color(0xFF03AF74),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Ride Filter: ${_genderPreference == GenderPreference.female ? '♀ Female Only' : _genderPreference == GenderPreference.male ? '♂ Male Only' : '⚡ Both Genders'}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: _genderPreference == GenderPreference.female
+                                        ? Colors.pink.shade700
+                                        : _genderPreference == GenderPreference.male
+                                            ? Colors.blue.shade700
+                                            : const Color(0xFF03AF74),
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                size: 16,
+                                color: _genderPreference == GenderPreference.female
+                                    ? Colors.pink.shade400
+                                    : _genderPreference == GenderPreference.male
+                                        ? Colors.blue.shade400
+                                        : const Color(0xFF03AF74).withOpacity(0.6),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                       // Action button
                       SizedBox(
                         width: double.infinity,
@@ -3765,7 +3891,7 @@ Future<void> _onChangeProfilePhoto() async {
 
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         // Show exit confirmation instead of going back to GetStartedScreen
         final shouldExit = await showDialog<bool>(
@@ -3862,6 +3988,7 @@ class _PassengerConfirmSheet extends StatefulWidget {
   final LatLng pickupLatLng;
   final LatLng dropLatLng;
   final UserProfile? userProfile;
+  final GenderPreference genderPreference;
 
   const _PassengerConfirmSheet({
     required this.pickupAddress,
@@ -3870,6 +3997,7 @@ class _PassengerConfirmSheet extends StatefulWidget {
     required this.pickupLatLng,
     required this.dropLatLng,
     this.userProfile,
+    this.genderPreference = GenderPreference.both,
   });
 
   @override
@@ -3892,6 +4020,7 @@ class _PassengerConfirmSheetState extends State<_PassengerConfirmSheet> {
           pickupLatLng: widget.pickupLatLng,
           dropLatLng: widget.dropLatLng,
           userProfile: widget.userProfile,
+          genderPreference: widget.genderPreference,
         ),
       ),
     );
@@ -3997,7 +4126,51 @@ class _PassengerConfirmSheetState extends State<_PassengerConfirmSheet> {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // Active gender preference indicator
+              if (widget.genderPreference != GenderPreference.both)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: widget.genderPreference == GenderPreference.female
+                        ? Colors.pink.shade50
+                        : Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: widget.genderPreference == GenderPreference.female
+                          ? Colors.pink.shade200
+                          : Colors.blue.shade200,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.tune_rounded,
+                        size: 16,
+                        color: widget.genderPreference == GenderPreference.female
+                            ? Colors.pink.shade600
+                            : Colors.blue.shade600,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          widget.genderPreference == GenderPreference.female
+                              ? 'Ride Filter: Female drivers only'
+                              : 'Ride Filter: Male drivers only',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: widget.genderPreference == GenderPreference.female
+                                ? Colors.pink.shade700
+                                : Colors.blue.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 16),
 
               // Find Rides button
               SizedBox(
