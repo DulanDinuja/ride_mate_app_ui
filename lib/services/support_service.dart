@@ -15,7 +15,7 @@ class SupportService {
     required String description,
   }) async {
     final response = await ApiClient.post(
-      '/user-reports',
+      '/user-reports/report',
       body: {
         'userId': userId,
         'category': category,
@@ -43,7 +43,7 @@ class SupportService {
     required String feedbackText,
   }) async {
     final response = await ApiClient.post(
-      '/user-feedback',
+      '/user-feedback/feedback',
       body: {
         'userId': userId,
         'rating': rating,

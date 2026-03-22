@@ -40,7 +40,7 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
   final ImagePicker _imagePicker = ImagePicker();
 
   // ── bottom nav ──
-  int _selectedIndex = 3;
+  int _selectedIndex = 0;
 
   // ── profile ──
   bool _isLoadingProfile = true;
@@ -2550,13 +2550,13 @@ Future<void> _onChangeProfilePhoto() async {
   String _titleForTab() {
     switch (_selectedIndex) {
       case 0:
-        return 'Account';
+        return 'Home';
       case 1:
         return 'Notifications';
       case 2:
         return 'Active Rides';
       default:
-        return 'Home';
+        return 'Account';
     }
   }
 
@@ -2619,7 +2619,7 @@ Future<void> _onChangeProfilePhoto() async {
                   GestureDetector(
                     onTap: () {
                       // Open account / menu
-                      setState(() => _selectedIndex = 0);
+                      setState(() => _selectedIndex = 3);
                     },
                     child: Container(
                       width: 48,
@@ -3961,10 +3961,10 @@ Future<void> _onChangeProfilePhoto() async {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      _buildAccountTab(),
+      _buildMapTab(),
       _buildNotificationsTab(),
       _buildActiveRidesTab(),
-      _buildMapTab(),
+      _buildAccountTab(),
     ];
 
     return PopScope(
@@ -3998,7 +3998,7 @@ Future<void> _onChangeProfilePhoto() async {
         }
       },
       child: Scaffold(
-        appBar: _selectedIndex == 3
+        appBar: _selectedIndex == 0
             ? null
             : AppBar(
                 title: Text(_titleForTab()),
@@ -4013,7 +4013,7 @@ Future<void> _onChangeProfilePhoto() async {
           selectedIndex: _selectedIndex,
           onDestinationSelected: (index) {
             setState(() => _selectedIndex = index);
-            if (index == 3 && _pickupLatLng != null) {
+            if (index == 0 && _pickupLatLng != null) {
               _mapController?.animateCamera(
                 CameraUpdate.newLatLngZoom(_pickupLatLng!, 16),
               );
@@ -4028,9 +4028,9 @@ Future<void> _onChangeProfilePhoto() async {
           },
           destinations: const [
             NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: 'Account',
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Home',
             ),
             NavigationDestination(
               icon: Icon(Icons.notifications_none),
@@ -4043,9 +4043,9 @@ Future<void> _onChangeProfilePhoto() async {
               label: 'Active Rides',
             ),
             NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Home',
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Account',
             ),
           ],
         ),
