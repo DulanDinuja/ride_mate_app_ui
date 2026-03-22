@@ -5,6 +5,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../core/routes/app_routes.dart';
+import '../models/user_verification_args.dart';
+import '../models/user_profile.dart';
 import '../services/driver_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
@@ -39,6 +41,10 @@ class HomeMapScreenState extends State<HomeMapScreen> {
   bool _isLocating = true;
   String? _locationError;
 
+  /// Stored when the profile card is shown so the "Complete Now" button can
+  /// route to the correct step (basic profile form vs. verification upload).
+  UserProfile? _incompleteProfile;
+
   GoogleMapController? _mapController;
   LatLng? _currentLatLng;
 
@@ -65,8 +71,24 @@ class HomeMapScreenState extends State<HomeMapScreen> {
       final userId = await TokenService.getUserId();
       if (userId == null) return;
       final profile = await UserService.getUserProfileByUserId(userId);
-      if (!profile.isProfileCompleted) {
-        if (mounted) setState(() => _showProfileCard = true);
+
+      // Consider profile incomplete if the server flag is not set OR if the
+      // user has not yet uploaded their ID photos and selfie.
+      final bool missingDocs =
+          (profile.identificationFrontImageUrl == null ||
+              profile.identificationFrontImageUrl!.isEmpty) ||
+          (profile.identificationBackImageUrl == null ||
+              profile.identificationBackImageUrl!.isEmpty) ||
+          (profile.userVerificationImageUrl == null ||
+              profile.userVerificationImageUrl!.isEmpty);
+
+      if (!profile.isProfileCompleted || missingDocs) {
+        if (mounted) {
+          setState(() {
+            _incompleteProfile = profile;
+            _showProfileCard = true;
+          });
+        }
         return;
       }
       if (profile.isWillingToDrive) {
@@ -334,7 +356,13 @@ class HomeMapScreenState extends State<HomeMapScreen> {
                   width: MediaQuery.of(context).size.width * 0.8 * 0.6,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.pushNamed(context, AppRoutes.profileCompletion),
+                    onPressed: () {
+                      Navigator.pushNamed(
+                        context,
+                        AppRoutes.profileCompletion,
+                        arguments: _incompleteProfile, // pre-fills existing data
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF03AF74),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),

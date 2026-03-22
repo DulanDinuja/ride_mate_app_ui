@@ -72,23 +72,41 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF020D19),
       body: Stack(
         children: [
-          SizedBox(
-            width: double.infinity,
-            height: size.height,
-            child: CustomPaint(
-              painter: _MapHeaderPainter(),
+          // ── Gradient background (matches login/signup) ──
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF4B6164),
+                  Color(0xFF1A2A33),
+                  Color(0xFF020D19),
+                ],
+                stops: [0.0, 0.5, 1.0],
+              ),
             ),
           ),
-          // Back button
-          const SafeArea(
-            child: Padding(
-              padding: EdgeInsets.only(left: 16, top: 12),
-              child: CustomBackButton(),
+
+          // ── Top section: back button ──
+          SafeArea(
+            bottom: false,
+            child: SizedBox(
+              height: size.height * 0.18,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: const CustomBackButton(),
+                ),
+              ),
             ),
           ),
+
+          // ── Bottom white card ──
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -614,6 +632,34 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
         '${dob.year}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
 
     if (widget.existingProfile != null) {
+      final p = widget.existingProfile!;
+
+      // If ID photos or selfie are still missing, the user needs to go through
+      // the verification upload step — don't just update and pop.
+      final bool missingDocs =
+          (p.identificationFrontImageUrl == null ||
+              p.identificationFrontImageUrl!.isEmpty) ||
+          (p.identificationBackImageUrl == null ||
+              p.identificationBackImageUrl!.isEmpty) ||
+          (p.userVerificationImageUrl == null ||
+              p.userVerificationImageUrl!.isEmpty);
+
+      if (missingDocs) {
+        Navigator.pushNamed(
+          context,
+          AppRoutes.userVerification,
+          arguments: UserVerificationArgs(
+            documentTypeId: _selectedDocumentTypeId!,
+            documentType: _selectedDocumentTypeName!,
+            idNumber: idNumber,
+            gender: _selectedGender!,
+            userRole: _willingToDrive ? 'YES' : 'NO',
+            dateOfBirth: dateOfBirthStr,
+          ),
+        );
+        return;
+      }
+
       _updateProfile(dateOfBirthStr);
       return;
     }
@@ -676,102 +722,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
   }
 }
 
-class _MapHeaderPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final backgroundPaint = Paint()..color = const Color(0xFF2A2C34);
-    canvas.drawRect(Offset.zero & size, backgroundPaint);
 
-    final roadPaint = Paint()
-      ..color = const Color(0xFF6E737C)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
 
-    final minorRoadPaint = Paint()
-      ..color = const Color(0xFF545962)
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-
-    final waterPaint = Paint()
-      ..color = const Color(0xFF0E3F4A)
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke;
-
-    final parkPaint = Paint()..color = const Color(0xFF203D1B);
-
-    final roads = <Path>[
-      Path()
-        ..moveTo(-20, size.height * 0.25)
-        ..lineTo(size.width + 20, size.height * 0.2),
-      Path()
-        ..moveTo(-20, size.height * 0.45)
-        ..lineTo(size.width + 20, size.height * 0.5),
-      Path()
-        ..moveTo(size.width * 0.2, -20)
-        ..lineTo(size.width * 0.23, size.height + 20),
-      Path()
-        ..moveTo(size.width * 0.7, -20)
-        ..lineTo(size.width * 0.75, size.height + 20),
-    ];
-
-    final minorRoads = <Path>[
-      Path()
-        ..moveTo(0, size.height * 0.12)
-        ..lineTo(size.width, size.height * 0.12),
-      Path()
-        ..moveTo(0, size.height * 0.33)
-        ..lineTo(size.width, size.height * 0.35),
-      Path()
-        ..moveTo(0, size.height * 0.61)
-        ..lineTo(size.width, size.height * 0.59),
-      Path()
-        ..moveTo(size.width * 0.42, 0)
-        ..lineTo(size.width * 0.44, size.height),
-    ];
-
-    final riverPath = Path()
-      ..moveTo(size.width * 0.08, size.height * 0.52)
-      ..quadraticBezierTo(
-        size.width * 0.36,
-        size.height * 0.42,
-        size.width * 0.62,
-        size.height * 0.56,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.84,
-        size.height * 0.68,
-        size.width * 1.1,
-        size.height * 0.6,
-      );
-
-    for (final path in roads) {
-      canvas.drawPath(path, roadPaint);
-    }
-    for (final path in minorRoads) {
-      canvas.drawPath(path, minorRoadPaint);
-    }
-
-    canvas.drawPath(riverPath, waterPaint);
-
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(size.width * 0.18, size.height * 0.28),
-        width: 70,
-        height: 48,
-      ),
-      parkPaint,
-    );
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(size.width * 0.8, size.height * 0.72),
-        width: 62,
-        height: 40,
-      ),
-      parkPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
 

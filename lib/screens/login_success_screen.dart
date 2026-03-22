@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../core/routes/app_routes.dart';
+import '../models/user_profile.dart';
+import '../models/user_verification_args.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import '../widgets/custom_button.dart';
@@ -39,27 +41,185 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen>
 
   Future<void> _onLetsExplore() async {
     setState(() => _isLoading = true);
+    UserProfile? foundProfile;
+
     try {
       final userId = await TokenService.getUserId();
       if (!mounted) return;
+
       if (userId != null) {
-        final profile = await UserService.getUserProfileByUserId(userId);
-        if (!mounted) return;
-        if (profile.isProfileCompleted) {
-          // Clear entire stack so GetStartedScreen is not left in back history
-          Navigator.pushNamedAndRemoveUntil(
-              context, AppRoutes.userHomeMap, (route) => false);
-        } else {
-          Navigator.pushNamedAndRemoveUntil(
-              context, AppRoutes.profileCompletion, (route) => false);
+        try {
+          foundProfile = await UserService.getUserProfileByUserId(userId);
+        } catch (_) {
+          // Profile record not found or network error — foundProfile stays null
         }
+
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+
+        // Profile exists and all docs are uploaded → go straight to home
+        if (foundProfile != null) {
+          final bool missingDocs =
+              (foundProfile.identificationFrontImageUrl == null ||
+                  foundProfile.identificationFrontImageUrl!.isEmpty) ||
+              (foundProfile.identificationBackImageUrl == null ||
+                  foundProfile.identificationBackImageUrl!.isEmpty) ||
+              (foundProfile.userVerificationImageUrl == null ||
+                  foundProfile.userVerificationImageUrl!.isEmpty);
+
+          if (foundProfile.isProfileCompleted && !missingDocs) {
+            Navigator.pushNamedAndRemoveUntil(
+                context, AppRoutes.userHomeMap, (route) => false);
+            return;
+          }
+        }
+
+        // Profile missing or incomplete — show popup
+        _showCompleteProfileSheet(foundProfile);
         return;
       }
     } catch (_) {}
+
     if (mounted) {
       setState(() => _isLoading = false);
+      _showCompleteProfileSheet(null);
+    }
+  }
+
+  void _showCompleteProfileSheet(UserProfile? profile) {
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFFFFFF0),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            28,
+            20,
+            28,
+            28 + MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDFE2EB),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 28),
+
+              // Icon
+              Container(
+                width: 76,
+                height: 76,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF040F1B),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.person_add_alt_1_rounded,
+                  color: Colors.white,
+                  size: 38,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Title
+              const Text(
+                'Complete Your Profile',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF040F1B),
+                  letterSpacing: 0.2,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Subtitle
+              const Text(
+                'Your profile is incomplete.\nPlease provide your details to start\nusing Ride Mate.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Color(0xFF4B6164),
+                  height: 1.6,
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // Complete Now button
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx); // close sheet
+                    _navigateToCompletion(profile);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF040F1B),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  child: const Text(
+                    'Complete Now',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Navigates to the correct step based on how much of the profile is filled.
+  void _navigateToCompletion(UserProfile? profile) {
+    if (profile != null &&
+        profile.isProfileCompleted &&
+        profile.identificationTypeId != null) {
+      // Basic info is done — resume at the ID / selfie upload step
       Navigator.pushNamedAndRemoveUntil(
-          context, AppRoutes.profileCompletion, (route) => false);
+        context,
+        AppRoutes.userVerification,
+        (route) => false,
+        arguments: UserVerificationArgs(
+          documentTypeId: profile.identificationTypeId!,
+          documentType: profile.identificationTypeName ?? '',
+          idNumber: profile.identificationNumber ?? '',
+          gender: profile.gender,
+          userRole: profile.willingToDrive,
+          dateOfBirth: profile.dateOfBirth,
+        ),
+      );
+    } else {
+      // No profile at all or basic info missing — start from the profile form
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.profileCompletion,
+        (route) => false,
+      );
     }
   }
 
