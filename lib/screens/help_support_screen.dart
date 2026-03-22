@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../widgets/custom_back_button.dart';
+import 'report_problem_screen.dart';
+import 'feedback_screen.dart';
 
 /// Help & Support screen — accessible from the account tab and from the
 /// active ride screen as an emergency panel.
@@ -540,8 +542,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                 iconColor: Colors.orange.shade600,
                 title: 'Report a Problem',
                 subtitle: 'Incorrect charge, app issue, driver complaint',
-                onTap: () => _openEmail(
-                    'report@ridemate.lk?subject=RideMate Problem Report'),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ReportProblemScreen()),
+                ),
               ),
               const Divider(height: 1, indent: 56),
               _contactTile(
@@ -549,8 +554,10 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                 iconColor: Colors.amber.shade600,
                 title: 'Give Feedback',
                 subtitle: 'Help us improve RideMate',
-                onTap: () => _openEmail(
-                    'feedback@ridemate.lk?subject=RideMate Feedback'),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FeedbackScreen()),
+                ),
               ),
             ],
           ),

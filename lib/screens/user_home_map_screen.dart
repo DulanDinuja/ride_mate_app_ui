@@ -25,6 +25,7 @@ import '../widgets/custom_back_button.dart';
 import 'available_rides_screen.dart';
 import 'driver_home_mixin.dart';
 import 'help_support_screen.dart';
+import 'privacy_terms_screen.dart';
 import 'ride_preferences_screen.dart';
 import 'ride_requests_screen.dart';
 
@@ -1749,7 +1750,13 @@ Future<void> _onChangeProfilePhoto() async {
               ListTile(
                 leading: const Icon(Icons.privacy_tip_outlined),
                 title: const Text('Privacy & Terms'),
-                onTap: () => _showComingSoon('Privacy & terms'),
+                trailing: const Icon(Icons.chevron_right_rounded, size: 18),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PrivacyTermsScreen(),
+                  ),
+                ),
               ),
               const Divider(height: 1),
               ListTile(
