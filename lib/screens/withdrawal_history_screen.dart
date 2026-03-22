@@ -128,7 +128,7 @@ class _WithdrawalHistoryScreenState extends State<WithdrawalHistoryScreen> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: _statusColor(w).withValues(alpha: 0.1),
+                    color: _statusColor(w).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(_statusIcon(w),
@@ -162,7 +162,7 @@ class _WithdrawalHistoryScreenState extends State<WithdrawalHistoryScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _statusColor(w).withValues(alpha: 0.1),
+                    color: _statusColor(w).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

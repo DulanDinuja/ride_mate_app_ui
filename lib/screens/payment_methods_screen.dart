@@ -159,12 +159,12 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [cardColor, cardColor.withValues(alpha: 0.8)],
+          colors: [cardColor, cardColor.withOpacity(0.8)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: cardColor.withValues(alpha: 0.3),
+            color: cardColor.withOpacity(0.3),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -257,7 +257,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.3),
+                    color: Colors.green.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(

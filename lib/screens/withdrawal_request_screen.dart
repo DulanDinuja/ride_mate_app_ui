@@ -97,10 +97,10 @@ class _WithdrawalRequestScreenState extends State<WithdrawalRequestScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF169F7E).withValues(alpha: 0.08),
+                  color: const Color(0xFF169F7E).withOpacity(0.08),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: const Color(0xFF169F7E).withValues(alpha: 0.3),
+                    color: const Color(0xFF169F7E).withOpacity(0.3),
                   ),
                 ),
                 child: Column(
@@ -268,9 +268,9 @@ class _WithdrawalRequestScreenState extends State<WithdrawalRequestScreen> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.1),
+                  color: Colors.amber.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                  border: Border.all(color: Colors.amber.withOpacity(0.3)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,

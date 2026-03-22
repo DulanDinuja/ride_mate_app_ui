@@ -121,7 +121,7 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF040F1B).withValues(alpha: 0.3),
+            color: const Color(0xFF040F1B).withOpacity(0.3),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -205,9 +205,9 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
+          color: color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
+          border: Border.all(color: color.withOpacity(0.2)),
         ),
         child: Column(
           children: [
@@ -228,7 +228,7 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: color.withValues(alpha: 0.9),
+                color: color.withOpacity(0.9),
               ),
               textAlign: TextAlign.center,
               maxLines: 1,
@@ -364,7 +364,7 @@ class _DriverWalletScreenState extends State<DriverWalletScreen>
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
+            color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(icon, color: color, size: 22),

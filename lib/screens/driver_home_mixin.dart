@@ -85,10 +85,17 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
   Future<void> checkDriverProfileStatus(String userId) async {
     try {
       final dp = await DriverService.getDriverProfileByUserId(userId);
-      if (mounted && !dp.isDriverProfileCompleted) {
-        setState(() => showDriverProfileCard = true);
+      if (mounted) {
+        if (dp.isDriverProfileCompleted) {
+          // Profile is complete — hide the card
+          setState(() => showDriverProfileCard = false);
+        } else {
+          // Profile exists but not complete — show the card
+          setState(() => showDriverProfileCard = true);
+        }
       }
     } catch (_) {
+      // Driver profile not found — show the card to prompt registration
       if (mounted) setState(() => showDriverProfileCard = true);
     }
   }

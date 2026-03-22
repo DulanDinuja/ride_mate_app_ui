@@ -1337,28 +1337,52 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
 
     setState(() => _isChangingRole = true);
     try {
-      await UserService.updateRole(userId, newRole);
-      await _loadUserProfile();
-      if (!mounted) return;
-
       if (newRole == 'DRIVER') {
-        // Check if driver is already registered by calling the driver profile API
+        // FIRST: Check if driver profile exists and is complete BEFORE switching role
+        bool driverProfileComplete = false;
         try {
-          final driverProfile =
+          final driverProfileData =
               await DriverService.getDriverProfileByUserId(userId);
-          if (!driverProfile.isDriverProfileCompleted) {
-            // Driver profile exists but is not complete — go to registration
-            if (mounted) {
-              Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
-            }
-          }
+          driverProfileComplete = driverProfileData.isDriverProfileCompleted;
         } catch (_) {
-          // Driver profile not found — navigate to vehicle registration
+          // Driver profile not found
+          driverProfileComplete = false;
+        }
+
+        // Now update the role
+        await UserService.updateRole(userId, newRole);
+
+        if (driverProfileComplete) {
+          // Driver profile is complete — load profile and show success
+          // Ensure card is hidden before loading
+          setState(() => showDriverProfileCard = false);
+          await _loadUserProfile();
           if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Switched to Driver mode.'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } else {
+          // Driver profile not found or incomplete — navigate to registration
+          // Don't call _loadUserProfile to avoid showing card
+          // Just update local state
+          final newProfile = await UserService.getUserProfileByUserId(userId);
+          if (mounted) {
+            setState(() {
+              _userProfile = newProfile;
+              showDriverProfileCard = false; // Don't show card, we're navigating away
+            });
             Navigator.pushNamed(context, AppRoutes.vehicleRegistration);
           }
         }
       } else {
+        // Switching to PASSENGER
+        await UserService.updateRole(userId, newRole);
+        await _loadUserProfile();
+        if (!mounted) return;
         // Reset driver-specific state
         resetDriverState();
         ScaffoldMessenger.of(context).showSnackBar(
