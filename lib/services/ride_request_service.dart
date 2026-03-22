@@ -100,9 +100,12 @@ class RideRequestService {
     required double passengerRideDistance,
     String? startCity,
     String? endCity,
+    /// Pre-calculated estimated cost from the estimate-cost API step.
+    /// Stored on the ride request so the passenger sees their cost immediately.
+    double? estimatedCost,
   }) async {
     try {
-      final body = {
+      final body = <String, dynamic>{
         'rideDetailId': rideDetailId,
         'userId': userId,
         'passengerStartLat': passengerStartLat,
@@ -113,6 +116,10 @@ class RideRequestService {
         'startCity': startCity,
         'endCity': endCity,
       };
+      // Only include estimatedCost if provided — backend stores it on ride_request.estimated_cost
+      if (estimatedCost != null) {
+        body['estimatedCost'] = estimatedCost;
+      }
 
       final response = await ApiClient.post('/ride-requests', body: body);
 

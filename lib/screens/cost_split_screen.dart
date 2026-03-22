@@ -309,13 +309,17 @@ class _CostSplitScreenState extends State<CostSplitScreen> {
   }
 
   Widget _buildSegmentCard(SegmentDetail seg) {
+    final isSideTrip = seg.segmentType == 'SIDE_TRIP';
+    final typeColor = isSideTrip ? Colors.orange : _accent;
+    final typeLabel = isSideTrip ? 'DETOUR' : 'MAIN';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _accent.withOpacity(0.15)),
+        border: Border.all(color: typeColor.withOpacity(0.20)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,15 +332,15 @@ class _CostSplitScreenState extends State<CostSplitScreen> {
                 height: 28,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _accent.withOpacity(0.15),
+                  color: typeColor.withOpacity(0.15),
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   '${seg.segmentOrder}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
-                    color: _accent,
+                    color: typeColor,
                   ),
                 ),
               ),
@@ -351,6 +355,22 @@ class _CostSplitScreenState extends State<CostSplitScreen> {
                   ),
                 ),
               ),
+              // Segment type badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: typeColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  typeLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: typeColor,
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -361,29 +381,60 @@ class _CostSplitScreenState extends State<CostSplitScreen> {
                   Icons.straighten, '${seg.distanceKm.toStringAsFixed(1)} km'),
               const SizedBox(width: 8),
               _buildDetailChip(
-                  Icons.people, '${seg.riderCount} rider${seg.riderCount > 1 ? 's' : ''}'),
+                  Icons.people, '${seg.riderCount} rider${seg.riderCount != 1 ? 's' : ''}'),
               const SizedBox(width: 8),
               _buildDetailChip(Icons.attach_money,
                   'LKR ${seg.segmentCost.toStringAsFixed(0)}'),
             ],
           ),
           const SizedBox(height: 8),
-          // Cost per rider
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: _accent.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              'Each rider pays: LKR ${seg.costPerRider.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: _accent,
+          // Share % and cost per rider
+          if (seg.riderCount > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: typeColor.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${seg.sharePercentage.toStringAsFixed(0)}% each',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: typeColor,
+                    ),
+                  ),
+                  const Text(' → ', style: TextStyle(fontSize: 12, color: Colors.black45)),
+                  Text(
+                    'LKR ${seg.costPerRider.toStringAsFixed(2)} per rider',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: typeColor,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'Driver only — no passenger charge',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black45,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -414,6 +465,9 @@ class _CostSplitScreenState extends State<CostSplitScreen> {
   }
 
   Widget _buildPassengerCard(PassengerCostDetail pax) {
+    // Passenger index (1-based) from the parent data list
+    final index = _data!.passengerCosts.indexOf(pax) + 1;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -430,10 +484,17 @@ class _CostSplitScreenState extends State<CostSplitScreen> {
           leading: CircleAvatar(
             radius: 18,
             backgroundColor: Colors.blue.withOpacity(0.12),
-            child: const Icon(Icons.person, color: Colors.blue, size: 20),
+            child: Text(
+              '#$index',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: Colors.blue,
+              ),
+            ),
           ),
           title: Text(
-            '${pax.startCity ?? 'Pickup'} → ${pax.endCity ?? 'Drop'}',
+            'Passenger $index  •  ${pax.startCity ?? 'Pickup'} → ${pax.endCity ?? 'Drop'}',
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -515,13 +576,13 @@ class _CostSplitScreenState extends State<CostSplitScreen> {
                           ),
                         ),
                         Text(
-                          '${seg.riderCount}p × ${seg.distanceKm.toStringAsFixed(1)}km',
+                          '${seg.riderCount}p · ${seg.sharePercentage.toStringAsFixed(0)}%',
                           style: const TextStyle(
                               fontSize: 11, color: Colors.black45),
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'LKR ${seg.passengerShareForSegment.toStringAsFixed(0)}',
+                          'LKR ${seg.passengerShareForSegment.toStringAsFixed(2)}',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,

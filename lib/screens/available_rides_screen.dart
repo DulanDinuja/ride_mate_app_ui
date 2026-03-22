@@ -99,7 +99,8 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
           ride: ride,
           onConfirm: () {
             Navigator.pop(context);
-            _requestToJoin(ride);
+            // Pass the pre-calculated estimatedCost so it is stored on the ride request
+            _requestToJoin(ride, estimatedCost: estimate.estimatedCost);
           },
         ),
       );
@@ -115,7 +116,7 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
     }
   }
 
-  Future<void> _requestToJoin(AvailableRide ride) async {
+  Future<void> _requestToJoin(AvailableRide ride, {double? estimatedCost}) async {
     int? userId = widget.userProfile?.userId;
     if (userId == null) {
       // Try to get userId from token
@@ -144,6 +145,7 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
         passengerRideDistance: widget.distanceKm,
         startCity: widget.pickupAddress,
         endCity: widget.dropAddress,
+        estimatedCost: estimatedCost,
       );
 
       if (!mounted) return;
