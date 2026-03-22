@@ -54,6 +54,8 @@ class SegmentDetail {
   final int riderCount;
   final double segmentCost;
   final double costPerRider;
+  final String? segmentType;
+  final double sharePercentage;
 
   SegmentDetail({
     required this.segmentOrder,
@@ -63,6 +65,8 @@ class SegmentDetail {
     required this.riderCount,
     required this.segmentCost,
     required this.costPerRider,
+    this.segmentType,
+    this.sharePercentage = 0.0,
   });
 
   factory SegmentDetail.fromJson(Map<String, dynamic> json) {
@@ -74,6 +78,8 @@ class SegmentDetail {
       riderCount: (json['riderCount'] as num).toInt(),
       segmentCost: (json['segmentCost'] as num).toDouble(),
       costPerRider: (json['costPerRider'] as num).toDouble(),
+      segmentType: json['segmentType'] as String?,
+      sharePercentage: (json['sharePercentage'] as num? ?? 0).toDouble(),
     );
   }
 }
@@ -125,6 +131,8 @@ class PassengerSegmentCost {
   final double distanceKm;
   final int riderCount;
   final double passengerShareForSegment;
+  final String? segmentType;
+  final double sharePercentage;
 
   PassengerSegmentCost({
     required this.segmentOrder,
@@ -133,6 +141,8 @@ class PassengerSegmentCost {
     required this.distanceKm,
     required this.riderCount,
     required this.passengerShareForSegment,
+    this.segmentType,
+    this.sharePercentage = 0.0,
   });
 
   factory PassengerSegmentCost.fromJson(Map<String, dynamic> json) {
@@ -144,7 +154,10 @@ class PassengerSegmentCost {
       riderCount: (json['riderCount'] as num).toInt(),
       passengerShareForSegment:
           (json['passengerShareForSegment'] as num).toDouble(),
+      segmentType: json['segmentType'] as String?,
+      sharePercentage: (json['sharePercentage'] as num? ?? 0).toDouble(),
     );
   }
 }
+
 
