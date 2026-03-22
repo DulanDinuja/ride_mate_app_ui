@@ -403,6 +403,29 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
                       const SizedBox(height: 2),
                       Row(
                         children: [
+                          if (ride.driverGenderLabel.isNotEmpty) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: ride.isFemaleDriver
+                                    ? Colors.pink.shade50
+                                    : Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                ride.driverGenderLabel,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: ride.isFemaleDriver
+                                      ? Colors.pink.shade600
+                                      : Colors.blue.shade600,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
                           const Icon(Icons.star,
                               size: 14, color: Colors.amber),
                           const SizedBox(width: 3),
@@ -440,7 +463,7 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
                     ],
                   ),
                 ),
-                // Seats badge
+                // Seats badge + seat icons
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 10, vertical: 6),
@@ -450,23 +473,50 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
                         : Colors.red.shade50,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Icon(Icons.event_seat,
-                          size: 14,
-                          color: seatsLeft > 0
-                              ? _accent
-                              : Colors.red.shade400),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$seatsLeft left',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: seatsLeft > 0
-                              ? _accent
-                              : Colors.red.shade400,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.event_seat,
+                              size: 14,
+                              color: seatsLeft > 0
+                                  ? _accent
+                                  : Colors.red.shade400),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$seatsLeft left',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: seatsLeft > 0
+                                  ? _accent
+                                  : Colors.red.shade400,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(
+                          ride.availableSeats.clamp(0, 6),
+                          (i) {
+                            final taken = i < ride.currentPassengers;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 2),
+                              child: Icon(
+                                taken
+                                    ? Icons.event_seat
+                                    : Icons.event_seat_outlined,
+                                size: 13,
+                                color: taken
+                                    ? Colors.grey.shade400
+                                    : _accent,
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ],
@@ -535,7 +585,15 @@ class _AvailableRidesScreenState extends State<AvailableRidesScreen> {
 
             if (ride.vehicleDescription != 'Vehicle') ...[
               const SizedBox(height: 8),
-              _infoChip(Icons.directions_car, ride.vehicleDescription),
+              Row(
+                children: [
+                  _infoChip(Icons.directions_car, ride.vehicleDescription),
+                  if (ride.vehicleTypeName != null) ...[
+                    const SizedBox(width: 6),
+                    _infoChip(Icons.category_outlined, ride.vehicleTypeName!),
+                  ],
+                ],
+              ),
             ],
             if (ride.vehiclePlateNumber != null) ...[
               const SizedBox(height: 4),

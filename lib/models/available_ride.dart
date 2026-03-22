@@ -25,6 +25,7 @@ class AvailableRide {
   // Driver/vehicle info — populated from AvailableRideResponse fields when available
   final String driverFirstName;
   final String driverLastName;
+  final String? driverGender;
   final String? driverProfileImageUrl;
   final String? vehicleTypeName;
   final String? vehicleMakeName;
@@ -55,6 +56,7 @@ class AvailableRide {
     this.mlRank,
     this.driverFirstName = '',
     this.driverLastName = '',
+    this.driverGender,
     this.driverProfileImageUrl,
     this.vehicleTypeName,
     this.vehicleMakeName,
@@ -63,6 +65,15 @@ class AvailableRide {
     this.vehiclePlateNumber,
     this.status,
   });
+
+  bool get isFemaleDriver => driverGender == 'FEMALE';
+  bool get isMaleDriver => driverGender == 'MALE';
+
+  String get driverGenderLabel {
+    if (driverGender == 'FEMALE') return '♀ Female';
+    if (driverGender == 'MALE') return '♂ Male';
+    return '';
+  }
 
   String get driverFullName {
     if (driverFirstName.isEmpty && driverLastName.isEmpty) return 'Driver';
@@ -108,6 +119,7 @@ class AvailableRide {
       mlRank: (json['mlRank'] as num?)?.toInt(),
       driverFirstName: json['driverFirstName'] as String? ?? '',
       driverLastName: json['driverLastName'] as String? ?? '',
+      driverGender: json['driverGender'] as String?,
       driverProfileImageUrl: json['driverProfileImageUrl'] as String?,
       vehicleTypeName: json['vehicleTypeName'] as String?,
       vehicleMakeName: json['vehicleMakeName'] as String?,

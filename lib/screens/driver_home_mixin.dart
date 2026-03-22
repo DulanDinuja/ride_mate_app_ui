@@ -8,6 +8,7 @@ import '../models/driver_profile.dart';
 import '../models/ride_detail_request.dart';
 import '../models/ride_price_calculation_response.dart';
 import '../models/user_profile.dart';
+import '../models/driver_vehicles_response.dart';
 import '../services/driver_service.dart';
 import '../services/ride_service.dart';
 import '../services/token_service.dart';
@@ -43,6 +44,14 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
   bool showDriverProfileCard = false;
   RidePriceCalculationResponse? ridePrice;
   int? activeRideDetailId;
+
+  // ── vehicle selection state ──────────────────────────────────────
+  List<DriverVehicle> _driverVehicles = [];
+  DriverVehicle? _selectedVehicle;
+  bool _isLoadingVehicles = false;
+
+  bool get hasMultipleDriverVehicles => _driverVehicles.length > 1;
+  DriverVehicle? get selectedVehicle => _selectedVehicle;
 
   /// Whether the current user has the DRIVER role.
   bool get isDriver => currentUserProfile?.role.toUpperCase() == 'DRIVER';
@@ -84,7 +93,116 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
     }
   }
 
-  /// Offer-ride: calculate price → create ride → navigate to NavigationScreen.
+  /// Load vehicles for the driver and pre-select the primary one.
+  /// Should be called after [fetchDriverProfile] when the user is in Driver mode.
+  Future<void> loadDriverVehicles(int driverProfileId) async {
+    if (_isLoadingVehicles) return;
+    setState(() => _isLoadingVehicles = true);
+    try {
+      final resp = await DriverService.getDriverVehicles(driverProfileId);
+      if (!mounted) return;
+      // Find primary vehicle or fall back to first
+      DriverVehicle? primary;
+      if (resp.vehicles.isNotEmpty) {
+        try {
+          primary = resp.vehicles.firstWhere((v) => v.isPrimary == 'YES');
+        } catch (_) {
+          primary = resp.vehicles.first;
+        }
+      }
+      setState(() {
+        _driverVehicles = resp.vehicles;
+        _selectedVehicle = primary;
+      });
+    } catch (e) {
+      debugPrint('[DriverMixin] loadDriverVehicles error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingVehicles = false);
+    }
+  }
+
+  /// Shows a bottom sheet for the driver to pick a vehicle.
+  /// Returns the selected [DriverVehicle], or null if dismissed.
+  Future<DriverVehicle?> _pickVehicle(List<DriverVehicle> vehicles) {
+    return showModalBottomSheet<DriverVehicle>(
+      context: context,
+      backgroundColor: const Color(0xFF1A2332),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Select Vehicle',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...vehicles.map(
+              (v) => ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                leading: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF03AF74).withOpacity(0.15),
+                  ),
+                  child: const Icon(Icons.directions_car,
+                      color: Color(0xFF03AF74), size: 22),
+                ),
+                title: Text(
+                  '${v.vehicleMakeName} ${v.vehicleModelName}',
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  '${v.registrationNumber} · ${v.color} · ${v.year}',
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                trailing: v.isPrimary == 'YES'
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF03AF74).withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text('Primary',
+                            style: TextStyle(
+                                color: Color(0xFF03AF74),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600)),
+                      )
+                    : null,
+                onTap: () => Navigator.pop(ctx, v),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Offer-ride: check vehicles → calculate price → create ride → navigate.
   Future<void> onOfferRide() async {
     final pickup = currentPickupLatLng;
     final drop = currentDropLatLng;
@@ -116,6 +234,22 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
 
     setState(() => _isOfferingRide = true);
     try {
+      // 0. Use pre-selected vehicle from the ride panel selector.
+      //    If somehow no vehicle is selected but driver has multiple, show picker as fallback.
+      int? selectedVehicleId = _selectedVehicle?.id;
+      if (_driverVehicles.length > 1 && _selectedVehicle == null) {
+        if (!mounted) return;
+        setState(() => _isOfferingRide = false);
+        final picked = await _pickVehicle(_driverVehicles);
+        if (!mounted) return;
+        if (picked == null) return; // user dismissed
+        selectedVehicleId = picked.id;
+        setState(() {
+          _selectedVehicle = picked;
+          _isOfferingRide = true;
+        });
+      }
+
       // 1. Calculate price
       final priceResp = await RideService.calculateRidePrice(
         driverProfileId: dp.id,
@@ -148,6 +282,7 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
         status: 'ACTIVE',
         totalRideCost: priceResp.totalRidePrice ?? 0.0,
         perKmRate: priceResp.perKmRate,
+        vehicleId: selectedVehicleId,
       );
 
       final result = await RideService.createRideDetail(request);
@@ -380,6 +515,106 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Vehicle selector widget shown in the driver ride panel.
+  /// If the driver has only one vehicle, shows it as read-only info.
+  /// If the driver has multiple vehicles, shows a tappable row that opens the picker.
+  Widget buildVehicleSelector(ColorScheme scheme, Color border) {
+    if (_isLoadingVehicles) {
+      return Container(
+        height: 50,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: border),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    if (_driverVehicles.isEmpty) return const SizedBox.shrink();
+
+    final vehicle = _selectedVehicle;
+    final hasMultiple = _driverVehicles.length > 1;
+
+    return GestureDetector(
+      onTap: hasMultiple
+          ? () async {
+              final picked = await _pickVehicle(_driverVehicles);
+              if (picked != null && mounted) {
+                setState(() => _selectedVehicle = picked);
+              }
+            }
+          : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: hasMultiple
+                ? const Color(0xFF03AF74).withOpacity(0.5)
+                : border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF03AF74).withOpacity(0.14),
+              ),
+              child: const Icon(Icons.directions_car,
+                  color: Color(0xFF03AF74), size: 16),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Vehicle',
+                    style: TextStyle(
+                        fontSize: 11, color: scheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    vehicle != null
+                        ? '${vehicle.vehicleMakeName} ${vehicle.vehicleModelName} · ${vehicle.registrationNumber}'
+                        : 'Select a vehicle',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: vehicle != null
+                          ? scheme.onSurface
+                          : scheme.onSurfaceVariant.withOpacity(0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (hasMultiple) ...[
+              const SizedBox(width: 6),
+              Icon(Icons.keyboard_arrow_down_rounded,
+                  color: const Color(0xFF03AF74), size: 20),
+            ],
+          ],
+        ),
       ),
     );
   }

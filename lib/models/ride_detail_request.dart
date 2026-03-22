@@ -15,6 +15,7 @@ class RideDetailRequest {
   final String status;
   final double totalRideCost;
   final double? perKmRate;
+  final int? vehicleId;
 
   RideDetailRequest({
     required this.driverProfileId,
@@ -31,6 +32,7 @@ class RideDetailRequest {
     required this.status,
     required this.totalRideCost,
     this.perKmRate,
+    this.vehicleId,
   });
 
   Map<String, dynamic> toJson() {
@@ -49,6 +51,7 @@ class RideDetailRequest {
       'status': status,
       'totalRideCost': totalRideCost,
       if (perKmRate != null) 'perKmRate': perKmRate,
+      if (vehicleId != null) 'vehicleId': vehicleId,
     };
   }
 }
