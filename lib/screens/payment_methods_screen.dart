@@ -69,14 +69,16 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     }
   }
 
-  IconData _getCardIcon(SavedCard card) {
+  /// Returns the asset path for the card background image.
+  /// MASTER → card_master.png, VISA → card_visa.png, others → null.
+  String? _getCardAsset(SavedCard card) {
     switch (card.paymentMethod?.toUpperCase()) {
-      case 'VISA':
-        return Icons.credit_card;
       case 'MASTER':
-        return Icons.credit_card;
+        return 'assets/images/card_master.png';
+      case 'VISA':
+        return 'assets/images/card_visa.png';
       default:
-        return Icons.credit_card;
+        return null;
     }
   }
 
@@ -152,6 +154,167 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   }
 
   Widget _buildCardTile(SavedCard card) {
+    final assetPath = _getCardAsset(card);
+
+    if (assetPath == null) {
+      return _buildFallbackCardTile(card);
+    }
+
+    // Standard credit card aspect ratio ≈ 1.586 : 1
+    // Our templates are ~351×223, close to that ratio.
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: AspectRatio(
+        aspectRatio: 351 / 223,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // ── Card template image ────────────────────────────
+              Image.asset(assetPath, fit: BoxFit.fill),
+
+              // ── Card number ────────────────────────────────────
+              Positioned(
+                left: 24,
+                right: 24,
+                // 42 % from top  (≈ 0.42 × 223 ≈ 94)
+                top: 94,
+                child: Text(
+                  card.cardNoMasked ?? '•••• •••• •••• ••••',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 3.5,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black38,
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── Card holder ────────────────────────────────────
+              Positioned(
+                left: 24,
+                bottom: 24,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'CARD HOLDER',
+                      style: TextStyle(
+                        color: Colors.white60,
+                        fontSize: 9,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      (card.cardHolderName ?? 'N/A').toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black26,
+                            blurRadius: 3,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Expiry date ────────────────────────────────────
+              Positioned(
+                right: 24,
+                bottom: 24,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'EXPIRES',
+                      style: TextStyle(
+                        color: Colors.white60,
+                        fontSize: 9,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      card.cardExpiry ?? 'N/A',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black26,
+                            blurRadius: 3,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Active badge ───────────────────────────────────
+              if (card.active)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.35),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.greenAccent.withOpacity(0.6),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Text(
+                      'ACTIVE',
+                      style: TextStyle(
+                        color: Colors.greenAccent,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Fallback gradient card for unknown card types (no template image).
+  Widget _buildFallbackCardTile(SavedCard card) {
     final cardColor = _getCardColor(card);
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -175,20 +338,14 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  card.paymentMethod ?? 'CARD',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                Icon(_getCardIcon(card), color: Colors.white, size: 32),
-              ],
+            Text(
+              card.paymentMethod ?? 'CARD',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.2,
+              ),
             ),
             const SizedBox(height: 24),
             Text(
@@ -210,19 +367,17 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                     const Text(
                       'CARD HOLDER',
                       style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 10,
-                        letterSpacing: 1,
-                      ),
+                          color: Colors.white54,
+                          fontSize: 10,
+                          letterSpacing: 1),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       card.cardHolderName ?? 'N/A',
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -232,19 +387,17 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                     const Text(
                       'EXPIRES',
                       style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 10,
-                        letterSpacing: 1,
-                      ),
+                          color: Colors.white54,
+                          fontSize: 10,
+                          letterSpacing: 1),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       card.cardExpiry ?? 'N/A',
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
