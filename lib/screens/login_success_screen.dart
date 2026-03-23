@@ -2,7 +2,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../core/routes/app_routes.dart';
 import '../models/user_profile.dart';
-import '../models/user_verification_args.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
 import '../widgets/custom_button.dart';
@@ -57,21 +56,11 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen>
         if (!mounted) return;
         setState(() => _isLoading = false);
 
-        // Profile exists and all docs are uploaded → go straight to home
-        if (foundProfile != null) {
-          final bool missingDocs =
-              (foundProfile.identificationFrontImageUrl == null ||
-                  foundProfile.identificationFrontImageUrl!.isEmpty) ||
-              (foundProfile.identificationBackImageUrl == null ||
-                  foundProfile.identificationBackImageUrl!.isEmpty) ||
-              (foundProfile.userVerificationImageUrl == null ||
-                  foundProfile.userVerificationImageUrl!.isEmpty);
-
-          if (foundProfile.isProfileCompleted && !missingDocs) {
-            Navigator.pushNamedAndRemoveUntil(
-                context, AppRoutes.userHomeMap, (route) => false);
-            return;
-          }
+        // Profile exists and is marked complete by the server → go straight to home
+        if (foundProfile != null && foundProfile.isProfileCompleted) {
+          Navigator.pushNamedAndRemoveUntil(
+              context, AppRoutes.userHomeMap, (route) => false);
+          return;
         }
 
         // Profile missing or incomplete — show popup
@@ -194,33 +183,15 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen>
     );
   }
 
-  /// Navigates to the correct step based on how much of the profile is filled.
+  /// Navigates to the profile completion screen.
   void _navigateToCompletion(UserProfile? profile) {
-    if (profile != null &&
-        profile.isProfileCompleted &&
-        profile.identificationTypeId != null) {
-      // Basic info is done — resume at the ID / selfie upload step
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRoutes.userVerification,
-        (route) => false,
-        arguments: UserVerificationArgs(
-          documentTypeId: profile.identificationTypeId!,
-          documentType: profile.identificationTypeName ?? '',
-          idNumber: profile.identificationNumber ?? '',
-          gender: profile.gender,
-          userRole: profile.willingToDrive,
-          dateOfBirth: profile.dateOfBirth,
-        ),
-      );
-    } else {
-      // No profile at all or basic info missing — start from the profile form
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRoutes.profileCompletion,
-        (route) => false,
-      );
-    }
+    // Always go to profile completion — pre-fill with existing data if available
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      AppRoutes.profileCompletion,
+      (route) => false,
+      arguments: profile,
+    );
   }
 
   @override

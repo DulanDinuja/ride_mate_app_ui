@@ -122,7 +122,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: _statusColor(txn).withValues(alpha: 0.1),
+                    color: _statusColor(txn).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -172,7 +172,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: _statusColor(txn).withValues(alpha: 0.1),
+                        color: _statusColor(txn).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
