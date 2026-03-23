@@ -108,7 +108,31 @@ class _AddCardScreenState extends State<AddCardScreen> {
       hash: hash,
     );
 
-    // ── Step 3: Initialise WebView and load the HTML ────────────────
+    // ── Step 3: Log all values being sent to PayHere ───────────────
+    dev.log(
+      '\n──────── PayHere Preapproval Fields ────────\n'
+      'merchant_id  : $merchantId\n'
+      'order_id     : $orderId\n'
+      'items        : RideMate Card Setup\n'
+      'currency     : $currency\n'
+      'amount       : $amount\n'
+      'first_name   : ${widget.firstName}\n'
+      'last_name    : ${widget.lastName}\n'
+      'email        : ${widget.email}\n'
+      'phone        : ${widget.phone}\n'
+      'address      : N/A\n'
+      'city         : Colombo\n'
+      'country      : Sri Lanka\n'
+      'return_url   : $_returnUrl\n'
+      'cancel_url   : $_cancelUrl\n'
+      'notify_url   : $notifyUrl\n'
+      'hash         : $hash\n'
+      'custom_1     : ${widget.userId}\n'
+      '────────────────────────────────────────────',
+      name: 'PayHere',
+    );
+
+    // ── Step 4: Initialise WebView and load the HTML ────────────────
     _initWebView(html);
   }
 
