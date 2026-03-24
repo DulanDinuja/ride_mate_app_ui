@@ -1,25 +1,24 @@
-import 'dart:async';
 import 'dart:developer' as dev;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter/services.dart';
+import 'package:payhere_mobilesdk_flutter/payhere_mobilesdk_flutter.dart';
 
 import '../core/config/app_config.dart';
 import '../services/payment_service.dart';
 import '../utils/snackbar_helper.dart';
 
-/// Screen that loads the PayHere Preapproval card-entry page inside an
-/// in-app WebView for card tokenization.
+/// Screen that initiates PayHere Preapproval for card tokenization using
+/// the **PayHere Flutter SDK** (native, no WebView).
 ///
 /// Flow:
-/// 1. Generate order_id → call backend for MD5 hash + merchantId.
-/// 2. Build a hidden HTML form with all required PayHere POST fields.
-/// 3. Load the HTML into the WebView via `loadHtmlString`.
-/// 4. JavaScript auto-submits the form → WebView navigates to PayHere.
-/// 5. PayHere's hosted card-entry page renders **inside** the WebView.
-/// 6. After the user submits, PayHere redirects to return_url / cancel_url
-///    which the NavigationDelegate intercepts.
+/// 1. Fetch PayHere merchant credentials (from backend or AppConfig).
+/// 2. Build a payment object with preapproval parameters.
+/// 3. Call `PayHere.startPayment()` — the SDK opens its own native UI.
+/// 4. On success, PayHere sends a server notification to `notify_url`
+///    and the SDK returns a `paymentId` to the app.
+/// 5. Pop with `true` so the parent screen refreshes saved cards.
 class AddCardScreen extends StatefulWidget {
   final int userId;
   final String firstName;
@@ -41,216 +40,202 @@ class AddCardScreen extends StatefulWidget {
 }
 
 class _AddCardScreenState extends State<AddCardScreen> {
-  WebViewController? _controller;
   bool _isLoading = true;
-  bool _hashError = false;
-
-  // PayHere sandbox preapproval endpoint
-  static const String _payherePreapproveUrl =
-      'https://sandbox.payhere.lk/pay/preapprove';
-
-  // Intercepted by NavigationDelegate — never actually loaded in a browser
-  static const String _returnUrl = 'https://ridemate.app/payment-return';
-  static const String _cancelUrl = 'https://ridemate.app/payment-cancel';
+  bool _configError = false;
+  String _errorMessage = '';
 
   @override
   void initState() {
     super.initState();
-    _initPreapproval();
+    _startPreapproval();
   }
 
-  // ─── Prepare hash & load PayHere inside WebView ─────────────────
+  // ─── Fetch config & launch PayHere SDK ──────────────────────────
 
-  Future<void> _initPreapproval() async {
-
-    final orderId =
-        'PREAPPROVE_${widget.userId}_${DateTime.now().millisecondsSinceEpoch}';
-    const currency = 'LKR';
-
-    // ── Step 1: Get hash + merchantId from backend ──────────────────
-    Map<String, String> hashData;
-    try {
-      hashData = await PaymentService.getPreapprovalHash(
-        orderId: orderId,
-        currency: currency,
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () => throw TimeoutException(
-          'Server took too long to respond',
-        ),
-      );
-    } catch (e) {
-      dev.log('[AddCardScreen] Hash error: $e', name: 'AddCardScreen');
+  Future<void> _startPreapproval() async {
+    // PayHere mobile SDK is Android/iOS only
+    if (kIsWeb) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _hashError = true;
+          _configError = true;
+          _errorMessage = 'PayHere SDK is not supported on web.\n'
+              'Please use the mobile app to add a card.';
         });
-        SnackBarHelper.showError(context, 'Failed to prepare payment: $e');
       }
       return;
     }
 
-    final hash = hashData['hash'] ?? '';
-    final merchantId = hashData['merchantId'] ?? '';
-    final amount = hashData['amount'] ?? '0.00';
+    setState(() {
+      _isLoading = true;
+      _configError = false;
+      _errorMessage = '';
+    });
+
+    // ── Step 1: Resolve merchant credentials ──────────────────────
+    String merchantId;
+    String merchantSecret;
+    bool sandbox;
+
+    try {
+      // Try fetching from backend first (recommended for security)
+      final config = await PaymentService.getPayHereConfig();
+
+      merchantId = config['merchantId'] ??
+          config['merchant_id'] ??
+          AppConfig.payhereMerchantId;
+
+      merchantSecret = config['merchantSecret'] ??
+          config['merchant_secret'] ??
+          AppConfig.payhereMerchantSecret;
+
+      sandbox = (config['sandbox'] ?? AppConfig.payhereSandbox.toString())
+              .toString()
+              .toLowerCase() ==
+          'true';
+    } catch (e) {
+      // Fallback to AppConfig values
+      merchantId = AppConfig.payhereMerchantId;
+      merchantSecret = AppConfig.payhereMerchantSecret;
+      sandbox = AppConfig.payhereSandbox;
+    }
+
+    // Validate credentials
+    if (merchantId.isEmpty || merchantSecret.isEmpty) {
+      dev.log(
+        '[AddCardScreen] Missing PayHere credentials. '
+        'merchantId: ${merchantId.isEmpty ? "EMPTY" : "SET"}, '
+        'merchantSecret: ${merchantSecret.isEmpty ? "EMPTY" : "SET"}',
+        name: 'PayHere',
+      );
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _configError = true;
+          _errorMessage =
+              'PayHere payment credentials are not configured.\n\n'
+              'Pass them via --dart-define flags:\n'
+              '  PAYHERE_MERCHANT_ID=your_id\n'
+              '  PAYHERE_MERCHANT_SECRET=your_secret';
+        });
+      }
+      return;
+    }
+
+    // ── Step 2: Generate a unique order ID ────────────────────────
+    final orderId =
+        'PREAPPROVE_${widget.userId}_${DateTime.now().millisecondsSinceEpoch}';
     final notifyUrl = '${AppConfig.baseUrl}/payment/notify';
 
-    // ── Step 2: Build HTML form that auto-submits to PayHere ────────
-    final html = _buildAutoSubmitHtml(
-      merchantId: merchantId,
-      returnUrl: _returnUrl,
-      cancelUrl: _cancelUrl,
-      notifyUrl: notifyUrl,
-      orderId: orderId,
-      currency: currency,
-      amount: amount,
-      hash: hash,
-    );
+    // ── Step 3: Build the PayHere payment object ──────────────────
+    final paymentObject = {
+      "sandbox": sandbox,
+      "preapprove": true,  // ← CRITICAL: triggers preapproval flow
+      "merchant_id": merchantId,
+      "merchant_secret": merchantSecret,
+      "notify_url": notifyUrl,
+      "order_id": orderId,
+      "items": "RideMate Card Setup",
+      "currency": "LKR",
+      "amount": "30.00",
+      "first_name": widget.firstName,
+      "last_name": widget.lastName,
+      "email": widget.email,
+      "phone": widget.phone,
+      "address": "N/A",
+      "city": "Colombo",
+      "country": "Sri Lanka",
+      "custom_1": widget.userId.toString(),
+      "custom_2": "",
+    };
 
-    // ── Step 3: Log all values being sent to PayHere ───────────────
+    // ── Step 4: Log all values being sent to PayHere ──────────────
     dev.log(
-      '\n──────── PayHere Preapproval Fields ────────\n'
+      '\n──────── PayHere SDK Preapproval Fields ────────\n'
+      'sandbox      : $sandbox\n'
       'merchant_id  : $merchantId\n'
       'order_id     : $orderId\n'
       'items        : RideMate Card Setup\n'
-      'currency     : $currency\n'
-      'amount       : $amount\n'
+      'currency     : LKR\n'
+      'amount       : 0.00\n'
       'first_name   : ${widget.firstName}\n'
       'last_name    : ${widget.lastName}\n'
       'email        : ${widget.email}\n'
       'phone        : ${widget.phone}\n'
-      'address      : N/A\n'
-      'city         : Colombo\n'
-      'country      : Sri Lanka\n'
-      'return_url   : $_returnUrl\n'
-      'cancel_url   : $_cancelUrl\n'
       'notify_url   : $notifyUrl\n'
-      'hash         : $hash\n'
       'custom_1     : ${widget.userId}\n'
-      '────────────────────────────────────────────',
+      '────────────────────────────────────────────────',
       name: 'PayHere',
     );
 
-    // ── Step 4: Initialise WebView and load the HTML ────────────────
-    _initWebView(html);
-  }
+    if (mounted) setState(() => _isLoading = false);
 
-  void _initWebView(String html) {
-    final controller = WebViewController();
-
-    // setJavaScriptMode and setNavigationDelegate are not implemented
-    // by webview_flutter_web (iframe). JS is always on in iframes, so
-    // we only call these on native mobile platforms.
-    if (!kIsWeb) {
-      controller.setJavaScriptMode(JavaScriptMode.unrestricted);
-      controller.setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) {
-            if (mounted) setState(() => _isLoading = true);
-          },
-          onPageFinished: (_) {
-            if (mounted) setState(() => _isLoading = false);
-          },
-          onWebResourceError: (error) {
-            dev.log(
-              '[AddCardScreen] WebView error: ${error.description}',
-              name: 'AddCardScreen',
-            );
-          },
-          onNavigationRequest: (request) {
-            final url = request.url;
-            dev.log('[AddCardScreen] Navigating: $url', name: 'AddCardScreen');
-
-            // ── Intercept return URL → card saved successfully ──
-            if (url.contains('payment-return') ||
-                url.contains('payment_return')) {
-              Navigator.of(context).pop(true);
-              return NavigationDecision.prevent;
-            }
-
-            // ── Intercept cancel URL → user cancelled ──
-            if (url.contains('payment-cancel') ||
-                url.contains('payment_cancel')) {
-              Navigator.of(context).pop(false);
-              return NavigationDecision.prevent;
-            }
-
-            return NavigationDecision.navigate;
-          },
-        ),
+    // ── Step 5: Launch PayHere SDK ────────────────────────────────
+    try {
+      PayHere.startPayment(
+        paymentObject,
+        // ── onCompleted ──
+        (paymentId) {
+          dev.log(
+            '[AddCardScreen] Preapproval success. PaymentId: $paymentId',
+            name: 'PayHere',
+          );
+          if (mounted) {
+            Navigator.of(context).pop(true);
+          }
+        },
+        // ── onError ──
+        (error) {
+          dev.log(
+            '[AddCardScreen] Preapproval error: $error',
+            name: 'PayHere',
+          );
+          if (mounted) {
+            SnackBarHelper.showError(context, 'Payment failed: $error');
+            setState(() {
+              _configError = true;
+              _errorMessage = 'Payment failed: $error';
+            });
+          }
+        },
+        // ── onDismissed ──
+        () {
+          dev.log(
+            '[AddCardScreen] Preapproval dismissed by user',
+            name: 'PayHere',
+          );
+          if (mounted) {
+            Navigator.of(context).pop(false);
+          }
+        },
       );
+    } on MissingPluginException catch (e) {
+      dev.log(
+        '[AddCardScreen] MissingPluginException: $e\n'
+        'Did you do a full rebuild after adding payhere_mobilesdk_flutter?\n'
+        'Run: flutter clean && flutter pub get && flutter run',
+        name: 'PayHere',
+      );
+      if (mounted) {
+        setState(() {
+          _configError = true;
+          _errorMessage =
+              'PayHere SDK failed to load.\n\n'
+              'Please fully restart the app:\n'
+              '1. Stop the app completely\n'
+              '2. Run: flutter clean\n'
+              '3. Run: flutter run';
+        });
+      }
+    } catch (e) {
+      dev.log('[AddCardScreen] Unexpected error: $e', name: 'PayHere');
+      if (mounted) {
+        setState(() {
+          _configError = true;
+          _errorMessage = 'Unexpected error: $e';
+        });
+      }
     }
-
-    controller.loadHtmlString(html);
-    _controller = controller;
-
-    if (mounted) setState(() {});
-  }
-
-  // ─── Build the HTML form that POSTs to PayHere ──────────────────
-
-  String _buildAutoSubmitHtml({
-    required String merchantId,
-    required String returnUrl,
-    required String cancelUrl,
-    required String notifyUrl,
-    required String orderId,
-    required String currency,
-    required String amount,
-    required String hash,
-  }) {
-    return '''
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      display: flex; justify-content: center; align-items: center;
-      min-height: 100vh; margin: 0; background: #f5f5f5;
-    }
-    .loader { text-align: center; color: #666; }
-    .spinner {
-      width: 40px; height: 40px; margin: 0 auto 16px;
-      border: 4px solid #e0e0e0; border-top: 4px solid #169F7E;
-      border-radius: 50%; animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
-</head>
-<body>
-  <div class="loader">
-    <div class="spinner"></div>
-    <p>Loading PayHere...</p>
-  </div>
-
-  <form id="payhere_form" method="POST" action="$_payherePreapproveUrl">
-    <input type="hidden" name="merchant_id"  value="$merchantId">
-    <input type="hidden" name="return_url"   value="$returnUrl">
-    <input type="hidden" name="cancel_url"   value="$cancelUrl">
-    <input type="hidden" name="notify_url"   value="$notifyUrl">
-    <input type="hidden" name="order_id"     value="$orderId">
-    <input type="hidden" name="items"        value="RideMate Card Setup">
-    <input type="hidden" name="currency"     value="$currency">
-    <input type="hidden" name="amount"       value="$amount">
-    <input type="hidden" name="first_name"   value="${widget.firstName}">
-    <input type="hidden" name="last_name"    value="${widget.lastName}">
-    <input type="hidden" name="email"        value="${widget.email}">
-    <input type="hidden" name="phone"        value="${widget.phone}">
-    <input type="hidden" name="address"      value="N/A">
-    <input type="hidden" name="city"         value="Colombo">
-    <input type="hidden" name="country"      value="Sri Lanka">
-    <input type="hidden" name="hash"         value="$hash">
-    <input type="hidden" name="custom_1"     value="${widget.userId}">
-  </form>
-
-  <script>document.getElementById("payhere_form").submit();</script>
-</body>
-</html>
-''';
   }
 
   // ─── UI ─────────────────────────────────────────────────────────
@@ -270,23 +255,26 @@ class _AddCardScreenState extends State<AddCardScreen> {
   }
 
   Widget _buildBody() {
-    // Error state (hash failed or unsupported platform)
-    if (_hashError) {
+    // Error state
+    if (_configError) {
       return _buildErrorView();
     }
 
-    // WebView ready — show it with loading overlay
-    if (_controller != null) {
-      return Stack(
-        children: [
-          WebViewWidget(controller: _controller!),
-          if (_isLoading)
-            const Center(child: CircularProgressIndicator()),
-        ],
+    // Loading — waiting for config fetch or SDK to open
+    if (_isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Preparing secure payment...'),
+          ],
+        ),
       );
     }
 
-    // Still fetching hash from backend
+    // SDK has been launched — show a lighter waiting state
     return const Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -294,6 +282,11 @@ class _AddCardScreenState extends State<AddCardScreen> {
           CircularProgressIndicator(),
           SizedBox(height: 16),
           Text('Preparing secure payment...'),
+          SizedBox(height: 8),
+          Text(
+            'PayHere payment gateway will open shortly',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
         ],
       ),
     );
@@ -314,8 +307,10 @@ class _AddCardScreenState extends State<AddCardScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Could not connect to the payment server.\n'
-              'Please check your connection and try again.',
+              _errorMessage.isNotEmpty
+                  ? _errorMessage
+                  : 'Could not connect to the payment server.\n'
+                      'Please check your connection and try again.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
@@ -324,14 +319,7 @@ class _AddCardScreenState extends State<AddCardScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _isLoading = true;
-                    _hashError = false;
-                    _controller = null;
-                  });
-                  _initPreapproval();
-                },
+                onPressed: _startPreapproval,
                 icon: const Icon(Icons.refresh),
                 label: const Text('Retry'),
                 style: ElevatedButton.styleFrom(
@@ -341,6 +329,20 @@ class _AddCardScreenState extends State<AddCardScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text('Cancel'),
               ),
             ),
           ],
