@@ -2,6 +2,7 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://jitpack.io") }
     }
 }
 
@@ -30,7 +31,7 @@ subprojects {
                 "compileSdkVersion" to 35,
                 "minSdkVersion"     to 21,
                 "targetSdkVersion"  to 35,
-                "ndkVersion"        to "27.0.12077973",
+                "ndkVersion"        to "28.2.13676358",
                 "versionCode"       to 1,
                 "versionName"       to "1.0.0"
             )
