@@ -122,6 +122,7 @@ class PaymentService {
         final List<dynamic> list = jsonDecode(response.body) as List<dynamic>;
         return list
             .map((e) => SavedCard.fromJson(e as Map<String, dynamic>))
+            .where((card) => card.isActive == 'YES')
             .toList();
       } else {
         final error = jsonDecode(response.body);
@@ -130,6 +131,33 @@ class PaymentService {
           if (msg != null) throw ApiException(msg.toString());
         }
         throw Exception('Failed to fetch saved cards');
+      }
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// DELETE /payment/saved-cards/{cardId}?userId={userId}
+  /// Soft-deletes a saved card (sets isActive = NO on backend).
+  static Future<void> deleteCard({
+    required int cardId,
+    required int userId,
+  }) async {
+    try {
+      final response = await ApiClient.delete(
+        '/payment/saved-cards/$cardId?userId=$userId',
+      );
+      dev.log('[PaymentService] deleteCard ${response.statusCode}',
+          name: 'PaymentService');
+
+      if (response.statusCode != 200) {
+        final error = jsonDecode(response.body);
+        if (error is Map) {
+          final msg = error['message'] ?? error['messages'];
+          if (msg != null) throw ApiException(msg.toString());
+        }
+        throw Exception('Failed to delete card');
       }
     } catch (e) {
       if (e is Exception) rethrow;

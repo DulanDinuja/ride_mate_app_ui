@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/saved_card.dart';
 import '../services/payment_service.dart';
 import '../utils/snackbar_helper.dart';
+import '../widgets/custom_button.dart';
 import 'add_card_screen.dart';
 
 /// Displays the user's saved payment cards and allows adding a new card
@@ -32,6 +33,7 @@ class PaymentMethodsScreen extends StatefulWidget {
 class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   List<SavedCard> _cards = [];
   bool _isLoading = true;
+  int? _selectedCardId; // tracks which card shows the delete overlay
 
   @override
   void initState() {
@@ -40,9 +42,14 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   }
 
   Future<void> _loadCards() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _selectedCardId = null;
+    });
     try {
-      _cards = await PaymentService.getSavedCards(widget.userId);
+      final cards = await PaymentService.getSavedCards(widget.userId);
+      // Extra client-side safety: only show active cards
+      _cards = cards.where((c) => c.isActive == 'YES').toList();
     } catch (e) {
       if (mounted) SnackBarHelper.showError(context, e.toString());
     } finally {
@@ -68,6 +75,57 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
       _loadCards();
     }
   }
+
+  /// Called when a card tile is tapped.
+  /// First tap → select (shows delete icon overlay).
+  /// Tap on already-selected card → deselect.
+  void _onCardTap(SavedCard card) {
+    setState(() {
+      _selectedCardId = (_selectedCardId == card.id) ? null : card.id;
+    });
+  }
+
+  /// Confirms and executes soft-delete (isActive = NO) for the given card.
+  Future<void> _deleteCard(SavedCard card) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Remove Card'),
+        content: Text(
+          'Remove ${card.cardNoMasked ?? 'this card'}?\nThis action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await PaymentService.deleteCard(
+        cardId: card.id!,
+        userId: widget.userId,
+      );
+      if (mounted) {
+        SnackBarHelper.showSuccess(context, 'Card removed successfully');
+        _loadCards();
+      }
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, e.toString());
+    }
+  }
+
+  // ─── Helpers ──────────────────────────────────────────────────────
 
   /// Returns the asset path for the card background image.
   /// MASTER → card_master.png, VISA → card_visa.png, others → null.
@@ -106,22 +164,40 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     }
   }
 
+  // ─── Build ────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Payment Methods')),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadCards,
-              child: _cards.isEmpty ? _buildEmptyState() : _buildCardList(),
+      body: Column(
+        children: [
+          // ── Card list / loading / empty ──
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : RefreshIndicator(
+                    onRefresh: _loadCards,
+                    child: _cards.isEmpty
+                        ? _buildEmptyState()
+                        : _buildCardList(),
+                  ),
+          ),
+
+          // ── Bottom "Add Card" button — same style as all other screens ──
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            color: Theme.of(context).scaffoldBackgroundColor,
+            child: SafeArea(
+              top: false,
+              child: CustomButton(
+                text: 'Add Card',
+                onPressed: _addCard,
+                backgroundColor: const Color(0xFF169F7E),
+              ),
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addCard,
-        icon: const Icon(Icons.add),
-        label: const Text('Add Card'),
-        backgroundColor: const Color(0xFF169F7E),
-        foregroundColor: Colors.white,
+          ),
+        ],
       ),
     );
   }
@@ -157,7 +233,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
 
   Widget _buildCardList() {
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       itemCount: _cards.length,
       itemBuilder: (context, index) {
         final card = _cards[index];
@@ -166,21 +242,69 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     );
   }
 
+  // ─── Card tile with tap-to-select delete overlay ─────────────────
+
   Widget _buildCardTile(SavedCard card) {
+    final isSelected = _selectedCardId == card.id;
     final assetPath = _getCardAsset(card);
 
-    if (assetPath == null) {
-      return _buildFallbackCardTile(card);
-    }
+    final cardWidget = assetPath != null
+        ? _buildImageCard(card, assetPath)
+        : _buildFallbackCardTile(card);
 
-    // Use the native aspect ratio of the card template image.
-    // MASTER → 1404×892, VISA → 1400×887.
+    return GestureDetector(
+      onTap: () => _onCardTap(card),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: Stack(
+          children: [
+            cardWidget,
+
+            // ── Delete overlay (shown when card is selected) ──────
+            if (isSelected)
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    color: Colors.black.withOpacity(0.55),
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: () => _deleteCard(card),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.85),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.red.withOpacity(0.5),
+                                blurRadius: 12,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.white,
+                            size: 36,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageCard(SavedCard card, String assetPath) {
     final aspectRatio = _getCardAspectRatio(card);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        // Match the ~5.3 % corner radius baked into the card PNGs.
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -197,23 +321,20 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
             final w = constraints.maxWidth;
             final h = constraints.maxHeight;
 
-            // Percentage-based offsets derived from the card templates.
-            final hPad = w * 0.065; // ~6.5 % horizontal padding
-            final vPad = h * 0.108; // ~10.8 % bottom padding
-            final cardNumTop = h * 0.42; // card number ≈ 42 % from top
-            final badgeTop = h * 0.054; // active badge ≈ 5.4 % from top
-            final badgeRight = w * 0.034; // active badge ≈ 3.4 % from right
-            final cornerRadius = w * 0.053; // ≈ 5.3 % matches PNG corners
+            final hPad = w * 0.065;
+            final vPad = h * 0.108;
+            final cardNumTop = h * 0.42;
+            final badgeTop = h * 0.054;
+            final badgeRight = w * 0.034;
+            final cornerRadius = w * 0.053;
 
             return ClipRRect(
               borderRadius: BorderRadius.circular(cornerRadius),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // ── Card template image ──────────────────────────
                   Image.asset(assetPath, fit: BoxFit.cover),
 
-                  // ── Card number ──────────────────────────────────
                   Positioned(
                     left: hPad,
                     right: hPad,
@@ -236,7 +357,6 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                     ),
                   ),
 
-                  // ── Card holder ──────────────────────────────────
                   Positioned(
                     left: hPad,
                     bottom: vPad,
@@ -261,10 +381,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                             fontWeight: FontWeight.w600,
                             letterSpacing: 0.5,
                             shadows: [
-                              Shadow(
-                                color: Colors.black26,
-                                blurRadius: 3,
-                              ),
+                              Shadow(color: Colors.black26, blurRadius: 3),
                             ],
                           ),
                         ),
@@ -272,7 +389,6 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                     ),
                   ),
 
-                  // ── Expiry date ──────────────────────────────────
                   Positioned(
                     right: hPad,
                     bottom: vPad,
@@ -296,10 +412,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             shadows: [
-                              Shadow(
-                                color: Colors.black26,
-                                blurRadius: 3,
-                              ),
+                              Shadow(color: Colors.black26, blurRadius: 3),
                             ],
                           ),
                         ),
@@ -307,7 +420,6 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                     ),
                   ),
 
-                  // ── Active badge ─────────────────────────────────
                   if (card.active)
                     Positioned(
                       top: badgeTop,
@@ -347,7 +459,6 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   Widget _buildFallbackCardTile(SavedCard card) {
     final cardColor = _getCardColor(card);
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
