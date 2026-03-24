@@ -13,7 +13,31 @@ import 'api_client.dart';
 ///   POST /payment/charge
 ///   GET  /payment/saved-cards/{userId}
 ///   GET  /payment/transactions/{userId}
+///   GET  /payment/payhere-config
 class PaymentService {
+  // ─── PayHere Config ───────────────────────────────────────────────
+
+  /// GET /payment/payhere-config
+  /// Returns {merchantId, merchantSecret, sandbox} for the PayHere SDK.
+  /// Falls back to AppConfig values if the endpoint doesn't exist yet.
+  static Future<Map<String, String>> getPayHereConfig() async {
+    try {
+      final response = await ApiClient.get('/payment/payhere-config');
+      dev.log('[PaymentService] getPayHereConfig ${response.statusCode}',
+          name: 'PaymentService');
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data =
+            jsonDecode(response.body) as Map<String, dynamic>;
+        return data.map((k, v) => MapEntry(k, v.toString()));
+      }
+      // If endpoint doesn't exist, return empty — caller uses AppConfig
+      return {};
+    } catch (_) {
+      return {};
+    }
+  }
+
   // ─── Preapproval Hash ─────────────────────────────────────────────
 
   /// GET /payment/preapproval-hash?orderId=...&currency=LKR
