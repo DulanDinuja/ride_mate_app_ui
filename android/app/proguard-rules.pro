@@ -31,3 +31,8 @@
 -dontwarn com.google.android.play.core.**
 -keep class com.google.android.play.core.** { *; }
 
+# ── PayHere SDK ─────────────────────────────────────────────────
+-keep class lk.payhere.androidsdk.** { *; }
+-keep class com.payhere.** { *; }
+-dontwarn lk.payhere.androidsdk.**
+
