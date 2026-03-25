@@ -232,9 +232,9 @@ class _SignupScreenState extends State<SignupScreen> {
                     Expanded(
                       child: ListView(
                         controller: scrollController,
-                        padding: const EdgeInsets.all(32.0),
+                        padding: const EdgeInsets.fromLTRB(28.0, 20.0, 28.0, 48.0),
                         children: [
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 16),
 
                           const Text(
                             'Create Account',
@@ -245,7 +245,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
 
                           const Text(
                             'Join us for seamless ride sharing',
@@ -255,7 +255,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 40),
 
                           const Text(
                             'First Name',
@@ -265,14 +265,14 @@ class _SignupScreenState extends State<SignupScreen> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
                           CustomTextField(
                             controller: _nameController,
                             hintText: 'First Name',
                             icon: Icons.person_outline,
                           ),
 
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 24),
 
                           const Text(
                             'Last Name',
@@ -282,14 +282,14 @@ class _SignupScreenState extends State<SignupScreen> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
                           CustomTextField(
                             controller: _lastNameController,
                             hintText: 'Last Name',
                             icon: Icons.person_outline,
                           ),
 
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 24),
 
                           const Text(
                             'Email',
@@ -299,7 +299,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
                           CustomTextField(
                             controller: _emailController,
                             hintText: 'your.email@example.com',
@@ -307,7 +307,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             keyboardType: TextInputType.text,
                           ),
 
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 24),
 
                           const Text(
                             'Phone Number',
@@ -317,7 +317,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
                           CustomTextField(
                             controller: _phoneController,
                             hintText: '07XXXXXXXXX',
@@ -325,7 +325,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             keyboardType: TextInputType.phone,
                           ),
 
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 24),
 
                           const Text(
                             'Password',
@@ -335,7 +335,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
                           CustomTextField(
                             controller: _passwordController,
                             hintText: '••••••••',
@@ -354,7 +354,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 24),
 
                           const Text(
                             'Confirm Password',
@@ -364,7 +364,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
                           CustomTextField(
                             controller: _confirmPasswordController,
                             hintText: '••••••••',
@@ -383,7 +383,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
 
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -432,7 +432,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             ],
                           ),
 
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 32),
 
                           CustomButton(
                             text: _isLoading ? 'Creating Account...' : 'Create Account',
@@ -442,7 +442,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                 : Colors.grey,
                           ),
 
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 32),
 
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -476,7 +476,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             ],
                           ),
 
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 40),
                         ],
                       ),
                     ),
