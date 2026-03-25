@@ -242,9 +242,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     Expanded(
                       child: ListView(
                         controller: scrollController,
-                        padding: const EdgeInsets.all(32.0),
+                        padding: const EdgeInsets.fromLTRB(28.0, 20.0, 28.0, 48.0),
                         children: [
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 16),
 
                           // Welcome Back Title
                           const Text(
@@ -256,7 +256,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
 
                           // Subtitle
                           const Text(
@@ -267,7 +267,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 40),
 
                           // Email Label
                           const Text(
@@ -279,7 +279,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
 
                           // Email Input Field
                           CustomTextField(
@@ -289,7 +289,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             keyboardType: TextInputType.text,
                           ),
 
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 24),
 
                           // Password Label
                           const Text(
@@ -301,7 +301,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
 
                           // Password Input Field
                           CustomTextField(
@@ -322,7 +322,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 4),
 
                           // Forgot Password
                           Align(
@@ -347,7 +347,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 32),
 
                           // Login Button
                           CustomButton(
@@ -356,7 +356,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             backgroundColor: const Color(0xFF040F1B),
                           ),
 
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 36),
 
                           // OR Divider
                           Row(
@@ -386,7 +386,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
 
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 32),
 
                           // Don't have an account text
                           Center(
@@ -400,7 +400,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
 
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
 
                           // Sign Up Button
                           CustomButton(
@@ -416,7 +416,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             backgroundColor: const Color(0xFF040F1B),
                           ),
 
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 40),
                         ],
                       ),
                     ),
