@@ -70,6 +70,37 @@ class AuthService {
     }
   }
 
+  // ─── Admin Login ─────────────────────────────────────────────────
+
+  static Future<LoginResponse> loginAdmin(LoginRequest request) async {
+    try {
+      final response = await ApiClient.publicPost(
+        '/admin/login',
+        body: jsonEncode(request.toJson()),
+      );
+
+      if (response.statusCode == 200) {
+        final loginResponse = LoginResponse.fromJson(jsonDecode(response.body));
+
+        if (loginResponse.success && loginResponse.accessToken != null) {
+          await TokenService.saveLoginResponse(loginResponse);
+        }
+
+        return loginResponse;
+      } else {
+        final error = jsonDecode(response.body);
+        if (error.containsKey('errorMessage') && error['errorMessage'] != null) {
+          throw ApiException(error['errorMessage']);
+        }
+        final msg = error['messages'] ?? 'Admin login failed';
+        throw Exception(msg);
+      }
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Network error: $e');
+    }
+  }
+
   // ─── Email verification ───────────────────────────────────────────
 
   static Future<ApiResponse> sendVerificationCode(SendVerificationCodeRequest request) async {

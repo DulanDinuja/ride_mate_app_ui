@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import '../core/config/app_config.dart';
+import '../core/routes/app_routes.dart';
 import '../widgets/custom_back_button.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_button.dart';
-import '../models/api_response.dart';
 import '../services/auth_service.dart';
 import '../models/login_request.dart';
 import '../models/send_verification_code_request.dart';
 import 'signup_screen.dart';
+import 'admin_signup_screen.dart';
 import 'login_success_screen.dart';
 import 'email_verification_screen.dart';
 import 'forgot_password_screen.dart';
@@ -26,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isAdminLogin = false;
 
   @override
   void dispose() {
@@ -60,16 +62,26 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
 
-      final response = await AuthService.loginUser(request);
+      final response = _isAdminLogin
+          ? await AuthService.loginAdmin(request)
+          : await AuthService.loginUser(request);
 
       if (mounted && response.success) {
-        // Login successful - proceed to success screen
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const LoginSuccessScreen(),
-          ),
-        );
+        final role = (response.role ?? response.userRole ?? '').toUpperCase();
+        if (role == 'ADMIN') {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            AppRoutes.adminDashboard,
+            (route) => false,
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const LoginSuccessScreen(),
+            ),
+          );
+        }
       } else if (mounted) {
         setState(() => _isLoading = false);
         final failureMessage = response.message.trim().isEmpty
@@ -94,8 +106,9 @@ class _LoginScreenState extends State<LoginScreen> {
             .replaceAll('Exception: ', '')
             .replaceAll('Network error: Exception: ', '');
 
-        if (errorMessage.toLowerCase().contains('email not verified') ||
-            errorMessage.toLowerCase().contains('verify your email')) {
+        if (!_isAdminLogin &&
+            (errorMessage.toLowerCase().contains('email not verified') ||
+                errorMessage.toLowerCase().contains('verify your email'))) {
 
           // Step 2: Email not verified - send verification code automatically
           setState(() => _isLoading = true); // Keep loading state
@@ -351,9 +364,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           // Login Button
                           CustomButton(
-                            text: _isLoading ? 'Logging in...' : 'Login',
+                            text: _isLoading
+                                ? (_isAdminLogin ? 'Logging in as admin...' : 'Logging in...')
+                                : (_isAdminLogin ? 'Admin Login' : 'Login'),
                             onPressed: _isLoading ? () {} : _handleLogin,
                             backgroundColor: const Color(0xFF040F1B),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          Center(
+                            child: TextButton(
+                              onPressed: _isLoading
+                                  ? null
+                                  : () {
+                                      setState(() => _isAdminLogin = !_isAdminLogin);
+                                    },
+                              child: Text(
+                                _isAdminLogin
+                                    ? 'Switch to passenger/driver login'
+                                    : 'Login as admin',
+                                style: const TextStyle(
+                                  color: Color(0xFF4A6063),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
                           ),
 
                           const SizedBox(height: 36),
@@ -414,6 +450,28 @@ class _LoginScreenState extends State<LoginScreen> {
                               );
                             },
                             backgroundColor: const Color(0xFF040F1B),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          Center(
+                            child: TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AdminSignupScreen(),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                'Need an admin account? Sign up here',
+                                style: TextStyle(
+                                  color: Color(0xFF4A6063),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
                           ),
 
                           const SizedBox(height: 40),

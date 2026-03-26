@@ -36,9 +36,35 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen>
       curve: Curves.easeIn,
     );
     _controller.forward();
+    _routeAdminToDashboardIfNeeded();
+  }
+
+  Future<void> _routeAdminToDashboardIfNeeded() async {
+    final role = (await TokenService.getRole() ?? '').toUpperCase();
+    if (!mounted || role != 'ADMIN') return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.adminDashboard,
+        (route) => false,
+      );
+    });
   }
 
   Future<void> _onLetsExplore() async {
+    final role = (await TokenService.getRole() ?? '').toUpperCase();
+    if (role == 'ADMIN') {
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.adminDashboard,
+        (route) => false,
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     UserProfile? foundProfile;
 

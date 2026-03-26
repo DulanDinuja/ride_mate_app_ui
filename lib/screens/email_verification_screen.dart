@@ -130,6 +130,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
+    final introLine = "We've sent a 6-digit code to your email";
+    final deliveryEmail = widget.email;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFFF0),
@@ -216,9 +218,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                                 height: 1.5,
                               ),
                               children: [
-                                const TextSpan(text: "We've sent a 6-digit code to your email\n"),
+                                TextSpan(text: '$introLine\n'),
                                 TextSpan(
-                                  text: widget.email,
+                                  text: deliveryEmail,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: Color(0xFF040F1B),
@@ -227,6 +229,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                               ],
                             ),
                           ),
+
 
                           const SizedBox(height: 40),
 
