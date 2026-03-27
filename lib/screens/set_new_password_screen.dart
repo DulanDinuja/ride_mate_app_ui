@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'email_verification_screen.dart';
-import 'set_new_password_screen.dart';
+import '../services/auth_service.dart';
 
 class _DomeClipper extends CustomClipper<Path> {
   @override
@@ -23,21 +22,28 @@ class _DomeClipper extends CustomClipper<Path> {
   bool shouldReclip(_DomeClipper oldClipper) => false;
 }
 
-class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+class SetNewPasswordScreen extends StatefulWidget {
+  final String email;
+
+  const SetNewPasswordScreen({super.key, required this.email});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  State<SetNewPasswordScreen> createState() => _SetNewPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _SetNewPasswordScreenState extends State<SetNewPasswordScreen> {
   bool _loading = false;
 
-  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmController  = TextEditingController();
+
+  bool _obscurePassword = true;
+  bool _obscureConfirm  = true;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
@@ -46,30 +52,41 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         .showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  Future<void> _sendCode() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      _showError('Please enter your email address.');
+  Future<void> _resetPassword() async {
+    final password = _passwordController.text.trim();
+    final confirm  = _confirmController.text.trim();
+    if (password.isEmpty || confirm.isEmpty) {
+      _showError('Please fill in both password fields.');
       return;
     }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => EmailVerificationScreen(
-          email: email,
-          onVerified: () {
-            // Close the verification screen, then open SetNewPasswordScreen
-            Navigator.pop(context);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SetNewPasswordScreen(email: email),
-              ),
-            );
-          },
+    if (password.length < 8) {
+      _showError('Password must be at least 8 characters.');
+      return;
+    }
+    if (password != confirm) {
+      _showError('Passwords do not match.');
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      await AuthService.resetPassword(
+        email: widget.email,
+        newPassword: password,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password reset successfully.'),
+          backgroundColor: Colors.green,
         ),
-      ),
-    );
+      );
+      // Pop back to the login screen (removes both this screen and forgot password)
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e) {
+      _showError(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   // Shared rounded input decoration
@@ -118,7 +135,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
 
-          // ── Dome ──────────────────────────────────────────────────��─────────
+          // ── Dome ────────────────────────────────────────────────────────────
           SizedBox(
             height: domeH,
             child: Stack(
@@ -129,14 +146,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   child: const ColoredBox(color: Color(0xFF0D0D0D)),
                 ),
                 Positioned(
-                  top: domeH * 0.16,
+                  top: domeH * 0.25,
                   left: 0,
                   right: 0,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Reset\nYour Password',
+                        'Enter\nNew Password',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.poppins(
                           fontSize: 32,
@@ -148,7 +165,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        "Enter your email address below\nand we'll send you a reset code",
+                        'Set a complex password to\nprotect your account',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.poppins(
                           fontSize: 12,
@@ -167,8 +184,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
           // ── Illustration ─────────────────────────────────────────────────────
           Image.asset(
-            'assets/images/reset_password_screen_element.png',
-            height: size.height * 0.35,
+            'assets/images/enter_new_password_screen_element.png',
+            height: size.height * 0.25,
             fit: BoxFit.contain,
           ),
 
@@ -182,8 +199,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   const SizedBox(height: 10),
                   const Spacer(),
 
-                  // ── Email ──────────────────────────────────────────────────────
-                  Text('Email',
+                  // Password field
+                  Text('Password',
                       style: GoogleFonts.poppins(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
@@ -192,13 +209,58 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   SizedBox(
                     height: 50,
                     child: TextField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
                       style: GoogleFonts.poppins(
                           fontSize: 11, color: const Color(0xFF1E2939)),
                       decoration: _inputDecoration(
-                          hint: 'your.email@example.com',
-                          prefixIcon: Icons.email_outlined),
+                        hint: '••••••••',
+                        prefixIcon: Icons.lock_outline,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: const Color(0xFFAAAAAA),
+                            size: 16,
+                          ),
+                          onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Confirm password field
+                  Text('Confirm Password',
+                      style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF4A5F63))),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 50,
+                    child: TextField(
+                      controller: _confirmController,
+                      obscureText: _obscureConfirm,
+                      style: GoogleFonts.poppins(
+                          fontSize: 11, color: const Color(0xFF1E2939)),
+                      decoration: _inputDecoration(
+                        hint: '••••••••',
+                        prefixIcon: Icons.lock_outline,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureConfirm
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: const Color(0xFFAAAAAA),
+                            size: 16,
+                          ),
+                          onPressed: () => setState(
+                              () => _obscureConfirm = !_obscureConfirm),
+                        ),
+                      ),
                     ),
                   ),
 
@@ -209,7 +271,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: _loading ? null : _sendCode,
+                      onPressed: _loading ? null : _resetPassword,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0D0D0D),
                         foregroundColor: Colors.white,
@@ -226,7 +288,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: Colors.white))
                           : Text(
-                              'Send Verification Code',
+                              'Reset Password',
                               style: GoogleFonts.poppins(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -245,3 +307,4 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 }
+
