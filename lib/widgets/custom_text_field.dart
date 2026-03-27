@@ -20,43 +20,45 @@ class CustomTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFF1E3),
-        borderRadius: BorderRadius.circular(16),
+    return TextField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      autocorrect: false,
+      enableSuggestions: false,
+      style: const TextStyle(
+        color: Color(0xFF1E2939),
+        fontSize: 12,
       ),
-      child: TextField(
-        controller: controller,
-        obscureText: obscureText,
-        keyboardType: keyboardType,
-        autocorrect: false,
-        enableSuggestions: false,
-        style: const TextStyle(
-          color: Color(0xFF1E2939),
-          fontSize: 16,
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: const TextStyle(
+          color: Color(0xFF99A1AF),
+          fontSize: 12,
         ),
-        decoration: InputDecoration(
-          hintText: hintText,
-          hintStyle: const TextStyle(
-            color: Color(0xFF99A1AF),
-            fontSize: 16,
-          ),
-          prefixIcon: Icon(
-            icon,
-            color: const Color(0xFF99A1AF),
-            size: 22,
-          ),
-          suffixIcon: suffixIcon,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          filled: true,
-          fillColor: const Color(0xFFEFF1E3),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 20,
-          ),
+        prefixIcon: Icon(
+          icon,
+          color: const Color(0xFF99A1AF),
+          size: 16,
+        ),
+        suffixIcon: suffixIcon,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50),
+          borderSide: BorderSide.none,
+        ),
+        filled: true,
+        fillColor: const Color(0xFFEFF1E3),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 9,
         ),
       ),
     );

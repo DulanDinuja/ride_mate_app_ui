@@ -220,9 +220,9 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
 
-          // ── Scrollable card + logo ───────────────────────────────────
+          // ── Card + logo ──────────────────────────────────────────────
           SafeArea(
-            child: SingleChildScrollView(
+            child: Padding(
               padding: EdgeInsets.only(
                 top: domeHeight * 0.60,
                 left: 36,
@@ -407,7 +407,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 250),
+                  const SizedBox(height: 80),
 
                   // RideMate logo
                   Image.asset(
