@@ -313,7 +313,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               disabledBackgroundColor:
                               const Color(0xFF0D0D0D).withOpacity(0.6),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(50),
                               ),
                               elevation: 0,
                             ),
