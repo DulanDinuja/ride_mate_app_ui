@@ -28,7 +28,7 @@ class IdentificationSuccessScreen extends StatelessWidget {
                 Expanded(
                   child: Center(
                     child: Image.asset(
-                      'assets/images/success.png',
+                      'assets/images/success_screen_element.png',
                       width: size.width * 0.80,
                       fit: BoxFit.contain,
                     ),
