@@ -47,7 +47,7 @@ class RideMateApp extends StatelessWidget {
       title: 'Ride Mate',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      initialRoute: AppRoutes.getStarted,
+      initialRoute: AppRoutes.splash,
       onGenerateRoute: AppRoutes.generateRoute,
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../screens/splash_screen.dart';
 import '../../screens/get_started_screen.dart';
 import '../../screens/login_screen.dart';
 import '../../screens/signup_screen.dart';
@@ -33,6 +34,7 @@ import '../../models/user_profile.dart';
 
 class AppRoutes {
   // Route names
+  static const String splash = '/splash';
   static const String getStarted = '/';
   static const String login = '/login';
   static const String signup = '/signup';
@@ -69,6 +71,9 @@ class AppRoutes {
   // Generate routes
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case splash:
+        return MaterialPageRoute(builder: (_) => const SplashScreen());
+      
       case getStarted:
         return MaterialPageRoute(builder: (_) => const GetStartedScreen());
       
