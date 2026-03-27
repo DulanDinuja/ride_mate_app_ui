@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import '../../screens/get_started_screen.dart';
 import '../../screens/login_screen.dart';
 import '../../screens/signup_screen.dart';
-import '../../screens/admin_signup_screen.dart';
-import '../../screens/admin_dashboard_screen.dart';
-import '../../screens/admin_email_verification_screen.dart';
 import '../../screens/email_verification_screen.dart';
 import '../../screens/login_success_screen.dart';
 import '../../screens/home_map_screen.dart';
@@ -39,9 +36,6 @@ class AppRoutes {
   static const String getStarted = '/';
   static const String login = '/login';
   static const String signup = '/signup';
-  static const String adminSignup = '/admin-signup';
-  static const String adminDashboard = '/admin-dashboard';
-  static const String adminEmailVerification = '/admin-email-verification';
   static const String emailVerification = '/email-verification';
   static const String loginSuccess = '/login-success';
   static const String homeMap = '/home-map';
@@ -83,20 +77,7 @@ class AppRoutes {
       
       case signup:
         return MaterialPageRoute(builder: (_) => const SignupScreen());
-
-      case adminSignup:
-        return MaterialPageRoute(builder: (_) => const AdminSignupScreen());
-
-      case adminDashboard:
-        return MaterialPageRoute(builder: (_) => const AdminDashboardScreen());
-
-      case adminEmailVerification:
-        final email = settings.arguments as String? ?? '';
-        return MaterialPageRoute(
-          builder: (_) =>
-              AdminEmailVerificationScreen(registeredEmail: email),
-        );
-
+      
       case emailVerification:
         final email = settings.arguments as String?;
         if (email == null) {

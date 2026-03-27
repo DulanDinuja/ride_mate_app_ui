@@ -28,7 +28,7 @@ class AppConfig {
 
   static const String _baseUrl = String.fromEnvironment(
     'BASE_URL',
-    defaultValue: 'http://localhost:8080/ride-mate',
+    defaultValue: 'http://187.124.98.120:8080/ride-mate',
   );
 
   // ─── PayHere Configuration ───────────────────────────────────────
