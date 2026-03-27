@@ -281,9 +281,32 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: TextButton(
                             onPressed: () => Navigator.push(
                               context,
-                              MaterialPageRoute(
-                                  builder: (_) =>
-                                  const ForgotPasswordScreen()),
+                              PageRouteBuilder(
+                                pageBuilder: (_, a, __) =>
+                                    const ForgotPasswordScreen(),
+                                transitionsBuilder:
+                                    (_, animation, __, child) {
+                                  final slide = Tween(
+                                    begin: const Offset(0.0, 1.0),
+                                    end: Offset.zero,
+                                  ).chain(CurveTween(
+                                      curve: Curves.easeOutCubic));
+                                  final fade = CurvedAnimation(
+                                    parent: animation,
+                                    curve: const Interval(0.0, 0.5,
+                                        curve: Curves.easeIn),
+                                  );
+                                  return FadeTransition(
+                                    opacity: fade,
+                                    child: SlideTransition(
+                                      position: animation.drive(slide),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                transitionDuration:
+                                    const Duration(milliseconds: 550),
+                              ),
                             ),
                             style: TextButton.styleFrom(
                               padding:
@@ -371,8 +394,27 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: GestureDetector(
                             onTap: () => Navigator.push(
                               context,
-                              MaterialPageRoute(
-                                  builder: (_) => const SignupScreen()),
+                              PageRouteBuilder(
+                                pageBuilder: (_, a, __) => const SignupScreen(),
+                                transitionsBuilder: (_, animation, __, child) {
+                                  final slide = Tween(
+                                    begin: const Offset(0.0, 1.0),
+                                    end: Offset.zero,
+                                  ).chain(CurveTween(curve: Curves.easeOutCubic));
+                                  final fade = CurvedAnimation(
+                                    parent: animation,
+                                    curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
+                                  );
+                                  return FadeTransition(
+                                    opacity: fade,
+                                    child: SlideTransition(
+                                      position: animation.drive(slide),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                transitionDuration: const Duration(milliseconds: 550),
+                              ),
                             ),
                             child: RichText(
                               text: TextSpan(

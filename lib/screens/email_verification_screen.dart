@@ -11,10 +11,12 @@ import '../utils/snackbar_helper.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   final String email;
+  final VoidCallback? onVerified;   // optional: used by forgot-password flow
 
   const EmailVerificationScreen({
     super.key,
     required this.email,
+    this.onVerified,
   });
 
   @override
@@ -84,14 +86,16 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       
       if (mounted) {
         if (response.isValid == true) {
-          // Verification successful
           SnackBarHelper.showSuccess(context, 'Email verified successfully!');
-          
-          // Navigate to login success screen
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const LoginSuccessScreen()),
-          );
+
+          if (widget.onVerified != null) {
+            widget.onVerified!();
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginSuccessScreen()),
+            );
+          }
         } else {
           // Verification failed - show backend message
           String errorMessage = response.messages ?? 'Verification failed. Please try again.';

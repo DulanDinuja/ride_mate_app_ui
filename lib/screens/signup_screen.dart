@@ -147,10 +147,28 @@ class _SignupScreenState extends State<SignupScreen> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => EmailVerificationScreen(
+          PageRouteBuilder(
+            pageBuilder: (_, a, __) => EmailVerificationScreen(
               email: _emailController.text.trim(),
             ),
+            transitionsBuilder: (_, animation, __, child) {
+              final slide = Tween(
+                begin: const Offset(0.0, 1.0),
+                end: Offset.zero,
+              ).chain(CurveTween(curve: Curves.easeOutCubic));
+              final fade = CurvedAnimation(
+                parent: animation,
+                curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
+              );
+              return FadeTransition(
+                opacity: fade,
+                child: SlideTransition(
+                  position: animation.drive(slide),
+                  child: child,
+                ),
+              );
+            },
+            transitionDuration: const Duration(milliseconds: 550),
           ),
         );
       }
