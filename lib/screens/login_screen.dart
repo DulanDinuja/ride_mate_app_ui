@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/config/app_config.dart';
-import '../widgets/custom_back_button.dart';
 import '../widgets/custom_text_field.dart';
 import '../services/auth_service.dart';
 import '../models/login_request.dart';
@@ -212,13 +211,6 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
 
-          // ── Back button ──────────────────────────────────────────────
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 16, top: 12),
-              child: const CustomBackButton(),
-            ),
-          ),
 
           // ── Card + logo ──────────────────────────────────────────────
           SafeArea(
@@ -297,11 +289,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               padding:
                               const EdgeInsets.symmetric(vertical: 2),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Forgot Password?',
-                              style: TextStyle(
-                                color: Color(0xFF6B8083),
-                                fontSize: 12,
+                              style: GoogleFonts.poppins(
+                                color: const Color(0xFF6B8083),
+                                fontSize: 11,
                               ),
                             ),
                           ),
@@ -334,10 +326,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Colors.white,
                               ),
                             )
-                                : const Text(
+                                : Text(
                               'Login',
-                              style: TextStyle(
-                                fontSize: 15,
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: 0.3,
                               ),
@@ -359,7 +351,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               const EdgeInsets.symmetric(horizontal: 12),
                               child: Text(
                                 'OR',
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   color: Colors.grey[400],
                                   fontSize: 11,
                                 ),
@@ -383,19 +375,22 @@ class _LoginScreenState extends State<LoginScreen> {
                                   builder: (_) => const SignupScreen()),
                             ),
                             child: RichText(
-                              text: const TextSpan(
-                                style: TextStyle(fontSize: 13),
+                              text: TextSpan(
+                                style: GoogleFonts.poppins(fontSize: 13),
                                 children: [
                                   TextSpan(
                                     text: "Don't have an account? ",
-                                    style:
-                                    TextStyle(color: Color(0xFF6B8083)),
+                                    style: GoogleFonts.poppins(
+                                      color: const Color(0xFF6B8083),
+                                      fontSize: 11,
+                                    ),
                                   ),
                                   TextSpan(
                                     text: 'Sign up',
-                                    style: TextStyle(
-                                      color: Color(0xFF2ECC40),
+                                    style: GoogleFonts.poppins(
+                                      color: const Color(0xFF2ECC40),
                                       fontWeight: FontWeight.w600,
+                                      fontSize: 11,
                                     ),
                                   ),
                                 ],
@@ -436,9 +431,9 @@ class _FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: const TextStyle(
-        fontSize: 14,
-        color: Color(0xFF4A5F63),
+      style: GoogleFonts.poppins(
+        fontSize: 12,
+        color: const Color(0xFF4A5F63),
         fontWeight: FontWeight.w500,
       ),
     );

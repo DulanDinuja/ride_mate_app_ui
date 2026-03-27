@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class CustomTextField extends StatelessWidget {
   final TextEditingController controller;
@@ -26,15 +27,15 @@ class CustomTextField extends StatelessWidget {
       keyboardType: keyboardType,
       autocorrect: false,
       enableSuggestions: false,
-      style: const TextStyle(
-        color: Color(0xFF1E2939),
-        fontSize: 12,
+      style: GoogleFonts.poppins(
+        color: const Color(0xFF1E2939),
+        fontSize: 11,
       ),
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: const TextStyle(
-          color: Color(0xFF99A1AF),
-          fontSize: 12,
+        hintStyle: GoogleFonts.poppins(
+          color: const Color(0xFF99A1AF),
+          fontSize: 11,
         ),
         prefixIcon: Icon(
           icon,
