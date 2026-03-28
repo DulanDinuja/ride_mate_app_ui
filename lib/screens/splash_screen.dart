@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'get_started_screen.dart';
+import '../core/routes/app_routes.dart';
+import '../services/token_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,10 +14,17 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // Navigate to GetStartedScreen after 3 seconds
-    Timer(const Duration(seconds: 5), () {
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/');
+    // Show splash for 3 seconds, then route based on login state
+    Timer(const Duration(seconds: 3), () async {
+      if (!mounted) return;
+      final loggedIn = await TokenService.isLoggedIn();
+      if (!mounted) return;
+      if (loggedIn) {
+        // Already authenticated → go straight to home screen
+        Navigator.of(context).pushReplacementNamed(AppRoutes.userHomeMap);
+      } else {
+        // Not logged in → go to Get Started / Login
+        Navigator.of(context).pushReplacementNamed(AppRoutes.getStarted);
       }
     });
   }
@@ -68,4 +76,3 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
-

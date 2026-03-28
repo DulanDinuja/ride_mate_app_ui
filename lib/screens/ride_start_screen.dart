@@ -55,9 +55,16 @@ class RideStartScreen extends StatefulWidget {
 
 class _RideStartScreenState extends State<RideStartScreen> {
   bool _isDriverMode = true; // true = Offer Ride, false = Request Ride
-  bool _showTripCard = true;
   bool _isChangingRole = false;
   bool _tripStarted = false;
+
+  // ── swappable location state ─────────────────────────────────────
+  String _pickupAddr = '';
+  String _dropAddr = '';
+  double? _pickupLat;
+  double? _pickupLng;
+  double? _dropLat;
+  double? _dropLng;
 
   static const Color _cardBackground = Color(0xFFFFFFF0);
   static const Color _accent = Color(0xFF10B47A);
@@ -119,7 +126,33 @@ class _RideStartScreenState extends State<RideStartScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is RideStartArgs) {
       _args = args;
+      // Initialise swappable location state from args (only first time)
+      if (_pickupAddr.isEmpty) {
+        _pickupAddr = args.pickupAddress;
+        _dropAddr   = args.dropAddress;
+        _pickupLat  = args.pickupLat;
+        _pickupLng  = args.pickupLng;
+        _dropLat    = args.dropLat;
+        _dropLng    = args.dropLng;
+      }
     }
+  }
+
+  /// Swap pickup ↔ drop location state.
+  void _swapLocations() {
+    setState(() {
+      final tmpAddr = _pickupAddr;
+      _pickupAddr = _dropAddr;
+      _dropAddr   = tmpAddr;
+
+      final tmpLat = _pickupLat;
+      _pickupLat  = _dropLat;
+      _dropLat    = tmpLat;
+
+      final tmpLng = _pickupLng;
+      _pickupLng  = _dropLng;
+      _dropLng    = tmpLng;
+    });
   }
 
   Future<void> _loadUserProfile() async {
@@ -240,9 +273,11 @@ class _RideStartScreenState extends State<RideStartScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
+          // ── background: start_map image ──────────────────────────
           Positioned.fill(
-            child: CustomPaint(
-              painter: _RideMapPainter(),
+            child: Image.asset(
+              'assets/images/start_map.png',
+              fit: BoxFit.cover,
             ),
           ),
           SafeArea(
@@ -253,20 +288,11 @@ class _RideStartScreenState extends State<RideStartScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const CustomBackButton(),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(child: _buildRideModeSwitcher()),
-                      const SizedBox(width: 12),
-                      _buildMenuButton(),
-                    ],
-                  ),
                 ],
               ),
             ),
           ),
-          if (_showTripCard)
-            Align(
+          Align(
               alignment: Alignment.bottomCenter,
               child: _buildTripCard(context),
             ),
@@ -403,12 +429,17 @@ class _RideStartScreenState extends State<RideStartScreen> {
   }
 
   Widget _buildTripCard(BuildContext context) {
-    final pickupAddr = _args?.pickupAddress ?? 'Current Location';
-    final dropAddr = _args?.dropAddress ?? 'Destination';
-    final totalCost = _args?.totalCost ?? 0;
+    // Use local swappable state (falls back to _args defaults if not yet set)
+    final pickupAddr = _pickupAddr.isNotEmpty
+        ? _pickupAddr
+        : (_args?.pickupAddress ?? 'Current Location');
+    final dropAddr = _dropAddr.isNotEmpty
+        ? _dropAddr
+        : (_args?.dropAddress ?? 'Destination');
+    final totalCost  = _args?.totalCost  ?? 0;
     final distanceKm = _args?.distanceKm ?? 0;
-    final perKmRate = _args?.perKmRate ?? 0;
-    final duration = _args?.duration ?? '';
+    final perKmRate  = _args?.perKmRate  ?? 0;
+    final duration   = _args?.duration   ?? '';
 
     return Container(
       width: double.infinity,
@@ -423,28 +454,16 @@ class _RideStartScreenState extends State<RideStartScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                const Spacer(),
-                const Text(
-                  'TOTAL COST OF THE TRIP',
-                  style: TextStyle(
-                    color: Color(0xFFA9AAAC),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
-                  ),
+            const Center(
+              child: Text(
+                'TOTAL COST OF THE TRIP',
+                style: TextStyle(
+                  color: Color(0xFFA9AAAC),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
                 ),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => setState(() => _showTripCard = false),
-                  child: const Icon(
-                    Icons.close_rounded,
-                    size: 38,
-                    color: Color(0xFF8C8F8C),
-                  ),
-                ),
-              ],
+              ),
             ),
             const SizedBox(height: 12),
             Container(
@@ -544,14 +563,17 @@ class _RideStartScreenState extends State<RideStartScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE6E7DC),
-                    shape: BoxShape.circle,
+                GestureDetector(
+                  onTap: _swapLocations,
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE6E7DC),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.swap_vert_rounded, color: _accent, size: 32),
                   ),
-                  child: const Icon(Icons.swap_vert_rounded, color: _accent, size: 32),
                 ),
               ],
             ),
