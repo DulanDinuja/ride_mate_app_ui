@@ -83,6 +83,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
           ),
 
           // ── Top section: back button ──
+
           SafeArea(
             bottom: false,
             child: SizedBox(
