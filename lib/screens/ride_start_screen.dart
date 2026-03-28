@@ -138,6 +138,21 @@ class _RideStartScreenState extends State<RideStartScreen> {
   }
 
   Future<void> _onToggleRole(bool toDriver) async {
+    // 🚫 Block role switch while a ride is active
+    if (_tripStarted && _isDriverMode && !toDriver) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'You cannot switch to Passenger mode while a ride is in progress.',
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     if (_isChangingRole) return;
     if (_userProfile == null) return;
 
@@ -294,19 +309,41 @@ class _RideStartScreenState extends State<RideStartScreen> {
               ),
               Expanded(
                 child: GestureDetector(
-                  onTap: _isChangingRole ? null : () => _onToggleRole(false),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: !_isDriverMode ? _accent : Colors.transparent,
-                      borderRadius: BorderRadius.circular(32),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      'Request Ride',
-                      style: TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w700,
-                        color: !_isDriverMode ? Colors.white : const Color(0xFFFFFFF0),
+                  // Disabled while ride is active or role is changing
+                  onTap: (_isChangingRole || (_tripStarted && _isDriverMode))
+                      ? null
+                      : () => _onToggleRole(false),
+                  child: Opacity(
+                    // Dim the tab to signal it's locked during an active ride
+                    opacity: (_tripStarted && _isDriverMode) ? 0.4 : 1.0,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: !_isDriverMode ? _accent : Colors.transparent,
+                        borderRadius: BorderRadius.circular(32),
+                      ),
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Request Ride',
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w700,
+                              color: !_isDriverMode
+                                  ? Colors.white
+                                  : const Color(0xFFFFFFF0),
+                            ),
+                          ),
+                          if (_tripStarted && _isDriverMode) ...[
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.lock_rounded,
+                              size: 14,
+                              color: Color(0xFFFFFFF0),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),

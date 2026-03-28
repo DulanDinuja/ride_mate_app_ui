@@ -1302,6 +1302,21 @@ class _UserHomeMapScreenState extends State<UserHomeMapScreen> with DriverHomeMi
     final profile = _userProfile;
     if (profile == null || _isChangingRole) return;
 
+    // 🚫 Block switching to Passenger while an active driver ride exists
+    if (!toDriver && isDriver && activeRideDetailId != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'You cannot switch to Passenger mode while a ride is in progress. Please complete or cancel your current ride first.',
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
     // Already in the target role — nothing to do
     final currentIsDriver = profile.role.toUpperCase() == 'DRIVER';
     if (toDriver == currentIsDriver) return;
@@ -2707,21 +2722,39 @@ Future<void> _onChangeProfilePhoto() async {
               ),
               Expanded(
                 child: GestureDetector(
-                  onTap: _isChangingRole
+                  // Disabled while role is changing OR driver has an active ride
+                  onTap: (_isChangingRole || (isDriver && activeRideDetailId != null))
                       ? null
                       : () => _onSwitchRole(toDriver: false),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: !isDriver ? const Color(0xFF03AF74) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(26),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      'Request Ride',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: !isDriver ? Colors.white : Colors.white54,
+                  child: Opacity(
+                    // Dim tab to signal it is locked during an active driver ride
+                    opacity: (isDriver && activeRideDetailId != null) ? 0.35 : 1.0,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: !isDriver ? const Color(0xFF03AF74) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(26),
+                      ),
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Request Ride',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: !isDriver ? Colors.white : Colors.white54,
+                            ),
+                          ),
+                          if (isDriver && activeRideDetailId != null) ...[
+                            const SizedBox(width: 3),
+                            const Icon(
+                              Icons.lock_rounded,
+                              size: 12,
+                              color: Colors.white54,
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
