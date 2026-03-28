@@ -127,11 +127,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             Container(
               margin: const EdgeInsets.all(12),
               decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0xFF4B6164), Color(0xFF1A2A33), Color(0xFF020D19)],
-                ),
+                color: Color(0xFF020808),
                 borderRadius: BorderRadius.all(Radius.circular(42)),
               ),
             ),

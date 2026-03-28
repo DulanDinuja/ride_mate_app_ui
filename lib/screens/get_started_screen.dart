@@ -9,7 +9,7 @@ class GetStartedScreen extends StatelessWidget {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF020D19),
+      backgroundColor: const Color(0xFF020808),
       body: Column(
         children: [
           // ── Top: full background image ──────────────────────────────
@@ -31,7 +31,7 @@ class GetStartedScreen extends StatelessWidget {
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Color(0xFF020D19)],
+                      colors: [Colors.transparent, Color(0xFF020808)],
                     ),
                   ),
                 ),
@@ -42,7 +42,7 @@ class GetStartedScreen extends StatelessWidget {
           // ── Bottom: logo + button + login ──────────────────────────
           Expanded(
             child: Container(
-              color: const Color(0xFF020D19),
+              color: const Color(0xFF020808),
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,

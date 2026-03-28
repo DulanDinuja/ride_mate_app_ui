@@ -72,22 +72,13 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF020D19),
+      backgroundColor: const Color(0xFF020808),
       body: Stack(
         children: [
-          // ── Gradient background (matches login/signup) ──
+          // ── Solid background ──
           Container(
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF4B6164),
-                  Color(0xFF1A2A33),
-                  Color(0xFF020D19),
-                ],
-                stops: [0.0, 0.5, 1.0],
-              ),
+              color: Color(0xFF020808),
             ),
           ),
 

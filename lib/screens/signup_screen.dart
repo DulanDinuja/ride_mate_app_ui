@@ -167,18 +167,7 @@ class _SignupScreenState extends State<SignupScreen> {
           // Gradient Background
           Container(
             height: screenHeight,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF4B6164),
-                  Color(0xFF1A2A33),
-                  Color(0xFF020D19),
-                ],
-                stops: [0.0, 0.5, 1.0],
-              ),
-            ),
+            color: const Color(0xFF020808),
           ),
 
           // Back Button

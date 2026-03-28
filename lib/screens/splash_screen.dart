@@ -32,7 +32,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF020D19),
+      backgroundColor: const Color(0xFF020808),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -40,7 +40,7 @@ class _SplashScreenState extends State<SplashScreen> {
             // Logo with name image
             Image.asset(
               'assets/images/logo_with_name.png',
-              height: 120,
+              height: 80,
             ),
 
             const SizedBox(height: 20),
@@ -48,7 +48,7 @@ class _SplashScreenState extends State<SplashScreen> {
         ),
       ),
       bottomSheet: Container(
-        color: const Color(0xFF020D19),
+        color: const Color(0xFF020808),
         width: double.infinity,
         padding: const EdgeInsets.only(bottom: 40),
         child: Column(
