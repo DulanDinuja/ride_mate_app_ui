@@ -12,7 +12,6 @@ class RideDetailRequest {
   final String startTime;
   final double totalRideDistance;
   final String tripRoute;
-  final String status;
   final double totalRideCost;
   final double? perKmRate;
   final int? vehicleId;
@@ -29,7 +28,6 @@ class RideDetailRequest {
     required this.startTime,
     required this.totalRideDistance,
     required this.tripRoute,
-    required this.status,
     required this.totalRideCost,
     this.perKmRate,
     this.vehicleId,
@@ -48,7 +46,6 @@ class RideDetailRequest {
       'startTime': startTime,
       'totalRideDistance': totalRideDistance,
       'tripRoute': tripRoute,
-      'status': status,
       'totalRideCost': totalRideCost,
       if (perKmRate != null) 'perKmRate': perKmRate,
       if (vehicleId != null) 'vehicleId': vehicleId,

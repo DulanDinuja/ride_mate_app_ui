@@ -286,7 +286,6 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
         startTime: startTime,
         totalRideDistance: distanceKm,
         tripRoute: tripRoute,
-        status: 'ACTIVE',
         totalRideCost: priceResp.totalRidePrice ?? 0.0,
         perKmRate: priceResp.perKmRate,
         vehicleId: selectedVehicleId,
