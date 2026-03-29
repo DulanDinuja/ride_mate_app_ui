@@ -281,7 +281,7 @@ class RideService {
       int driverProfileId) async {
     try {
       final response = await ApiClient.get(
-        '/ride-details/driver/$driverProfileId/ACTIVE',
+        '/ride-details/driver/$driverProfileId/active',
       );
 
       if (response.statusCode == 200) {
