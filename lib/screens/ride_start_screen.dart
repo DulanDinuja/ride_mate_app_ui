@@ -28,6 +28,7 @@ class RideStartArgs {
   final double? dropLat;
   final double? dropLng;
   final List<LatLng>? polylinePoints;
+  final String? vehicleTypeName;
 
   const RideStartArgs({
     required this.rideDetailId,
@@ -43,6 +44,7 @@ class RideStartArgs {
     this.dropLat,
     this.dropLng,
     this.polylinePoints,
+    this.vehicleTypeName,
   });
 }
 
@@ -171,7 +173,58 @@ class _RideStartScreenState extends State<RideStartScreen> {
   }
 
   Future<void> _onToggleRole(bool toDriver) async {
-    // 🚫 Block role switch while a ride is active
+    // 🚫 Block role switch while a ride has been offered (before OR after trip starts)
+    final hasActiveRideOffer = _args != null && _isDriverMode;
+    if (!toDriver && hasActiveRideOffer) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.directions_car,
+                    color: Colors.orange.shade700, size: 22),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Active Ride in Progress',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'You already have an active ride offer.\n\n'
+            'Please complete or end your current ride before switching to '
+            'Passenger mode.',
+            style: TextStyle(fontSize: 14, height: 1.5),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF03AF74),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Got it'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Legacy guard for trip-started state (kept as safety net)
     if (_tripStarted && _isDriverMode && !toDriver) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -335,13 +388,16 @@ class _RideStartScreenState extends State<RideStartScreen> {
               ),
               Expanded(
                 child: GestureDetector(
-                  // Disabled while ride is active or role is changing
-                  onTap: (_isChangingRole || (_tripStarted && _isDriverMode))
+                  // Disabled while ride is active/offered or role is changing
+                  onTap: (_isChangingRole ||
+                          (_isDriverMode && (_tripStarted || _args != null)))
                       ? null
                       : () => _onToggleRole(false),
                   child: Opacity(
                     // Dim the tab to signal it's locked during an active ride
-                    opacity: (_tripStarted && _isDriverMode) ? 0.4 : 1.0,
+                    opacity: (_isDriverMode && (_tripStarted || _args != null))
+                        ? 0.4
+                        : 1.0,
                     child: Container(
                       decoration: BoxDecoration(
                         color: !_isDriverMode ? _accent : Colors.transparent,
@@ -361,7 +417,7 @@ class _RideStartScreenState extends State<RideStartScreen> {
                                   : const Color(0xFFFFFFF0),
                             ),
                           ),
-                          if (_tripStarted && _isDriverMode) ...[
+                          if (_isDriverMode && (_tripStarted || _args != null)) ...[
                             const SizedBox(width: 4),
                             const Icon(
                               Icons.lock_rounded,
@@ -597,6 +653,7 @@ class _RideStartScreenState extends State<RideStartScreen> {
                             dropAddress: _args!.dropAddress,
                             totalDistance: _args!.distanceKm,
                             totalCost: _args!.totalCost,
+                            vehicleTypeName: _args!.vehicleTypeName,
                           ),
                         ),
                       );

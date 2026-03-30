@@ -137,9 +137,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     return Scaffold(
       backgroundColor: _cream,
       appBar: AppBar(
-        leading: const Padding(
-          padding: EdgeInsets.all(6),
-          child: CustomBackButton(),
+        leading: Padding(
+          padding: const EdgeInsets.all(6),
+          child: CustomBackButton(
+            onPressed: () => Navigator.of(context).pop(),
+          ),
         ),
         title: const Text('Help & Support'),
         backgroundColor: _navy,

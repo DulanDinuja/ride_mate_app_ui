@@ -216,6 +216,7 @@ class AppRoutes {
               dropAddress: args['dropAddress'] as String? ?? '',
               totalDistance: (args['totalDistance'] as num?)?.toDouble() ?? 0,
               totalCost: (args['totalCost'] as num?)?.toDouble() ?? 0,
+              vehicleTypeName: args['vehicleTypeName'] as String?,
             ),
           );
         }

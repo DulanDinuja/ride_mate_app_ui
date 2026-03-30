@@ -6,6 +6,7 @@ import '../core/routes/app_routes.dart';
 import '../models/cost_split_response.dart';
 import '../services/ride_service.dart';
 import '../services/ride_request_service.dart';
+import '../utils/vehicle_capacity.dart';
 import '../widgets/custom_back_button.dart';
 import 'cost_split_screen.dart';
 import 'driver_ride_requests_screen.dart';
@@ -19,6 +20,9 @@ class ActiveRideScreen extends StatefulWidget {
   final String dropAddress;
   final double totalDistance;
   final double totalCost;
+  /// Vehicle type name used to enforce maximum seat capacity.
+  /// e.g. "BIKE", "CAR", "TUK_TUK". Defaults to null (uses 3-seat default).
+  final String? vehicleTypeName;
 
   const ActiveRideScreen({
     super.key,
@@ -28,6 +32,7 @@ class ActiveRideScreen extends StatefulWidget {
     required this.dropAddress,
     required this.totalDistance,
     required this.totalCost,
+    this.vehicleTypeName,
   });
 
   @override
@@ -102,12 +107,16 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
 
   void _openRideRequests() {
     if (widget.driverProfileId == null) return;
+    final maxSeats = VehicleCapacityUtils.maxSeats(widget.vehicleTypeName);
+    final currentPassengers = _costSplit?.totalPassengers ?? 0;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => DriverRideRequestsScreen(
           driverProfileId: widget.driverProfileId!,
           rideDetailId: widget.rideDetailId,
+          maxSeats: maxSeats,
+          currentPassengers: currentPassengers,
         ),
       ),
     ).then((_) {
@@ -194,20 +203,6 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _cream,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const HelpSupportScreen(isEmergencyMode: true),
-          ),
-        ),
-        backgroundColor: const Color(0xFFD32F2F),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.sos_rounded),
-        label: const Text('SOS',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-        elevation: 6,
-      ),
       appBar: AppBar(
         leading: const Padding(
           padding: EdgeInsets.all(6),
@@ -243,11 +238,23 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
   }
 
   Widget _buildContent() {
+    final maxSeats = VehicleCapacityUtils.maxSeats(widget.vehicleTypeName);
+    final currentPassengers = _costSplit?.totalPassengers ?? 0;
+    final isFull = currentPassengers >= maxSeats;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         // ── Route card ──
         _buildRouteCard(),
+        const SizedBox(height: 16),
+
+        // ── Seat capacity card ──
+        _buildSeatCapacityCard(
+          maxSeats: maxSeats,
+          currentPassengers: currentPassengers,
+          isFull: isFull,
+        ),
         const SizedBox(height: 16),
 
         // ── Cost summary ──
@@ -262,31 +269,67 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
         if (widget.driverProfileId != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
-                onPressed: _openRideRequests,
-                icon: Badge(
-                  isLabelVisible: _pendingRequestCount > 0,
-                  label: Text('$_pendingRequestCount'),
-                  backgroundColor: Colors.red,
-                  child: const Icon(Icons.person_add_alt_1),
+            child: Column(
+              children: [
+                if (isFull)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.event_seat, color: Colors.orange.shade700, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Vehicle is at full capacity ($currentPassengers/$maxSeats). '
+                            'New ride requests cannot be accepted.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange.shade800,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: isFull ? null : _openRideRequests,
+                    icon: Badge(
+                      isLabelVisible: _pendingRequestCount > 0,
+                      label: Text('$_pendingRequestCount'),
+                      backgroundColor: Colors.red,
+                      child: const Icon(Icons.person_add_alt_1),
+                    ),
+                    label: Text(
+                      isFull
+                          ? 'Vehicle Full — No More Seats'
+                          : _pendingRequestCount > 0
+                              ? 'Ride Requests ($_pendingRequestCount pending)'
+                              : 'Ride Requests',
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w700),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isFull ? Colors.grey.shade400 : _accent,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      disabledForegroundColor: Colors.grey.shade600,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                    ),
+                  ),
                 ),
-                label: Text(
-                  _pendingRequestCount > 0
-                      ? 'Ride Requests ($_pendingRequestCount pending)'
-                      : 'Ride Requests',
-                  style: const TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _accent,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
+              ],
             ),
           ),
 
@@ -353,6 +396,98 @@ class _ActiveRideScreenState extends State<ActiveRideScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildSeatCapacityCard({
+    required int maxSeats,
+    required int currentPassengers,
+    required bool isFull,
+  }) {
+    final vehicleLabel = VehicleCapacityUtils.vehicleLabel(widget.vehicleTypeName);
+    final emoji = VehicleCapacityUtils.vehicleEmoji(widget.vehicleTypeName);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: _navy.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 20)),
+              const SizedBox(width: 8),
+              Text(
+                'Seat Capacity  ·  $vehicleLabel',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _navy,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isFull
+                      ? Colors.red.withOpacity(0.12)
+                      : _accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  isFull ? 'FULL' : '$currentPassengers / $maxSeats',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isFull ? Colors.red.shade700 : _accent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: maxSeats == 0 ? 0 : currentPassengers / maxSeats,
+              minHeight: 10,
+              backgroundColor: Colors.grey.shade200,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isFull ? Colors.red.shade500 : _accent,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Seat icons row
+          Row(
+            children: List.generate(maxSeats, (i) {
+              final filled = i < currentPassengers;
+              return Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Icon(
+                  filled ? Icons.event_seat : Icons.event_seat_outlined,
+                  size: 20,
+                  color: filled
+                      ? (isFull ? Colors.red.shade500 : _accent)
+                      : Colors.grey.shade300,
+                ),
+              );
+            }),
+            // Add overflow label if maxSeats > 6
+          ),
+        ],
+      ),
     );
   }
 

@@ -13,6 +13,7 @@ import '../services/driver_service.dart';
 import '../services/ride_service.dart';
 import '../services/token_service.dart';
 import '../services/user_service.dart';
+import '../utils/vehicle_capacity.dart';
 import 'ride_start_screen.dart';
 import 'user_home_map_screen.dart';
 
@@ -52,6 +53,11 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
 
   bool get hasMultipleDriverVehicles => _driverVehicles.length > 1;
   DriverVehicle? get selectedVehicle => _selectedVehicle;
+
+  /// Maximum passengers allowed based on the selected vehicle type.
+  /// bike=1, tuk=3, car=4, van=6, etc.
+  int get maxSeatsByVehicleType =>
+      VehicleCapacityUtils.maxSeats(_selectedVehicle?.vehicleTypeName);
 
   /// Whether the current user has the DRIVER role.
   bool get isDriver => currentUserProfile?.role.toUpperCase() == 'DRIVER';
@@ -316,6 +322,8 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
           dropLat: drop.latitude,
           dropLng: drop.longitude,
           polylinePoints: currentPolylinePoints,
+          vehicleTypeName:
+              priceResp.vehicleTypeName ?? _selectedVehicle?.vehicleTypeName,
         ),
       );
     } catch (e) {
@@ -458,7 +466,7 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
             ),
           ),
           GestureDetector(
-            onTap: driverAvailableSeats < 6
+            onTap: driverAvailableSeats < maxSeatsByVehicleType
                 ? () => setState(() => driverAvailableSeats++)
                 : null,
             child: Container(
@@ -466,13 +474,13 @@ mixin DriverHomeMixin on State<UserHomeMapScreen> {
               height: 30,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: driverAvailableSeats < 6
+                color: driverAvailableSeats < maxSeatsByVehicleType
                     ? const Color(0xFF03AF74).withOpacity(0.12)
                     : scheme.onSurfaceVariant.withOpacity(0.08),
               ),
               child: Icon(Icons.add,
                   size: 16,
-                  color: driverAvailableSeats < 6
+                  color: driverAvailableSeats < maxSeatsByVehicleType
                       ? const Color(0xFF03AF74)
                       : scheme.onSurfaceVariant.withOpacity(0.4)),
             ),

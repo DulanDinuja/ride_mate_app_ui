@@ -11,11 +11,17 @@ import '../widgets/custom_back_button.dart';
 class DriverRideRequestsScreen extends StatefulWidget {
   final int driverProfileId;
   final int rideDetailId;
+  /// Maximum passengers the vehicle can hold (from vehicle type rules).
+  final int maxSeats;
+  /// Number of passengers already accepted on this ride.
+  final int currentPassengers;
 
   const DriverRideRequestsScreen({
     super.key,
     required this.driverProfileId,
     required this.rideDetailId,
+    this.maxSeats = 3,
+    this.currentPassengers = 0,
   });
 
   @override
@@ -33,6 +39,15 @@ class _DriverRideRequestsScreenState extends State<DriverRideRequestsScreen> {
   String? _error;
   Timer? _refreshTimer;
   final Set<int> _processingIds = {};
+
+  /// Tracks how many requests have been accepted during this session
+  /// so capacity check stays accurate without a network round-trip.
+  int _sessionAccepted = 0;
+
+  int get _effectivePassengers =>
+      widget.currentPassengers + _sessionAccepted;
+
+  bool get _isFull => _effectivePassengers >= widget.maxSeats;
 
   @override
   void initState() {
@@ -73,10 +88,21 @@ class _DriverRideRequestsScreenState extends State<DriverRideRequestsScreen> {
   }
 
   Future<void> _acceptRequest(RideRequest request) async {
+    // ── Capacity guard ───────────────────────────────────────────
+    if (_isFull) {
+      _showSnackBar(
+        'Vehicle is full ($_effectivePassengers/${widget.maxSeats} seats). '
+        'Cannot accept more passengers.',
+        isError: true,
+      );
+      return;
+    }
+
     setState(() => _processingIds.add(request.id));
     try {
       final updated = await RideRequestService.acceptRequest(request.id);
       if (mounted) {
+        setState(() => _sessionAccepted++);
         final costText = updated.estimatedCost != null
             ? ' Cost: LKR ${updated.estimatedCost!.toStringAsFixed(2)}'
             : '';
@@ -136,7 +162,23 @@ class _DriverRideRequestsScreenState extends State<DriverRideRequestsScreen> {
           padding: EdgeInsets.all(6),
           child: CustomBackButton(),
         ),
-        title: const Text('Ride Requests'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Ride Requests',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            Text(
+              'Seats: $_effectivePassengers / ${widget.maxSeats}'
+              '${_isFull ? ' · FULL' : ''}',
+              style: TextStyle(
+                fontSize: 11,
+                color: _isFull ? Colors.red.shade200 : Colors.white70,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
         backgroundColor: _navy,
         foregroundColor: Colors.white,
         actions: [
@@ -146,7 +188,72 @@ class _DriverRideRequestsScreenState extends State<DriverRideRequestsScreen> {
           ),
         ],
       ),
-      body: _buildBody(),
+      body: Column(
+        children: [
+          // ── Capacity bar ──────────────────────────────────────
+          _buildCapacityBar(),
+          // ── Request list ──────────────────────────────────────
+          Expanded(child: _buildBody()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCapacityBar() {
+    final pct = widget.maxSeats == 0
+        ? 0.0
+        : (_effectivePassengers / widget.maxSeats).clamp(0.0, 1.0);
+
+    return Container(
+      color: _navy,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _isFull
+                    ? '🚫 No available seats'
+                    : '${widget.maxSeats - _effectivePassengers} seat${widget.maxSeats - _effectivePassengers != 1 ? 's' : ''} available',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _isFull ? Colors.red.shade300 : Colors.white70,
+                ),
+              ),
+              // Seat icons
+              Row(
+                children: List.generate(widget.maxSeats, (i) {
+                  final filled = i < _effectivePassengers;
+                  return Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Icon(
+                      filled ? Icons.event_seat : Icons.event_seat_outlined,
+                      size: 16,
+                      color: filled
+                          ? (_isFull ? Colors.red.shade400 : _accent)
+                          : Colors.white24,
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: pct,
+              minHeight: 6,
+              backgroundColor: Colors.white12,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                _isFull ? Colors.red.shade400 : _accent,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -372,11 +479,14 @@ class _DriverRideRequestsScreenState extends State<DriverRideRequestsScreen> {
                   child: SizedBox(
                     height: 44,
                     child: ElevatedButton(
-                      onPressed:
-                          isProcessing ? null : () => _acceptRequest(request),
+                      onPressed: (isProcessing || _isFull)
+                          ? null
+                          : () => _acceptRequest(request),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _accent,
-                        disabledBackgroundColor: _accent.withOpacity(0.4),
+                        disabledBackgroundColor: _isFull
+                            ? Colors.grey.shade300
+                            : _accent.withOpacity(0.4),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
                       ),
@@ -389,11 +499,13 @@ class _DriverRideRequestsScreenState extends State<DriverRideRequestsScreen> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text(
-                              'Accept',
+                          : Text(
+                              _isFull ? 'Seat Full' : 'Accept',
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                                color: _isFull
+                                    ? Colors.grey.shade600
+                                    : Colors.white,
                               ),
                             ),
                     ),

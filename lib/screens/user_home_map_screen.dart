@@ -2648,29 +2648,32 @@ Future<void> _onChangeProfilePhoto() async {
             minMaxZoomPreference: const MinMaxZoomPreference(7, 20),
           ),
           // ── Offer Ride / Request Ride toggle ──
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
-              child: Row(
-                children: [
-                  Expanded(child: _buildRideModeSwitcher()),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: () {
-                      // Open account / menu
-                      setState(() => _selectedIndex = 3);
-                    },
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xFF040F1B),
+          GestureDetector(
+            onDoubleTap: () {}, // absorb double-tap so the map below does NOT zoom
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+                child: Row(
+                  children: [
+                    Expanded(child: _buildRideModeSwitcher()),
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: () {
+                        // Open account / menu
+                        setState(() => _selectedIndex = 3);
+                      },
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF040F1B),
+                        ),
+                        child: const Icon(Icons.menu_rounded, color: Colors.white, size: 24),
                       ),
-                      child: const Icon(Icons.menu_rounded, color: Colors.white, size: 24),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -2790,9 +2793,13 @@ Future<void> _onChangeProfilePhoto() async {
     final border = scheme.outline.withOpacity(0.3);
     final fill = scheme.surfaceContainerHighest.withOpacity(0.75);
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 68, 14, 10),
+    // GestureDetector absorbs double-taps so they never reach the GoogleMap
+    // PlatformView below and inadvertently zoom the map.
+    return GestureDetector(
+      onDoubleTap: () {},
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 68, 14, 10),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
@@ -3103,7 +3110,8 @@ Future<void> _onChangeProfilePhoto() async {
           ],
         ),
       ),
-    );
+    ),   // SafeArea
+    );   // GestureDetector
   }
 
   Widget _buildLocationRow({
