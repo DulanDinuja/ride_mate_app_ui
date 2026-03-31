@@ -1,3 +1,6 @@
+# Exclude backend folder
+Ridemate Backend/
+
 # Miscellaneous
 *.class
 *.log
